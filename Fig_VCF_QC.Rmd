@@ -1,0 +1,1232 @@
+---
+title: "Data analysis"
+author: "Aoyue Bi, Daxing Xu"
+date: "`r Sys.Date()`"
+output: 
+  html_document: # html_notebook, html_document
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
+    # bibliography: bibliography.json
+---
+
+# Fig1
+
+```{r}
+setwd("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2_S1000Figs/")
+```
+
+```{r setup, echo =F, message = T, warning = F}
+library(tidyverse)
+library(RColorBrewer)
+library(ggpubr)
+library(egg)
+## eval 代码要不要运行
+## echo 代码要不要输出
+## include 图要不要输出
+## warning 警告要不要输出
+## message 默认Bin等信息要不要输出
+```
+
+## 补充材料：PCA by ploidy by continent
+### A subgenome
+```{r}
+library(factoextra)
+library(FactoMineR)
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType,Subspecies_by22, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group,GroupByOriPublication_Abbre)
+
+### import matrix
+dataFile <- c("data/002_pca/004_matrix_Asub.txt.gz")
+df <- read.delim(dataFile)
+
+### 建立Taxa对应的属性变量数据框
+dfTaxaInfo <- df %>% select(Taxa) %>% left_join(.,dftaxaDB,by="Taxa")
+
+### pca analysis
+c1 <- which(colnames(df) == 'Taxa')
+df.pca <- PCA(df[,-c(c1)], graph = F)
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分
+dfpca <- as.data.frame(df.pca$ind$coord)
+df <- cbind(dfTaxaInfo,dfpca)
+
+factorA <- c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploids","OtherTetraploids", "Landrace","Cultivar","OtherHexaploids")
+
+labelsA <- c("Wild emmer","Domesticated emmer","Free-threshing tetraploids","OtherTetraploids", "Landrace","Cultivar","OtherHexaploids")
+
+colB <- c("#ffd702","#7f5701","#016699","#00f3ff", "#fc6e6e","#9900ff","#fe63c2")
+
+df$Subspecies_by6_TreeValidated <- factor(df$Subspecies_by6_TreeValidated,levels=factorA,labels=labelsA)
+
+```
+
+```{r}
+### start to plot
+p <- df %>% 
+  # filter(! Taxa %in%  c("AB_183","AB_185","AB_039")) %>%
+  ggplot(aes(x=Dim.1,y=Dim.2,fill= Subspecies_by6_TreeValidated))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  # scale_color_manual(values = colB,name="Genetic group")+
+  scale_fill_manual(values = colB,name="Genetic group")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+
+
+library(plotly)
+fig <- df %>%
+  plot_ly(x = ~ Dim.1, y = ~ Dim.2,color = ~ Subspecies_by6_TreeValidated,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+```
+### B subgenome
+```{r}
+library(factoextra)
+library(FactoMineR)
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType,Subspecies_by22, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group,GroupByOriPublication_Abbre)
+
+### import matrix
+dataFile <- c("data/002_pca/005_matrix_Bsub.txt.gz")
+df <- read.delim(dataFile)
+
+### 建立Taxa对应的属性变量数据框
+dfTaxaInfo <- df %>% select(Taxa) %>% left_join(.,dftaxaDB,by="Taxa")
+
+### pca analysis
+c1 <- which(colnames(df) == 'Taxa')
+df.pca <- PCA(df[,-c(c1)], graph = F)
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分
+dfpca <- as.data.frame(df.pca$ind$coord)
+df <- cbind(dfTaxaInfo,dfpca)
+
+factorA <- c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploids","OtherTetraploids", "Landrace","Cultivar","OtherHexaploids")
+
+labelsA <- c("Wild emmer","Domesticated emmer","Free-threshing tetraploids","OtherTetraploids", "Landrace","Cultivar","OtherHexaploids")
+
+colB <- c("#ffd702","#7f5701","#016699","#00f3ff", "#fc6e6e","#9900ff","#fe63c2")
+
+df$Subspecies_by6_TreeValidated <- factor(df$Subspecies_by6_TreeValidated,levels=factorA,labels=labelsA)
+
+```
+
+```{r}
+### start to plot
+p <- df %>% 
+  # filter(! Taxa %in%  c("AB_183","AB_185","AB_039")) %>%
+  ggplot(aes(x=Dim.1,y=Dim.2,fill= Subspecies_by6_TreeValidated))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  # scale_color_manual(values = colB,name="Genetic group")+
+  scale_fill_manual(values = colB,name="Genetic group")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+
+
+library(plotly)
+fig <- df %>%
+  plot_ly(x = ~ Dim.1, y = ~ Dim.2,color = ~ Subspecies_by6_TreeValidated,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+```
+
+### D subgenome
+```{r}
+library(factoextra)
+library(FactoMineR)
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType,Subspecies_by22, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group,GroupByOriPublication_Abbre)
+
+### import matrix
+dataFile <- c("data/002_pca/006_matrix_Dsub.txt.gz")
+df <- read.delim(dataFile)
+
+### 建立Taxa对应的属性变量数据框
+dfTaxaInfo <- df %>% select(Taxa) %>% left_join(.,dftaxaDB,by="Taxa")
+
+### pca analysis
+c1 <- which(colnames(df) == 'Taxa')
+df.pca <- PCA(df[,-c(c1)], graph = F)
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分
+dfpca <- as.data.frame(df.pca$ind$coord)
+df <- cbind(dfTaxaInfo,dfpca)
+
+factorA <- c("Strangulata","Landrace","Cultivar","OtherHexaploids")
+
+labelsA <- c("Strangulata","Landrace","Cultivar","OtherHexaploids")
+
+colB <- c("#87cef9","#fc6e6e","#9900ff","#fe63c2")
+
+df$Subspecies_by6_TreeValidated <- factor(df$Subspecies_by6_TreeValidated,levels=factorA,labels=labelsA)
+
+```
+
+```{r}
+### start to plot
+p <- df %>% 
+  # filter(! Taxa %in%  c("AB_183","AB_185","AB_039")) %>%
+  ggplot(aes(x=Dim.1,y=Dim.2,fill= Subspecies_by6_TreeValidated))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  # scale_color_manual(values = colB,name="Genetic group")+
+  scale_fill_manual(values = colB,name="Genetic group")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+
+ggplotly(p)
+
+# library(plotly)
+# fig <- df %>%
+#   plot_ly(x = ~ Dim.1, y = ~ Dim.2,color = ~ Subspecies_by6_TreeValidated,
+#                text = ~paste(Taxa),
+#                colors = colB)
+# 
+# fig
+```
+
+### Hexaploid by subspecise
+```{r}
+library(factoextra)
+library(FactoMineR)
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType,Subspecies_by22, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group,GroupByOriPublication_Abbre)
+
+### import matrix
+dataFile <- c("data/002_pca/001_matrix_hexa.txt.gz")
+df <- read.delim(dataFile)
+
+### 建立Taxa对应的属性变量数据框
+dfTaxaInfo <- df %>% select(Taxa) %>% left_join(.,dftaxaDB,by="Taxa")
+
+### pca analysis
+c1 <- which(colnames(df) == 'Taxa')
+df.pca <- PCA(df[,-c(c1)], graph = F)
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分
+dfpca <- as.data.frame(df.pca$ind$coord)
+df <- cbind(dfTaxaInfo,dfpca)
+
+### 设置因子顺序及颜色
+factorA <- c("Landrace","Cultivar","OtherHexaploids","compactum","sphaerococcum","tibeticum","vavilovii","petropavlovskyi","yunna-nense","macha","spelta")
+
+labelsA <- c("Landrace","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt")
+
+colB <- c("#fc6e6e","#9900ff","#fe63c2","gray","#E41A1C","#984EA3","#FF7F00","#FFFF33","#A65628","#377EB8","#4DAF4A")
+
+df$Subspecies_by22 <- factor(df$Subspecies_by22,levels = factorA,labels = labelsA)
+```
+
+```{r}
+### start to plot
+p <- df %>% 
+  # filter(Subspecies == "Spelt_CAU" |Subspecies == "spelta") %>% 
+  # filter(Subspecies %in% c("Landrace_Yunnan","yunna-nense")) %>%
+  # filter(Taxa == "ABD_1142" | Taxa == "ABD_1143") %>% 
+  # filter(Subspecies %in% c("petropavlovskyi","Landrace_Xinjiang")) %>%
+  # filter(Subspecies %in% c("Landrace_Tibet","tibeticum")) %>%
+  # filter(Subspecies == "Cultivar",Group %in% c("CAAS") ) %>%
+  ggplot(aes(x=Dim.1,y=Dim.2,fill= Subspecies_by22))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  # scale_color_manual(values = colB,name="Genetic group")+
+  scale_fill_manual(values = colB,name="Hexaploid by subspecies")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+
+library(plotly)
+fig <- df %>%
+  # filter(Subspecies %in% c("Landrace_Yunnan","yunna-nense")) %>%
+  # filter(Subspecies == "Spelt_CAU" |Subspecies == "spelta") %>%
+  # filter(Subspecies %in% c("petropavlovskyi","Landrace_Xinjiang")) %>%
+  # filter(Subspecies == "Landrace",Group %in% c("JiaoLab","LuLab","CAAS") ) %>%
+  plot_ly(x = ~ Dim.1, y = ~ Dim.2,color = ~ Subspecies_by22,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+
+```
+
+
+### Tetraploid by subspecies
+```{r}
+library(factoextra)
+library(FactoMineR)
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType,Subspecies_by22, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group,GroupByOriPublication_Abbre)
+
+### import matrix
+dataFile <- c("data/002_pca/002_matrix_tetra.txt.gz")
+df <- read.delim(dataFile)
+
+### 建立Taxa对应的属性变量数据框
+dfTaxaInfo <- df %>% select(Taxa) %>% left_join(.,dftaxaDB,by="Taxa")
+
+### pca analysis
+c1 <- which(colnames(df) == 'Taxa')
+df.pca <- PCA(df[,-c(c1)], graph = F)
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分
+dfpca <- as.data.frame(df.pca$ind$coord)
+df <- cbind(dfTaxaInfo,dfpca)
+
+factorA <- c("dicoccoides","dicoccum","durum","turanicum","polonicum","turgidum","karamyschevii","ispahanicum","carthlicum")
+
+labelsA <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat ","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat")
+
+colB <- c("#ffd702","#7f5701","#016699","#66A61E","#E7298A","#666666","#7570B3","#D95F02","cyan") ### 色系来自 Dark2
+
+df$Subspecies_by22 <- factor(df$Subspecies_by22,levels = factorA,labels = labelsA)
+```
+
+```{r}
+
+p <- df %>% 
+  filter(! Taxa %in%  c("AB_183","AB_185","AB_039")) %>% 
+  # filter(Subspecies == "dicoccoides") %>% 
+  ggplot(aes(x=Dim.1,y=Dim.2,fill=Subspecies_by22))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  # scale_color_manual(values = colB,name="Genetic group")+
+  scale_fill_manual(values = colB,name="Tetraploid by subspecies")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 3)
+
+
+library(plotly)
+fig <- df %>% 
+  filter(! Taxa %in%  c("AB_183","AB_185","AB_039")) %>% 
+  plot_ly(x = ~ Dim.1, y = ~ Dim.2,color = ~ Subspecies_by22,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+
+
+```
+### Hexaploid by continent
+```{r}
+library(factoextra)
+library(FactoMineR)
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType,Subspecies_by22, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group,GroupByOriPublication_Abbre)
+
+### import matrix
+dataFile <- c("data/002_pca/001_matrix_hexa.txt.gz")
+df <- read.delim(dataFile)
+
+### 建立Taxa对应的属性变量数据框
+dfTaxaInfo <- df %>% select(Taxa) %>% left_join(.,dftaxaDB,by="Taxa")
+
+### pca analysis
+c1 <- which(colnames(df) == 'Taxa')
+df.pca <- PCA(df[,-c(c1)], graph = F)
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分
+dfpca <- as.data.frame(df.pca$ind$coord)
+df <- cbind(dfTaxaInfo,dfpca)
+```
+
+```{r}
+colB <- c('#7B241C','#dbb3ff','#A9A9A9','#fc6e6e','#FF9900','#7dbde8','#82C782')
+shapeB <- c(16,8,18,6,15,7,17)
+### start to plot
+p <- df %>% 
+  filter(!Continent_forTree=="") %>%
+  ggplot(aes(x=Dim.1,y=Dim.2))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(aes(col=Continent_forTree,shape=Continent_forTree),alpha=0.8,size=1.5)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  scale_color_manual(values = colB)+
+  scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+
+library(plotly)
+fig <- df %>%
+  # filter(Subspecies %in% c("Landrace_Yunnan","yunna-nense")) %>%
+  # filter(Subspecies == "Spelt_CAU" |Subspecies == "spelta") %>%
+  # filter(Subspecies %in% c("petropavlovskyi","Landrace_Xinjiang")) %>%
+  # filter(Subspecies == "Landrace",Group %in% c("JiaoLab","LuLab","CAAS") ) %>%
+  plot_ly(x = ~ Dim.1, y = ~ Dim.2,color = ~ Subspecies_by22,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+
+```
+
+### Tetraploid by continnet
+```{r}
+library(factoextra)
+library(FactoMineR)
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType,Subspecies_by22, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group,GroupByOriPublication_Abbre)
+
+### import matrix
+dataFile <- c("data/002_pca/002_matrix_tetra.txt.gz")
+df <- read.delim(dataFile)
+
+### 建立Taxa对应的属性变量数据框
+dfTaxaInfo <- df %>% select(Taxa) %>% left_join(.,dftaxaDB,by="Taxa")
+
+### pca analysis
+c1 <- which(colnames(df) == 'Taxa')
+df.pca <- PCA(df[,-c(c1)], graph = F)
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分
+dfpca <- as.data.frame(df.pca$ind$coord)
+df <- cbind(dfTaxaInfo,dfpca)
+
+```
+
+```{r}
+colB <- c(c('#7B241C','#dbb3ff','#A9A9A9','#fc6e6e','#FF9900','#82C782'))
+shapeB <- c(16,8,18,6,15,17)
+p <- df %>% 
+  filter(! Taxa %in%  c("AB_183","AB_185","AB_039")) %>% 
+  ggplot(aes(x=Dim.1,y=Dim.2,fill=Subspecies_by22))+
+  geom_point(aes(col=Continent_forTree,shape=Continent_forTree),alpha=0.8,size=1.5)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  scale_color_manual(values = colB)+
+  scale_shape_manual(values = shapeB)+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 3)
+
+
+library(plotly)
+fig <- df %>% 
+  plot_ly(x = ~ Dim.1, y = ~ Dim.2,color = ~ Subspecies_by22,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+
+
+```
+### Diploid by continent
+```{r}
+library(factoextra)
+library(FactoMineR)
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType,Subspecies_by22, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group,GroupByOriPublication_Abbre)
+
+### import matrix
+dataFile <- c("data/002_pca/003_matrix_diploid.txt.gz")
+df <- read.delim(dataFile)
+
+### 建立Taxa对应的属性变量数据框
+dfTaxaInfo <- df %>% select(Taxa) %>% left_join(.,dftaxaDB,by="Taxa")
+
+### pca analysis
+c1 <- which(colnames(df) == 'Taxa')
+df.pca <- PCA(df[,-c(c1)], graph = F)
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分
+dfpca <- as.data.frame(df.pca$ind$coord)
+df <- cbind(dfTaxaInfo,dfpca)
+
+### strangulata 只有来自 America/ Europe/ Western Asia
+colB <- c('#dbb3ff','#FF9900','#82C782')
+shapeB <- c(8,15,17)
+```
+
+```{r}
+### start to plot
+p <- df %>% 
+  ggplot(aes(x=Dim.1,y=Dim.2,fill= Subspecies_by22))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  # geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_point(aes(col=Continent_forTree,shape=Continent_forTree),alpha=0.8,size=2)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  scale_color_manual(values = colB,name="Genetic group")+
+  scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  scale_fill_manual(values = colB,name="Hexaploid by subspecies")+
+  scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+
+# library(plotly)
+# fig <- df %>%
+#   # filter(Subspecies %in% c("Landrace_Yunnan","yunna-nense")) %>%
+#   # filter(Subspecies == "Spelt_CAU" |Subspecies == "spelta") %>%
+#   # filter(Subspecies %in% c("petropavlovskyi","Landrace_Xinjiang")) %>%
+#   # filter(Subspecies == "Landrace",Group %in% c("JiaoLab","LuLab","CAAS") ) %>%
+#   plot_ly(x = ~ Dim.1, y = ~ Dim.2,color = ~ Subspecies_by22,
+#                text = ~paste(Taxa),
+#                colors = colB)
+# 
+# fig
+
+```
+## =========================
+## 补充材料：样本质控
+## IBS
+### IBS distance by 6 subspecies
+```{r}
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group)
+
+dataFile <- c("data/002_pca/004_matrix_Asub.txt.gz")
+dfmatrixA <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "A")
+dataFile <- c("data/002_pca/005_matrix_Bsub.txt.gz") 
+dfmatrixB <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "B")
+dataFile <- c("data/002_pca/006_matrix_Dsub.txt.gz")
+dfmatrixD <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "D")
+
+dfori <- rbind(dfmatrixA,dfmatrixB,dfmatrixD) %>% rename(IBSdistance2CS=ABD_1142)
+
+df <- dfori %>% group_by(Taxa) %>% 
+  summarise(aveIBS = mean(IBSdistance2CS,na.rm = T)) %>% 
+  left_join(.,dftaxaDB,by="Taxa")
+
+### 包括Other类型
+factorA <- c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploids","OtherTetraploids", "Landrace","Cultivar","OtherHexaploids","Strangulata")
+
+labelsA <- c("Wild emmer","Domesticated emmer","Free-threshing tetraploids","OtherTetraploids","Landrace","Cultivar","OtherHexaploids","Strangulata")
+
+colC <- c("#ffd702","#7f5701","#016699","#00f3ff", "#fc6e6e","#9900ff","#fe63c2","#87cef9")
+
+df$Subspecies_by6_TreeValidated <- factor(df$Subspecies_by6_TreeValidated,levels = factorA,labels = labelsA)
+
+# write.table(dfV1,file="data/002_pca/ibs.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+```
+```{r}
+colB <- c("#ffd702","#fc6e6e","#87cef9")
+
+p <- ggplot(df,aes(x=GenomeType, y=aveIBS,fill= GenomeType))+
+  geom_boxplot(position = position_dodge(0.8),outlier.colour = "white",alpha=0.1)+
+  stat_boxplot(geom = "errorbar",width=0.12,position = position_dodge(0.5))+
+  geom_point(position = position_jitterdodge(0.8),alpha = 0.6,aes(color=Subspecies_by6_TreeValidated),size=1)+
+  labs(y="IBS distance to CS",x="")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colC)+
+theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 14))
+
+  
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+```
+### IBS distance by 21 subspecies
+```{r}
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group)
+
+dataFile <- c("data/002_pca/004_matrix_Asub.txt.gz")
+dfmatrixA <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "A")
+dataFile <- c("data/002_pca/005_matrix_Bsub.txt.gz") 
+dfmatrixB <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "B")
+dataFile <- c("data/002_pca/006_matrix_Dsub.txt.gz")
+dfmatrixD <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "D")
+
+df <- rbind(dfmatrixA,dfmatrixB,dfmatrixD) %>% 
+  rename(IBSdistance2CS=ABD_1142) %>% 
+  left_join(.,dftaxaDB,by="Taxa")
+
+```
+
+```{r}
+### 六倍体的亚群
+factorHexa <- c("Landrace","Cultivar","OtherHexaploids","compactum","sphaerococcum","tibeticum","vavilovii","petropavlovskyi","yunna-nense","macha","spelta")
+
+labelsHexa <- c("Landrace","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt")
+
+# colotherHexaploid <- brewer.pal(12,"Set1")[1:7]
+# colB <- c("#fc6e6e","#9900ff","#fe63c2","gray",colotherHexaploid)
+colBHexa <- c("#fc6e6e","#9900ff","#fe63c2","gray","#E41A1C","#984EA3","#FF7F00","#FFFF33","#A65628","#377EB8","#4DAF4A")
+
+### 四倍体的亚群
+factorTetra <- c("dicoccoides","dicoccum","durum","turanicum","polonicum","turgidum","karamyschevii","ispahanicum","carthlicum")
+
+labelsTetra <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat ","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat")
+
+colBTetra <- c("#ffd702","#7f5701","#016699","#66A61E","#E7298A","#666666","#7570B3","#D95F02","cyan") ### 色系来自 Dark2
+
+df$Subspecies_by22_TreeValidated <- factor(df$Subspecies_by22_TreeValidated,levels = c(factorTetra, factorHexa,"strangulata"),labels = c(labelsTetra,labelsHexa,"Strangulata"))
+
+colB <- c(colBTetra,colBHexa,"#87cef9")
+```
+
+```{r}
+### 计算每个亚群的个数，并添加到taxa数据库后面
+dftaxaCount <- df %>% group_by(Sub,Subspecies_by22_TreeValidated) %>% 
+  count() %>% ungroup() %>%  distinct(.,Subspecies_by22_TreeValidated,.keep_all = T) %>% 
+  select(-Sub) %>% mutate(Subspecies_by22_TreeValidated_AddCount = str_c(Subspecies_by22_TreeValidated," (", n, ")",sep = "")) %>% 
+  select(-n)
+
+```
+
+```{r}
+p <- ggplot(df,aes(x=Subspecies_by22_TreeValidated,y= IBSdistance2CS))+
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(1))+ # add error bar
+  # geom_violin(position = position_dodge(0.8),alpha=0.8) +
+  # geom_boxplot(position = position_dodge(1),outlier.color = 'white',alpha=0.8,width=0.5)+ #,width=0.2
+  # geom_point(position = position_jitterdodge(0.5),alpha = 0.6,aes(col=Sub),size=0.3)+
+  ylab("IBS distance to CS")+
+  xlab("")+
+  ### 加阴影
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5,color="white")+
+  geom_rect(aes(xmin=3-0.5,xmax=3+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=5-0.5,xmax=5+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=7+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=9-0.5,xmax=9+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=11-0.5,xmax=11+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=13-0.5,xmax=13+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=15-0.5,xmax=15+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=17+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=19-0.5,xmax=19+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=21-0.5,xmax=21+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  # 最上面的条纹
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=0.25,ymax=Inf),fill="#ffd702",alpha=0.5)+
+  geom_rect(aes(xmin=2-0.5,xmax=3+0.5,ymin=0.25,ymax=Inf),fill="#7f5701",alpha=0.5)+
+  geom_rect(aes(xmin=3-0.5,xmax=6+0.5,ymin=0.25,ymax=Inf),fill="#016699",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=9+0.5,ymin=0.25,ymax=Inf),fill="#00f3ff",alpha=0.5)+
+  geom_rect(aes(xmin=10-0.5,xmax=10+0.5,ymin=0.25,ymax=Inf),fill="#fc6e6e",alpha=0.5)+
+  geom_rect(aes(xmin=11-0.5,xmax=11+0.5,ymin=0.25,ymax=Inf),fill="#9900ff",alpha=0.5)+
+  geom_rect(aes(xmin=12-0.5,xmax=20+0.5,ymin=0.25,ymax=Inf),fill="#fe63c2",alpha=0.5)+
+  geom_rect(aes(xmin=21-0.5,xmax=21+0.5,ymin=0.25,ymax=Inf),fill="#87cef9",alpha=0.5)+
+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(1),size=0.1)+
+  stat_summary(aes(color=Sub),fun.data=mean_sdl,position = position_dodge(0.5),geom="pointrange",size=0.3)+
+  geom_vline(xintercept = 9.5,linetype="dashed",color="black")+
+  geom_vline(xintercept = 20.5,linetype="dashed",color="black")+
+  scale_color_manual(values =c("#fd8582","#967bce","#4bcdc6"),name='')+
+  scale_x_discrete(labels = dftaxaCount$Subspecies_by22_TreeValidated_AddCount)+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(plot.margin=unit(rep(1.3,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    text = element_text(size = 12),legend.position = 'none')
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4,width = 7.2)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 3.88,width = 7)
+```
+
+### IBS distance by continent
+```{r}
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType, GroupbyContinent) %>% 
+  filter(str_detect(GroupbyContinent,"LR") | str_detect(GroupbyContinent,"CL"))
+
+dataFile <- c("data/002_pca/004_matrix_Asub.txt.gz")
+dfmatrixA <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "A")
+dataFile <- c("data/002_pca/005_matrix_Bsub.txt.gz") 
+dfmatrixB <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "B")
+dataFile <- c("data/002_pca/006_matrix_Dsub.txt.gz")
+dfmatrixD <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "D")
+
+df <- rbind(dfmatrixA,dfmatrixB,dfmatrixD) %>% 
+  rename(IBSdistance2CS=ABD_1142) %>% 
+  right_join(.,dftaxaDB,by="Taxa")
+```
+
+```{r}
+### 统计每个亚基因组内，以亚洲为单位的均值，按照B亚基因组排序
+### dfV2 为排序后的亚洲列表
+dfV1 <- df %>% group_by(Sub,GroupbyContinent) %>% summarise(mean = mean(IBSdistance2CS)) %>% arrange(.,Sub,-mean) %>% ungroup() %>%  filter(Sub=="B") %>% select(GroupbyContinent)
+
+### 因子排序
+df$GroupbyContinent <- factor(df$GroupbyContinent,levels = dfV1$GroupbyContinent)
+
+### 计算每个亚群的个数
+dftaxaCount <- df %>% group_by(Sub,GroupbyContinent) %>% 
+  count() %>% ungroup() %>%  distinct(.,GroupbyContinent,.keep_all = T) %>% 
+  select(-Sub) %>% mutate(GroupbyContinent_AddCount = str_c(GroupbyContinent," (", n, ")",sep = "")) %>% 
+  select(-n)
+
+```
+
+```{r}
+### 阴影，discrete x 
+p <- ggplot(df,aes(x=GroupbyContinent,y=IBSdistance2CS))+
+  ylab("IBS distance to CS")+xlab("")+
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=3-0.5,xmax=3+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=5-0.5,xmax=5+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=7+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(1),size=0.1)+
+  stat_summary(aes(color=Sub),fun.data=mean_sdl,position = position_dodge(0.5),geom="pointrange",size=0.3)+
+  scale_color_manual(values = c("#fd8582","#967bce","#4bcdc6"),name='')+
+  scale_x_discrete(labels = dftaxaCount$GroupbyContinent_AddCount)+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  # theme(plot.margin=unit(rep(0.3,4),'lines'))+
+  theme(plot.margin=unit(rep(1.2,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    text = element_text(size = 12)
+    ,legend.position = 'none'
+    ,legend.key = element_blank()
+    )
+p
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 3.43,width = 4)
+```
+
+## Heter by taxa boxplot
+```{r}
+library(brew)
+subA <- c("AABB","AABBDD","DD")
+colB <- c('#ffd702','#fc6e6e',"#87cef9")
+
+### 要去除的几个 spelt 个体
+spelt <- c("ABD_1130","ABD_1131","ABD_1132","ABD_1133","ABD_1134","ABD_1135","ABD_1136","ABD_1137","ABD_1138","ABD_1139","ABD_1140","ABD_1141")
+
+df1 <- read.delim("data/003_VCF_QC/AABBDD_taxa_QC.txt.gz")
+df2 <- read.delim("data/003_VCF_QC/AABB_taxa_QC.txt.gz")
+df3 <- read.delim("data/003_VCF_QC/DD_taxa_QC.txt.gz")
+df <- rbind(df1,df2,df3) %>% mutate(GenomeType = factor(GenomeType,levels = subA))
+
+p <- df %>% 
+  filter(! Taxa %in% spelt) %>% 
+  ggplot(aes(x=GenomeType,y=HeterozygousProportion,fill = GenomeType)) +
+  geom_boxplot(position = position_dodge(0.9),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.5),alpha = 0.6,aes(color=GenomeType),size=0.2)+
+  ylab("Heterozygous genotype\nproportion by taxon") + xlab("")+
+  stat_summary(fun=mean, geom="point", color="blue",position = position_dodge(0.8),size=1)+
+  scale_fill_manual(values = colB,name='')+
+  scale_color_manual(values = colB,name='')+
+theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+  # theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))
+
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ 
+```
+
+## Miss by taxa histgram
+```{r}
+subA <- c("AABB","AABBDD","DD")
+colB <- c('#ffd702','#fc6e6e',"#87cef9")
+
+### 要去除的几个 spelt 个体
+spelt <- c("ABD_1130","ABD_1131","ABD_1132","ABD_1133","ABD_1134","ABD_1135","ABD_1136","ABD_1137","ABD_1138","ABD_1139","ABD_1140","ABD_1141")
+
+df1 <- read.delim("data/003_VCF_QC/AABBDD_taxa_QC.txt.gz")
+df2 <- read.delim("data/003_VCF_QC/AABB_taxa_QC.txt.gz")
+df3 <- read.delim("data/003_VCF_QC/DD_taxa_QC.txt.gz")
+df <- rbind(df1,df2,df3) %>% mutate(GenomeType = factor(GenomeType,levels = subA))
+
+p <- df %>% 
+  filter(! Taxa %in% spelt) %>% 
+  ggplot(aes(x=MissRate,fill=GenomeType)) +
+  geom_histogram(aes(y=..ndensity..),alpha=1,position="dodge",bins = 30)+
+  # geom_density()+
+  ylab("Density") + xlab("Missing rate by taxon")+
+  scale_fill_manual(values = colB,name='')+
+  scale_color_manual(values = colB,name='')+
+  facet_grid(.~GenomeType)+
+theme_classic()+
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.4, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))+
+  theme(strip.background = element_rect(size = 0.4))+
+  # theme(strip.text = element_blank())+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+```
+
+## Depth by genomeType - scatterPlot
+```{r}
+library(cowplot) 
+library(ggExtra)
+library(forcats)
+
+dataFile <- c("data/003_VCF_QC/siteDepth/byGenomeType/tetra_depth.txt.gz")
+df1 <- read.delim(dataFile) %>% mutate(GenomeType = "AABB")
+dataFile <- c("data/003_VCF_QC/siteDepth/byGenomeType/hexa_depth.txt.gz")
+df2 <- read.delim(dataFile)%>% mutate(GenomeType = "AABBDD")
+dataFile <- c("data/003_VCF_QC/siteDepth/byGenomeType/diploid_depth.txt.gz")
+df3 <- read.delim(dataFile)%>% mutate(GenomeType = "DD")
+
+df <- rbind(df1,df2,df3) %>% 
+  group_by(GenomeType) %>% 
+  slice_sample(.,n = 3000) %>% 
+  ungroup()
+
+colB <- c('#ffd702','#fc6e6e',"#87cef9")
+df$GenomeType <- factor(df$GenomeType,levels = c("AABB","AABBDD","DD"))
+
+p <- ggplot(df,aes(x=AverageDepth,y=SD,col=GenomeType))+
+  geom_point(alpha=0.5,shape=1,size=0.8)+
+  # scale_x_continuous(limits = c(2,14),breaks = seq(0,16,4))+
+  # scale_y_continuous(limits = c(2,10),breaks = seq(0,12,2))+
+  xlab("Mean of depth")+ylab("SD")+
+  scale_color_manual(values = colB)+
+theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+  # theme(panel.background = element_rect(size = 0.4, colour = 'black',fill = 'white'),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 12),legend.position = 'none')
+p
+p2 <- ggMarginal(p, type="density",groupColour = TRUE, groupFill = TRUE)
+p2
+# ggsave(p2,filename = "~/Documents/test.pdf",height = 3.2,width = 3.2)
+ggsave(p2,filename = "~/Documents/test.pdf",height = 4,width = 4)
+```
+
+## Depth by site by subgenome- scatterPlot
+```{r}
+library(cowplot) 
+library(ggExtra)
+library(forcats)
+
+dataFile <- c("data/003_VCF_QC/siteDepth/bySub/chrA_vmap2.1_500k_depth.txt.gz")
+df1 <- read.delim(dataFile) %>% mutate(GenomeType = "A")
+dataFile <- c("data/003_VCF_QC/siteDepth/bySub/chrA_vmap2.1_500k_depth.txt.gz")
+df2 <- read.delim(dataFile)%>% mutate(GenomeType = "B")
+dataFile <- c("data/003_VCF_QC/siteDepth/bySub/chrA_vmap2.1_500k_depth.txt.gz")
+df3 <- read.delim(dataFile)%>% mutate(GenomeType = "D")
+
+df <- rbind(df1,df2,df3) %>% 
+  group_by(GenomeType) %>% 
+  slice_sample(.,n = 3000) %>% 
+  ungroup()
+
+#Lines
+p <-  ggplot(df, aes(x=AverageDepth, y=SD)) +
+  geom_hex(bins = 30, size = 0.5, color = "black") +
+  scale_fill_viridis_c(option = "C")+
+  scale_y_continuous(limits=c(3,8),breaks = seq(0,8,2))+
+  scale_x_continuous(limits=c(6,12),breaks = seq(0,12,2))+
+  labs(x="Average depth",y="SD")+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    text = element_text(size = 12))
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+
+```
+## Depth by taxa-histgram
+```{r}
+library(cowplot)
+library(ggExtra)
+library(forcats)
+
+dataFile <- c("data/003_VCF_QC/taxaDepth/aabb.summary.txt")
+df1 <- read.delim(dataFile) 
+dataFile <- c("data/003_VCF_QC/taxaDepth/aabbdd.summary.txt")
+df2 <- read.delim(dataFile)
+dataFile <- c("data/003_VCF_QC/taxaDepth/dd.summary.txt")
+df3 <- read.delim(dataFile)
+
+df <- rbind(df1,df2,df3) %>% select(-ID)
+
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% select(Taxa = VcfID,GenomeType)
+
+### 添加列信息
+df1 <- df %>% left_join(.,dftaxaDB,by= "Taxa") 
+
+colB <- c('#ffd702','#fc6e6e',"#87cef9")
+p <- df1 %>% 
+  ggplot(aes(x=MeanDepth,fill =GenomeType))+
+  geom_histogram( alpha=0.95,bins = 50,color="white",size=0.3)+
+  scale_fill_manual(values = colB)+
+  scale_x_continuous(limits = c(0,28))+
+  theme(
+    legend.position = c(0.7,0.7),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    text = element_text(size = 12))
+  
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+
+```
+
+## MAF
+### step1
+```{r}
+inputDir <- c("data/003_VCF_QC/maf/aabb")
+dfoutM <- NULL
+fsList <- list.files(inputDir) ### 列出文件名字
+length(fsList)
+cnt <- 0
+dflog <- NULL
+for (i in fsList) {
+  df <- read.delim(file.path(inputDir,i))
+  chr <- str_sub(i,4,6)
+  dfout <- df %>% mutate(Total = MafMore005 + MAFLess005) ### data operate
+  cnt <- cnt+nrow(dfout)
+  ### output file into one 
+  dfoutM <- rbind(dfoutM,dfout)
+  ### log
+  log <- paste(i, nrow(dfout),sep = "\t")
+  dflog2 <- data.frame(filename = i, LineA = nrow(df))
+  dflog <- rbind(dflog,dflog2)
+  # print(log) ### 打印当前文件的名字和行数
+}
+
+# print(cnt) ### 打印总行数
+# write.table(dflog,file="~/Documents/log.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+dfV1 <- dfoutM %>% summarise(MafMore005 = sum(MafMore005), MafLess005 = sum(MAFLess005)) %>% 
+  pivot_longer(.,cols = c(1:2),names_to = "MafType",values_to = "n") %>% 
+  mutate(GenomeType = "AABB") %>% 
+  mutate(fre = n/sum(n))
+```
+### step2
+```{r}
+inputDir <- c("data/003_VCF_QC/maf/aabbdd")
+
+dfoutM <- NULL
+fsList <- list.files(inputDir) ### 列出文件名字
+length(fsList)
+cnt <- 0
+dflog <- NULL
+for (i in fsList) {
+  df <- read.delim(file.path(inputDir,i))
+  chr <- str_sub(i,4,6)
+  dfout <- df %>% mutate(Total = MafMore005 + MAFLess005) ### data operate
+  cnt <- cnt+nrow(dfout)
+  ### output file into one 
+  dfoutM <- rbind(dfoutM,dfout)
+  ### log
+  log <- paste(i, nrow(dfout),sep = "\t")
+  dflog2 <- data.frame(filename = i, LineA = nrow(df))
+  dflog <- rbind(dflog,dflog2)
+  # print(log) ### 打印当前文件的名字和行数
+}
+
+# print(cnt) ### 打印总行数
+# write.table(dflog,file="~/Documents/log.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+dfV2 <- dfoutM %>% summarise(MafMore005 = sum(MafMore005), MafLess005 = sum(MAFLess005)) %>% 
+  pivot_longer(.,cols = c(1:2),names_to = "MafType",values_to = "n") %>% 
+  mutate(GenomeType = "AABBDD") %>% 
+  mutate(fre = n/sum(n))
+```
+### step3
+```{r}
+inputDir <- c("data/003_VCF_QC/maf/dd")
+
+dfoutM <- NULL
+fsList <- list.files(inputDir) ### 列出文件名字
+length(fsList)
+cnt <- 0
+dflog <- NULL
+for (i in fsList) {
+  df <- read.delim(file.path(inputDir,i))
+  chr <- str_sub(i,4,6)
+  dfout <- df %>% mutate(Total = MafMore005 + MAFLess005) ### data operate
+  cnt <- cnt+nrow(dfout)
+  ### output file into one 
+  dfoutM <- rbind(dfoutM,dfout)
+  ### log
+  log <- paste(i, nrow(dfout),sep = "\t")
+  dflog2 <- data.frame(filename = i, LineA = nrow(df))
+  dflog <- rbind(dflog,dflog2)
+  # print(log) ### 打印当前文件的名字和行数
+}
+
+# print(cnt) ### 打印总行数
+# write.table(dflog,file="~/Documents/log.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+dfV3 <- dfoutM %>% summarise(MafMore005 = sum(MafMore005), MafLess005 = sum(MAFLess005)) %>% 
+  pivot_longer(.,cols = c(1:2),names_to = "MafType",values_to = "n") %>% 
+  mutate(GenomeType = "DD") %>% 
+  mutate(fre = n/sum(n))
+```
+### plot
+```{r}
+df <- rbind(dfV1,dfV2,dfV3)
+  
+colB <- c("#ffd702","#fc6e6e","#87cef9")
+df$MafType <- factor(df$MafType,levels = c("MafLess005","MafMore005"),labels = c("MAF <= 0.05","MAF > 0.05"))
+
+p <- df %>% 
+  ggplot(aes(x=MafType,y=n,fill=GenomeType))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  geom_text(aes(label=paste("\n(",round(fre,2),")",sep = "")),size=3,
+            position = position_dodge(0.9))+
+  # geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,nudge_y = 1)+
+  labs(x="", y="SNP count")+
+  # scale_fill_brewer(palette = "Set2")+
+  scale_fill_manual(values = colB)+
+theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    text = element_text(size = 14),legend.position = 'none')+
+  theme(axis.text.x = element_text(size = 14))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 4)
+```
+
+### maf直方图和线图
+```{r}
+library(tidyverse)
+library(cowplot)
+dataFile <- c("data/003_VCF_QC/AABB_site_QC.txt.gz") 
+df1 <- read.delim(dataFile)%>% select(GenomeType,Maf)
+dataFile <- c("data/003_VCF_QC/AABBDD_site_QC.txt.gz")
+df2 <- read.delim(dataFile)%>% select(GenomeType,Maf)
+dataFile <- c("data/003_VCF_QC/DD_site_QC.txt.gz")
+df3 <- read.delim(dataFile)%>% select(GenomeType,Maf)
+
+df <- rbind(df1,df2,df3)
+
+df <- df %>% 
+  filter(Maf > 0) %>% 
+  # mutate(bin = cut(Maf, breaks=c(0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5))) %>% 
+  mutate(bin = cut(Maf, breaks=c(0,0.1,0.2,0.3,0.4,0.5))) %>% 
+  group_by(GenomeType) %>% 
+  count(bin) %>% 
+  mutate(fre = n/sum(n)) %>% 
+  arrange(GenomeType,bin)
+
+colB <- c("#ffd702","#fc6e6e","#87cef9")
+
+### 直方图形式
+p <- df %>% 
+  ggplot(aes(x=bin,y=fre,group=GenomeType,fill=GenomeType))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  labs(y="Proportion",x="Minor allele frequency bins")+
+  # scale_color_brewer(palette = "Set2")+
+  scale_fill_manual(values = colB)+
+  scale_y_continuous(limits = c(0,1))+
+  # scale_x_discrete(labels=c(0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5))+
+  scale_x_discrete(labels=c(0.1,0.2,0.3,0.4,0.5))+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    text = element_text(size = 12),legend.position = 'none')+
+  theme(axis.text.x = element_text(size = 10))
+  # theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  #     panel.background = element_blank(),
+  #     axis.line = element_line(size=0.4, colour = "black"),
+  #     text = element_text(size = 12),legend.position = 'none')+
+  # theme(axis.text.x = element_text(size = 10))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 4)
+
+### 线图形式
+p <- df %>%
+  ggplot(aes(x=bin,y=fre,group=GenomeType,color=GenomeType))+
+  geom_line(aes(linetype=GenomeType))+
+  scale_linetype_manual(values=c("solid","dotdash","dashed"))+
+  labs(y="Proportion",x="Minor allele frequency bins")+
+  # scale_color_brewer(palette = "Set2")+
+  scale_color_manual(values = colB)+
+  scale_y_continuous(limits = c(0,1))+
+  # scale_x_discrete(labels=c(0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5))+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    text = element_text(size = 12),legend.position = 'none')+
+  theme(axis.text.x = element_text(size = 10))
+  # theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  #     panel.background = element_blank(),
+  #     axis.line = element_line(size=0.4, colour = "black"),
+  #     text = element_text(size = 12),legend.position = 'none')+
+  # theme(axis.text.x = element_text(size = 10))
+
+p
+ggsave(p,filename = "~/Documents/test2.pdf",height = 2.57,width = 4)
+```
+
+## Residual hetero
+```{r}
+library(tidyverse)
+library(ggpubr)
+dataFile <- c("data/003_VCF_QC/indiviHeterAlongChrom/chr1A1B_Wild_emmer_RH_2000000_1000000.txt")
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+head(df)
+
+df <- df %>% filter(CHROM == "1A")
+## heter order: W11 W20 W19 W14 W15 W13 W16 W18 PI487260 W5 W7 W8 PI362699 PI94648
+# df <- subset(df,df$Taxa == "W11" | df$Taxa == "W15" | df$Taxa == "W18"| df$Taxa == "W7")
+
+p1 <- ggplot()+
+  # stat_smooth(col = colB,method = "gam", formula = y ~ s(x,k=95), size = 1,se=FALSE) +
+  # geom_line(aes(col=Taxa),size=0.3)+
+  geom_area(data = df, mapping = aes(x=BIN_START/1000000,y=df$HETEROZYGOSITY,fill=Taxa),alpha=0.7) +
+  geom_point(aes(x=213,y=0),color="blue")+
+  xlab("Physical distance(Mb)")+ylab("Residual heterozygosity") +
+  theme_classic()+
+  scale_x_continuous(breaks=seq(0, 800, 100), expand = c(0.01, 0))
+
+p1
+
+ggsave(p1,filename = "~/Documents/test.pdf",height = 4,width = 4)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
