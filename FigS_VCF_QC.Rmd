@@ -777,6 +777,7 @@ dftaxaCount <- df %>% group_by(Sub,GroupbyContinent) %>%
 
 ```{r}
 ### 阴影，discrete x 
+### 注意，如果想要加阴影，必须有scale_x_discrete 的自定义才可以
 p <- ggplot(df,aes(x=GroupbyContinent,y=IBSdistance2CS))+
   ylab("IBS distance to CS")+xlab("")+
   geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
@@ -877,15 +878,14 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
 ```
 ## Miss by site histgram
 ```{r}
+subA <- c("AABB","AABBDD","DD")
+colB <- c('#ffd702','#fc6e6e',"#87cef9")
+
 df1 <- read.delim("data/003_VCF_QC/AABBDD_site_QC.txt.gz")
 df2 <- read.delim("data/003_VCF_QC/AABB_site_QC.txt.gz")
 df3 <- read.delim("data/003_VCF_QC/DD_site_QC.txt.gz")
 df <- rbind(df1,df2,df3) %>% mutate(GenomeType = factor(GenomeType,levels = subA))
 
-
-df <- read.delim("data/001_site_QC.txt.gz")
-colB <- c("#ffd702","#fc6e6e","#87cef9")
-df$GenomeType <- factor(df$GenomeType,levels = c("AB","ABD","D"),labels = c("AABB","AABBDD","DD"))
 p <- df %>% 
   ggplot(aes(x=MissingRate,fill=GenomeType)) +
   geom_histogram(aes(y=..ndensity..),alpha=1,position="dodge",bins = 50)+
@@ -910,6 +910,71 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
 ```
 
 ## Heter by site histgram
+```{r}
+subA <- c("AABB","AABBDD","DD")
+colB <- c('#ffd702','#fc6e6e',"#87cef9")
+
+df1 <- read.delim("data/003_VCF_QC/AABBDD_site_QC.txt.gz")
+df2 <- read.delim("data/003_VCF_QC/AABB_site_QC.txt.gz")
+df3 <- read.delim("data/003_VCF_QC/DD_site_QC.txt.gz")
+df <- rbind(df1,df2,df3) %>% mutate(GenomeType = factor(GenomeType,levels = subA))
+
+p <- df %>% 
+  ggplot(aes(x=HeterozygousProportion,fill=GenomeType)) +
+  geom_histogram(aes(y=..ndensity..),alpha=1,position="dodge",bins = 50)+
+  # geom_density()+
+  labs(x="Heterozygous genotype proportion by site",y="Density")+
+  scale_fill_manual(values = colB,name='')+
+  scale_color_manual(values = colB,name='')+
+  # coord_cartesian(xlim = c(0,0.5))+
+  facet_grid(.~GenomeType)+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.4, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))+
+  theme(strip.background = element_rect(size = 0.4))+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+
+```
+## MAF by site
+```{r}
+subA <- c("AABB","AABBDD","DD")
+colB <- c('#ffd702','#fc6e6e',"#87cef9")
+
+df1 <- read.delim("data/003_VCF_QC/AABBDD_site_QC.txt.gz")
+df2 <- read.delim("data/003_VCF_QC/AABB_site_QC.txt.gz")
+df3 <- read.delim("data/003_VCF_QC/DD_site_QC.txt.gz")
+df <- rbind(df1,df2,df3) %>% mutate(GenomeType = factor(GenomeType,levels = subA))
+
+p <- df %>% 
+  ggplot(aes(x=Maf,fill=GenomeType)) +
+  geom_histogram(aes(y=..ndensity..),alpha=1,position="dodge",bins = 50)+
+  # geom_density()+
+  labs(x="Missing rate by site",y="Density")+
+  scale_fill_manual(values = colB,name='')+
+  scale_color_manual(values = colB,name='')+
+  # coord_cartesian(xlim = c(0,0.5))+
+  facet_grid(.~GenomeType)+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.4, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))+
+  theme(strip.background = element_rect(size = 0.4))+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+```
+
 
 ## Depth by genomeType - scatterPlot
 ```{r}
