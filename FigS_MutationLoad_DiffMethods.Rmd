@@ -34,7 +34,7 @@ library(parallel)
 library(doParallel)
 ```
 
-## Tidy
+## Tidy BIG DATA
 ```{r}
 dftotal <- read_tsv("data/004_delCount/007_geneSNPAnno.txt.gz") %>% 
   mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
@@ -195,6 +195,63 @@ q
 ggsave(q,filename = "~/Documents/temp.pdf",height = 3.6,width = 2.7)
 
 ```
+
+## 2. Correlation
+```{r}
+library(corrr)
+df <- df_AllMethod %>% 
+  filter(LoadGroup=="Deleterious") %>% 
+  mutate(ID=str_c(Chr,Pos,sep = "_"), IfDel = 1) %>% 
+  select(ID,Sub,Method,IfDel) %>% 
+  pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
+  select(-Sub,-ID) %>% 
+  correlate() %>% 
+  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
+  rearrange() %>%    # rearrange by correlations
+  # shave() # Shave off the upper triangle for a clean result
+  map(~replace_na(.x,1)) 
+  # column_to_rownames(var = "term") 
+
+# matrix <- cor(df)
+
+rplot(df) 
+
+
+ df_AllMethod %>% 
+  filter(LoadGroup=="Deleterious") %>% 
+  mutate(ID=str_c(Chr,Pos,sep = "_"), IfDel = 1) %>% 
+  select(ID,Sub,Method,IfDel) %>% 
+  pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
+  select(-Sub,-ID) %>% 
+  correlate() %>% 
+  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
+  rearrange() %>%    # rearrange by correlations
+  # shave() # Shave off the upper triangle for a clean result
+  map(~replace_na(.x,1)) %>% 
+  network_plot(min_cor = .1)
+
+# matrix <- cor(df)
+
+rplot(df) 
+
+```
+
+```{r}
+x <- datasets::mtcars %>%
+       correlate() %>%  # Create correlation data frame (cor_df)
+       focus(-cyl, -vs, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
+       rearrange() %>%   # rearrange by correlations
+       shave() # Shave off the upper triangle for a clean result
+
+rplot(x) 
+```
+
+
+```{r}
+aolevels(df_AllMethod,"LoadGroup")
+```
+
+
 
 ## 3.DAF
 ```{r}
