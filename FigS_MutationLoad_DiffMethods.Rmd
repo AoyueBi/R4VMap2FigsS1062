@@ -208,10 +208,30 @@ df <- df_AllMethod %>%
   correlate() %>% 
   # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
   rearrange() %>%    # rearrange by correlations
-  # shave() # Shave off the upper triangle for a clean result
-  map(~replace_na(.x,1)) 
-  # column_to_rownames(var = "term") 
+  # shave() # Shave off the upper triangle for a clean result %>% 
+  # map(~replace_na(.x,1)) %>% 
+  # as_tibble() %>%
+  # column_to_rownames(var = "term") %>% 
+  as_matrix(diagonal = 1)
 
+
+heatmap(as.matrix(df),main = "pheatmap default")
+
+
+distmat <- dist(as.matrix(df))
+
+cutoff.distance <- 0.00001  
+cols <- colorRampPalette(c("white", "red",    # distances 0 to 3 colored from white to red
+                               "green", "black"), # distances 3 to max(distmat) colored from green to black
+                             cutoff.distance / max(distmat),
+                             100)
+
+library(pheatmap)
+pheatmap(as.matrix(df), display_numbers = T,
+         # breaks = c(-1, 0, 1),
+         color= colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(10),
+         # color=cols
+         )
 # matrix <- cor(df)
 
 rplot(df) 
