@@ -33,23 +33,24 @@ library(ggpubr)
 
 import data
 ```{r}
-dataFile <- c("data/001_exonSNP_anno.txt.gz")
-dftotal <- read.delim(dataFile)
 
-dataFile <- c("data/chrConvertionRule.txt")
-dfchrmap <- read.delim(dataFile)
-dfchrmap <- dfchrmap %>% filter(!ChrID == "0", !ChrID=="43",!ChrID=="44") %>%
-  mutate(OriChrName=str_sub(OriChrName,4,5),Sub=str_sub(OriChrName,2,2)) %>%
-  select(ChrID,OriChrName,Sub) %>%
-  select(Chr=ChrID,Sub)
+dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>%
+  mutate(Sub=str_sub(Transcript, 9, 9))
 
-dftotal <- dftotal %>% left_join(.,dfchrmap,by="Chr")
+# dfchrmap <- read.delim("data/chrConvertionRule_byAoyue.txt") %>% select(Chr = ChrID,Subgenome)
+
+# dftotal <- dftotal %>% left_join(.,dfchrmap,by="Chr")
+
 ```
 
 
 ```{r}
 
-df <- dftotal %>% filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+df <- dftotal %>% 
+  filter(!is.na(Ancestral)) %>%
+  filter(Ancestral==Ref|Ancestral==Alt) %>%
+
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
   mutate(Derived_SIFT = ifelse(is.na(Derived_SIFT),100,Derived_SIFT)) %>% 
   mutate(Gerp = ifelse(is.na(Gerp),-100,Gerp)) %>% 
   mutate(LoadGroup = ifelse(Variant_type=="NONSYNONYMOUS",ifelse(Derived_SIFT<0.05&Gerp>=1,"Deleterious","Nonsynonymous"),"Synonymous")) %>% 
