@@ -109,10 +109,6 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 6,width = 4)
 
 ```
 
-
-
-
-
 ## -Sample size to SNPs
 
 ### V1:Sample size to variants discovery by subspecies
