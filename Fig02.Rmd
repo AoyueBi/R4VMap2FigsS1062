@@ -33,35 +33,36 @@ library(ggpubr)
 
 import data
 ```{r}
-
 dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>%
   mutate(Sub=str_sub(Transcript, 9, 9))
-
-# dfchrmap <- read.delim("data/chrConvertionRule_byAoyue.txt") %>% select(Chr = ChrID,Subgenome)
-
-# dftotal <- dftotal %>% left_join(.,dfchrmap,by="Chr")
-
 ```
 
 
 ```{r}
-
+### 区分亚基因组
 df <- dftotal %>% 
+  mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
   filter(!is.na(Ancestral)) %>%
   filter(Ancestral==Ref|Ancestral==Alt) %>%
-
-  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
-  mutate(Derived_SIFT = ifelse(is.na(Derived_SIFT),100,Derived_SIFT)) %>% 
-  mutate(Gerp = ifelse(is.na(Gerp),-100,Gerp)) %>% 
-  mutate(LoadGroup = ifelse(Variant_type=="NONSYNONYMOUS",ifelse(Derived_SIFT<0.05&Gerp>=1,"Deleterious","Nonsynonymous"),"Synonymous")) %>% 
-  filter(!Ancestral == "NA") %>% 
-  filter(Ancestral==Ref|Ancestral==Alt) %>% 
-  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
-  # select(Variant_type,Derived_SIFT,Gerp,LoadGroup)
+  # filter(!is.na(DAF)) %>% 
+  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
   group_by(Sub) %>% 
   count(LoadGroup) %>% 
   mutate(fre=n/sum(n)) %>% 
   arrange(Sub,desc(LoadGroup))
+
+### 不区分亚基因组
+df <- dftotal %>% 
+  mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
+  filter(!is.na(Ancestral)) %>%
+  filter(Ancestral==Ref|Ancestral==Alt) %>%
+  # filter(!is.na(DAF)) %>% 
+  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  # group_by(Sub) %>%
+  count(LoadGroup) %>% 
+  mutate(fre=n/sum(n)) 
 
 ### 只画柱状图 dodge
 # colB <- c("#d5311c","#004680","#e69f00")

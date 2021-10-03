@@ -1,0 +1,2770 @@
+---
+title: "Data analysis"
+author: "Aoyue Bi, Daxing Xu"
+date: "`r Sys.Date()`"
+output: 
+  html_document: # html_notebook, html_document
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
+    # bibliography: bibliography.json
+---
+
+# Fig3
+
+```{r setup, echo =F, message = T, warning = F}
+library(tidyverse)
+# library(RColorBrewer)
+# library(ggpubr)
+# library(egg)
+## eval 代码要不要运行
+## echo 代码要不要输出
+## include 图要不要输出
+## warning 警告要不要输出
+## message 默认Bin等信息要不要输出
+```
+
+## delterious ratio
+## 5.delRatio
+```{r}
+
+dfdelRatio <- read.delim("data/004_delCount/delRatio.txt.gz")
+
+dftaxaDB <- read.delim("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+# factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+# colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray90")
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL")
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")
+
+
+# factorB <- c("Ratio_002_nonsynonymous","Ratio_004_nonsynDerivedSIFT","Ratio_007_VEP","Ratio_008_snpEff", "Ratio_014_GERP16way_2.14_max","Ratio_015_LIST_S2","Ratio_016_PhyloP")
+# labelsB <- c("Nonsynonymous","SIFT","VEP","SnpEff", "GERP","LIST-S2","PhyloP")
+
+# factorB <- c("Ratio_002_nonsynonymous","Ratio_014_GERP16way_2.14_max","Ratio_007_VEP")
+# labelsB <- c("Nonsynonymous","GERP","VEP")
+
+factorB <- c("Ratio_002_nonsynonymous","Ratio_014_GERP16way_2.14_max")
+labelsB <- c("Nonsynonymous","GERP")
+
+df <- dfdelRatio %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  select(-c("IfSelected","Group_refobj")) %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(Stand_LoadGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB))
+
+
+```
+- 接上
+```{r}
+dfCS <- df %>% filter(Taxa=="ABD_1142")
+
+p <- df %>%
+  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
+  ylab("Mutation burden")+xlab("")+
+  ### volin
+  geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+
+  ### boxplot
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  
+  ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+  ### 打上中国春的位置
+  # geom_hline(data = dfCS, aes( yintercept = Stand_delCount))+
+  # geom_point(data = dfCS,aes(x=Subgenome,y=Stand_delCount),color="black")+
+
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 1)+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
+```
+```{r}
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 7.2)
+ggsave(p,filename = "~/Documents/test.pdf",height = 6,width = 4)
+
+```
+
+
+
+
+
+## -Sample size to SNPs
+
+### V1:Sample size to variants discovery by subspecies
+
+step1: Import all data and deal with hexaploid
+```{r}
+### 合并所有文件
+inputDir <- c("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/047_referenceEvaluation/rscript/referenceEvaluation/data/009_sampleSize2VariantsDiscovery/002_bysubspecies")
+fsList <- list.files(inputDir)
+length(fsList)
+dfout <- NULL
+for (i in fsList) {
+  filename <- str_replace(i,".txt","")
+  df <- read.table(file.path(inputDir,i),header = T,sep="\t",row.names = NULL)
+  df <- df %>% mutate(Subspecies = filename)
+  dfout <- rbind(dfout,df)
+}
+
+```
+
+step2: Merge hexa data
+```{r}
+### 将六倍体的AB sub和D sub的结果合并起来，成为一个数据框
+hexa <- c("Landrace-AB","Landrace-D","Cultivar-AB","Cultivar-D","OtherHexaploid-AB","OtherHexaploid-D")
+dfhexa <- dfout %>% filter(Subspecies %in% hexa) %>% filter(!is.na(Group)) %>% 
+  mutate(GroupMerge= str_split(Subspecies,"-",n=2,simplify = TRUE)[,1]) %>% 
+  group_by(TaxaNum,Group,GroupMerge) %>% ## 将同一LoadGroup分类的数目相加
+  summarise(n=sum(ObservedCount)) %>% 
+  rename(ObservedCount=n,Subspecies=GroupMerge) %>% ungroup()
+
+colnames(dfout)
+levels(as.factor(dfout$Subspecies))
+
+non_hexa <- c("Ae.tauschii","Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","OtherTetraploid")
+dfnon_hexa <- dfout %>% filter(Subspecies %in% non_hexa) %>% filter(!is.na(Group)) 
+
+dfsample <- rbind(dfhexa,dfnon_hexa) ## 1056 4
+```
+
+step3: plot by merged hexa subgenome
+```{r}
+factor1 <- c("Nonsyn","Syn","UTR")
+dfhere <- dfsample %>% filter(Group != "NA") %>% 
+  filter(Group %in% factor1) %>%
+  droplevels()
+
+df <- dfhere %>% group_by(TaxaNum,Subspecies) %>% 
+  summarise(ObservedVariants = sum(ObservedCount))
+
+df$Subspecies <- factor(df$Subspecies, levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","OtherTetraploid", "Landrace","Cultivar","OtherHexaploid", "Ae.tauschii"),labels = c("Wild emmer","Domesticated emmer","Free-threshing tetraploids","Other tetraploids","Landrace","Cultivar","Other hexaploids","Ae.tauschii"))
+
+colB <- c("#ffd702","#7f5701","#016699", "00f3ff","#fc6e6e","#9900ff","#fe63c2","#87cef9")
+
+p <- df %>% 
+  ggplot(aes(x=TaxaNum,y=ObservedVariants/1000,color=Subspecies))+
+  # stat_smooth(method = "lm", formula = y~poly(x,3),se=F,geom = "smooth")+
+  # stat_smooth(se=F,alpha=0.5)+
+  geom_line()+
+  # geom_point()+
+  # geom_line(stat="smooth",alpha = 0.9)+
+  # geom_point(data = dfpoint,aes(x=TaxaNum,y=ObservedCount/1000,color=Group),size=2)+
+  scale_x_continuous(breaks = c(1,50,100,150,200))+
+  # geom_line()+
+  # stat_function(fun = lm(ObservedVariants/1000 ~ poly(TaxaNum, 2, raw = TRUE), data = df,geom="point"))+
+  labs(x="Sample size",y="Number of sites observed\nto be variable per kb")+
+  scale_color_manual(values = colB)+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      axis.line = element_line(size=0.4, colour = "black"),
+      text = element_text(size = 12),legend.position = 'none')
+
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 4*3/4,width = 4)
+
+```
+
+
+### V2:Sample size to variants discovery by subspecies
+
+step1: Import all data and deal with hexaploid
+```{r}
+### 合并所有文件
+inputDir <- c("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/047_referenceEvaluation/rscript/referenceEvaluation/data/009_sampleSize2VariantsDiscovery/002_bysubspecies")
+fsList <- list.files(inputDir)
+length(fsList)
+dfout <- NULL
+for (i in fsList) {
+  filename <- str_replace(i,".txt","")
+  df <- read.table(file.path(inputDir,i),header = T,sep="\t",row.names = NULL)
+  df <- df %>% mutate(Subspecies = filename)
+  dfout <- rbind(dfout,df)
+}
+
+```
+
+step2: plot
+```{r}
+### 从 import chunck 中导入数据
+factor1 <- c("Nonsyn","Syn","UTR")
+dfhere <- dfout %>% filter(Group != "NA") %>% 
+  filter(Group %in% factor1) %>%
+  droplevels()
+
+### 
+df <- dfhere %>% group_by(TaxaNum,Subspecies) %>% 
+  summarise(ObservedVariants = sum(ObservedCount)) 
+
+df$Subspecies <- factor(df$Subspecies, levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","OtherTetraploid", "Landrace-AB","Landrace-D","Cultivar-AB","Cultivar-D","OtherHexaploid-AB","OtherHexaploid-D", "Ae.tauschii"),labels = c("Wild emmer","Domesticated emmer","Free-threshing tetraploids","Other tetraploids","Landrace-ABsub","Landrace-Dsub", "Cultivar-ABsub","Cultivar-Dsub","Other hexaploids-ABsub","Other hexaploids-Dsub","Ae.tauschii"))
+
+colB <- c("#ffd702","#7f5701","#016699", "#00f3ff","#fc6e6e","#fc6e6e","#9900ff","#9900ff","#fe63c2","#fe63c2","#87cef9")
+
+p <- df %>% 
+  ggplot(aes(x=TaxaNum,y=ObservedVariants/1000,color=Subspecies))+
+  # stat_smooth(method = "lm", formula = y~poly(x,3),se=F,geom = "smooth")+
+  # stat_smooth(method = "gam", formula = y ~ s(x,k=20), size = 1,se=FALSE)+
+  stat_smooth(se=F,size=0.5)+
+  # stat_smooth(se=F)+
+  # geom_line()+
+  # geom_point()+
+  # geom_point(data = dfpoint,aes(x=TaxaNum,y=ObservedCount/1000,color=Group),size=2)+
+  # scale_x_continuous(breaks = c(1,100,200,300,400,500,600))+
+  # geom_line()+
+  # stat_function(fun = lm(ObservedVariants/1000 ~ poly(TaxaNum, 2, raw = TRUE), data = df,geom="point"))+
+  labs(x="Sample size",y="Number of sites observed\nto be variable per kb")+
+  scale_color_manual(values = colB)+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      axis.line = element_line(size=0.4, colour = "black"),
+      text = element_text(size = 12),legend.position = "none")
+
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 4*3/4,width = 4)
+
+```
+
+step2_V2: cdf
+- y轴除以各自分类的总数
+```{r}
+### 从 import chunck 中导入数据
+factor1 <- c("Nonsyn","Syn","UTR")
+dfhere <- dfout %>% filter(Group != "NA") %>% 
+  filter(Group %in% factor1) %>%
+  droplevels()
+
+### 
+df <- dfhere %>% group_by(TaxaNum,Subspecies) %>% 
+  summarise(ObservedVariants = sum(ObservedCount)) 
+
+df$Subspecies <- factor(df$Subspecies, levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","OtherTetraploid", "Landrace-AB","Landrace-D","Cultivar-AB","Cultivar-D","OtherHexaploid-AB","OtherHexaploid-D", "Ae.tauschii"),labels = c("Wild emmer","Domesticated emmer","Free-threshing tetraploids","Other tetraploids","Landrace-ABsub","Landrace-Dsub", "Cultivar-ABsub","Cultivar-Dsub","Other hexaploids-ABsub","Other hexaploids-Dsub","Ae.tauschii"))
+
+### 找到各自亚群的最大taxaNum所对应的有害变异观测数目
+
+dfmax <- df %>% group_by(Subspecies) %>% 
+  arrange(Subspecies,TaxaNum) %>% 
+  slice_tail(n=1) %>% 
+  select(Subspecies, TotalVariants = ObservedVariants)
+
+dfnew <- df %>% left_join(.,dfmax,by = "Subspecies")
+
+
+colB <- c("#ffd702","#7f5701","#016699", "#00f3ff","#fc6e6e","#fc6e6e","#9900ff","#9900ff","#fe63c2","#fe63c2","#87cef9")
+
+p <- dfnew %>% 
+  ggplot(aes(x=TaxaNum,y=ObservedVariants/TotalVariants,color=Subspecies))+
+  # stat_smooth(method = "lm", formula = y~poly(x,3),se=F,geom = "smooth")+
+  # stat_smooth(method = "gam", formula = y ~ s(x,k=20), size = 1,se=FALSE)+
+  stat_smooth(se=F,size=0.5)+
+  # stat_smooth(se=F)+
+  # geom_line()+
+  # geom_point()+
+  # geom_point(data = dfpoint,aes(x=TaxaNum,y=ObservedCount/1000,color=Group),size=2)+
+  # scale_x_continuous(breaks = c(1,100,200,300,400,500,600))+
+  # geom_line()+
+  # stat_function(fun = lm(ObservedVariants/1000 ~ poly(TaxaNum, 2, raw = TRUE), data = df,geom="point"))+
+  # labs(x="Sample size",y="Number of sites observed\nto be variable per kb")+
+  labs(x="Sample size",y="CDF")+
+  scale_color_manual(values = colB)+
+  # scale_x_log10(limits = c(1,500))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      axis.line = element_line(size=0.4, colour = "black"),
+      text = element_text(size = 12),legend.position = "none")
+
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 4*3/4,width = 4)
+
+```
+
+### Only deleterious by subspecies: Sample size to variants discovery by subspecies
+
+step1: Import all data and deal with hexaploid
+```{r}
+### 合并所有文件
+inputDir <- c("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/047_referenceEvaluation/rscript/referenceEvaluation/data/009_sampleSize2VariantsDiscovery/002_bysubspecies")
+fsList <- list.files(inputDir)
+length(fsList)
+dfout <- NULL
+for (i in fsList) {
+  filename <- str_replace(i,".txt","")
+  df <- read.table(file.path(inputDir,i),header = T,sep="\t",row.names = NULL)
+  df <- df %>% mutate(Subspecies = filename)
+  dfout <- rbind(dfout,df)
+}
+
+```
+
+step2: plot
+```{r}
+### 从 import chunck 中导入数据
+factor1 <- c("Deleterious")
+dfhere <- dfout %>% filter(Group != "NA") %>% 
+  filter(Group %in% factor1) %>%
+  droplevels()
+
+### 
+df <- dfhere %>% group_by(TaxaNum,Subspecies) %>% 
+  summarise(ObservedVariants = sum(ObservedCount))
+
+df$Subspecies <- factor(df$Subspecies, levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","OtherTetraploid", "Landrace-AB","Landrace-D","Cultivar-AB","Cultivar-D","OtherHexaploid-AB","OtherHexaploid-D", "Ae.tauschii"),labels = c("Wild emmer","Domesticated emmer","Free-threshing tetraploids","Other tetraploids","Landrace-ABsub","Landrace-Dsub", "Cultivar-ABsub","Cultivar-Dsub","Other hexaploids-ABsub","Other hexaploids-Dsub","Ae.tauschii"))
+
+colB <- c("#ffd702","#7f5701","#016699", "#00f3ff","#fc6e6e","#fc6e6e","#9900ff","#9900ff","#fe63c2","#fe63c2","#87cef9")
+
+p <- df %>% 
+  ggplot(aes(x=TaxaNum,y=ObservedVariants/1000,color=Subspecies))+
+  # stat_smooth(method = "lm", formula = y~poly(x,3),se=F,geom = "smooth")+
+  # stat_smooth(method = "gam", formula = y ~ s(x,k=20), size = 1,se=FALSE)+
+  stat_smooth(se=F,size=0.5)+
+  # stat_smooth(se=F)+
+  # geom_line()+
+  # geom_point()+
+  # geom_point(data = dfpoint,aes(x=TaxaNum,y=ObservedCount/1000,color=Group),size=2)+
+  scale_x_continuous(breaks = c(1,50,100,150,200))+
+  # geom_line()+
+  # stat_function(fun = lm(ObservedVariants/1000 ~ poly(TaxaNum, 2, raw = TRUE), data = df,geom="point"))+
+  labs(x="Sample size",y="Number of sites observed\nto be variable per kb")+
+  scale_color_manual(values = colB)+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      axis.line = element_line(size=0.4, colour = "black"),
+      text = element_text(size = 12),legend.position = "none")
+
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 4*3/4,width = 4)
+
+```
+
+## - by subspecies by utr syn nonsyn
+
+```{r}
+inputDir <- c("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/047_referenceEvaluation/rscript/referenceEvaluation/data/009_sampleSize2VariantsDiscovery/002_bysubspecies")
+fsList <- list.files(inputDir)
+length(fsList)
+dfout <- NULL
+for (i in fsList) {
+  filename <- str_replace(i,".txt","")
+  df <- read.table(file.path(inputDir,i),header = T,sep="\t",row.names = NULL)
+  df <- df %>% mutate(Subspecies = filename)
+  dfout <- rbind(dfout,df)
+}
+
+df <- dfout
+df <- df %>% filter(Group != "NA") %>% 
+  filter(Group == "Nonsyn"|Group == "Syn"|Group == "UTR") %>%
+  droplevels()
+
+df$Group <- factor(df$Group, levels = c("UTR","Syn","Nonsyn"),labels = c("UTR","Synonymous (S)","Nonsynonymous (NS)"))
+colB <- c("DarkGrey", "#004680","Orange")
+
+df$Subspecies <- factor(df$Subspecies,levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","OtherTetraploid","Landrace-AB","Cultivar-AB","OtherHexaploid-AB","Ae.tauschii","Landrace-D","Cultivar-D","OtherHexaploid-D"),labels = c("WE","DE","FTT","OtherTetra","LR-AB","Cultivar-AB","OtherHexa-AB","Ae.tauschii","LR-D","Cultivar-D","OtherHexa-D"))
+
+p <- df %>% 
+  # filter(TaxaNum < 601) %>% 
+  ggplot(aes(x=TaxaNum,y=ObservedCount/1000,color=Group))+
+  # stat_smooth(method = "lm", formula = y~poly(x,3),se=F,geom = "smooth")+
+  stat_smooth(se=F)+
+  # geom_line()+
+  # geom_point(data = dfpoint,aes(x=TaxaNum,y=ObservedCount/1000,color=Group),size=2)+
+  # geom_line()+
+  # stat_function(fun = lm(ObservedCount/1000 ~ poly(TaxaNum, 2, raw = TRUE), data = df,geom="point"))+
+  scale_x_continuous(limits = c(0,240),breaks = c(1,50,100,150,200))+
+  scale_y_continuous(limits = c(0,200))+
+  labs(x="Sample size",y="Number of sites observed\nto be variable per kb")+
+  scale_color_manual(values = colB)+
+  facet_wrap(~Subspecies,ncol=4,scales = "free")+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      axis.line = element_line(size=0.4, colour = "black"),
+      text = element_text(size = 12),legend.position = 'none')+
+  theme(strip.background = element_blank())
+
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
+
+```
+
+## - by subspecies by del nonsyn syn
+```{r}
+inputDir <- c("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/047_referenceEvaluation/rscript/referenceEvaluation/data/009_sampleSize2VariantsDiscovery/002_bysubspecies")
+fsList <- list.files(inputDir)
+length(fsList)
+dfout <- NULL
+for (i in fsList) {
+  filename <- str_replace(i,".txt","")
+  df <- read.table(file.path(inputDir,i),header = T,sep="\t",row.names = NULL)
+  df <- df %>% mutate(Subspecies = filename)
+  dfout <- rbind(dfout,df)
+}
+
+df <- dfout
+
+factor1 <- c("Synonymous","Nonsynonymous","Deleterious")
+df <- df %>% filter(Group != "NA") %>% 
+  filter(Group %in% factor1) %>%
+  droplevels()
+
+df$Group <- factor(df$Group, levels = c("Synonymous","Nonsynonymous","Deleterious"))
+colB <- c("#004680","#e69f00","#d5311c")
+
+df$Subspecies <- factor(df$Subspecies,levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","OtherTetraploid","Landrace-AB","Cultivar-AB","OtherHexaploid-AB","Ae.tauschii","Landrace-D","Cultivar-D","OtherHexaploid-D"),labels = c("WE","DE","FTT","OtherTetra","LR-AB","Cultivar-AB","OtherHexa-AB","Ae.tauschii","LR-D","Cultivar-D","OtherHexa-D"))
+
+p <- df %>% 
+  # filter(TaxaNum < 601) %>% 
+  ggplot(aes(x=TaxaNum,y=ObservedCount/1000,color=Group))+
+  # stat_smooth(method = "lm", formula = y~poly(x,3),se=F,geom = "smooth")+
+  stat_smooth(se=F)+
+  # geom_line()+
+  # geom_point(data = dfpoint,aes(x=TaxaNum,y=ObservedCount/1000,color=Group),size=2)+
+  # geom_line()+
+  # stat_function(fun = lm(ObservedCount/1000 ~ poly(TaxaNum, 2, raw = TRUE), data = df,geom="point"))+
+  scale_x_continuous(limits = c(0,240),breaks = c(1,50,100,150,200))+
+  scale_y_continuous(limits = c(0,110))+
+  labs(x="Sample size",y="Number of sites observed\nto be variable per kb")+
+  scale_color_manual(values = colB)+
+  facet_wrap(~Subspecies,ncol=4,scales = "free")+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      axis.line = element_line(size=0.4, colour = "black"),
+      text = element_text(size = 12),legend.position = 'none')+
+  theme(strip.background = element_blank())
+
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
+```
+
+## ===========================
+## -Pi 
+### 颜色为A B D亚基因组
+```{r}
+dataFile <- c("data/fig3/pi/001_Pi_bySubspecies_20200907.txt")
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+head(df)
+df$Group <- factor(df$Group,levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","Landrace","Cultivar","Ae.tauschii")
+                   ,labels = c("Wild emmer","Domesticated emmer","Free-threshing tetraploids","Landrace","Cultivar","Ae.tauschii")
+                   ,ordered = TRUE
+                   )
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+p <- ggplot(df,aes(Group,y=MEAN_PI,fill=Sub))+
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(0.8))+ # add error bar
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.8)+
+  # geom_point(position = position_jitterdodge(0.5),alpha = 0.6,aes(col=Subspecies),size=0.3)+
+  # geom_point(position = position_jitterdodge(0.2),alpha = 1,aes(col=Group),size=0.3)+
+  # geom_violin(position = position_dodge(0.8),width=3,alpha=0.8) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.05, color="black", alpha=0.5) +
+  stat_summary(fun=mean, geom="point", color="white",position = position_dodge(0.8),size=0.5)+
+  ylab(expression(pi))+xlab("")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
+  theme(panel.background = element_rect(size = 0.7, colour = 'black',fill = 'white'),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        text = element_text(size = 10),
+        legend.position = 'none')+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+```
+### 颜色为亚群
+```{r}
+dataFile <- c("data/fig3/pi/001_Pi_bySubspecies_20200907.txt")
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+head(df)
+df$Group <- factor(df$Group,levels = c("Ae.tauschii","Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","Landrace","Cultivar")
+                   ,labels = c("Ae.tauschii","Wild emmer","Domesticated emmer","Free-threshing tetraploids","Landrace","Cultivar")
+                   ,ordered = TRUE
+                   )
+
+# colB <- c("#ffd702","#7f5701","#016699", "00f3ff","#fc6e6e","#9900ff","#fe63c2","#87cef9")
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")
+
+p <- df %>% 
+  mutate(MergedSub = if_else(Sub=="D","D","AB")) %>% 
+  ggplot(aes(x=MergedSub,y=MEAN_PI,fill=Group))+
+  stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(0.8))+ # add error bar
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.8)+
+  geom_point(position = position_jitterdodge(0.5),alpha = 0.9,aes(col=Group),size=0.3)+
+  # geom_point(position = position_jitterdodge(0.2),alpha = 1,aes(col=Group),size=0.3)+
+  # geom_violin(position = position_dodge(0.8),width=2,alpha=0.8) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.05, color="black", alpha=0.5) +
+  # stat_summary(fun=mean, geom="point", color="white",position = position_dodge(0.8),size=0.5)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  ylab(expression(pi))+xlab("")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+    
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+```
+
+## ===========================
+## Deleterious Load count (boxplot)
+ 
+```{r}
+dataFile1 <- c("data/loadCount/004_additiveDeleterious_nonsynGERPandDerivedSIFT_ANCbarleyVSsecalePasimony_vmap2_bychr_bysub_delVSsynonymous.txt")
+df1 <- read.table(dataFile1, header=TRUE, sep="\t",row.names=NULL)
+df1 <- df1 %>% mutate(IfLoadisStrong="Strongly")
+
+dataFile2 <- c("data/loadCount/002_additiveDeleterious_nonsynonymous_ANCbarleyVSsecaleParsimony_vmap2_bychr_bysub_delVSsynonymous.txt")
+df2 <- read.table(dataFile2, header=TRUE, sep="\t",row.names=NULL)
+df2 <- df2 %>% mutate(IfLoadisStrong="Slightly")
+
+df <- rbind(df1,df2)
+colB <- c("#87cef9","#ffd702","#7f5701","#016699","#fc6e6e","#9900ff")
+nrow(df)
+## 过滤 OtherHexaploid OtherTetraploid
+df <- subset(df,df$Subspecies!='OtherHexaploid' & df$Subspecies!='OtherTetraploid')
+df$Subspecies <- factor(df$Subspecies,
+                        levels = c("Ae.tauschii","Wild_emmer","Domesticated_emmer",
+                                   "Free_threshing_tetraploid","Landrace","Cultivar"),ordered = TRUE)
+p <-ggplot(df, aes(x=Sub,y=df$Ratio_delVSsyn_bycount,fill=Subspecies))+
+  ### box
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(0.8))+ # add error bar
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.8)+
+  # geom_point(position = position_jitterdodge(0.2),alpha = 1,aes(col=Subspecies),size=0.3)+  #this
+  ### violin
+  geom_violin(position = position_dodge(0.8),alpha=0.8,width=1.4) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.08, color="white", alpha=0.2) + #this
+  geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  labs(y="Mutation burden",x="")+
+  facet_grid(IfLoadisStrong~.,scales = "free")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+
+p
+# ggsave(p,fi  lename = "~/Documents/test.pdf",height = 3,width = 3.6)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 7.2*3/4,width = 7.2)
+## summary:
+# plot1: 字体：7 大小 3 4
+# plot1: 字体：12 大小 7.2*3/4 7.2
+
+
+```
+
+## Deleterious count boxplot - point
+```{r}
+dataFile1 <- c("data/loadCount/004_additiveDeleterious_nonsynGERPandDerivedSIFT_ANCbarleyVSsecalePasimony_vmap2_bychr_bysub_delVSsynonymous.txt")
+df1 <- read.table(dataFile1, header=TRUE, sep="\t",row.names=NULL)
+df1 <- df1 %>% mutate(IfLoadisStrong="Strongly")
+
+dataFile2 <- c("data/loadCount/002_additiveDeleterious_nonsynonymous_ANCbarleyVSsecaleParsimony_vmap2_bychr_bysub_delVSsynonymous.txt")
+df2 <- read.table(dataFile2, header=TRUE, sep="\t",row.names=NULL)
+df2 <- df2 %>% mutate(IfLoadisStrong="Slightly")
+
+df <- rbind(df1,df2)
+colB <- c("#87cef9","#ffd702","#7f5701","#016699","#fc6e6e","#9900ff")
+nrow(df)
+## 过滤 OtherHexaploid OtherTetraploid
+df <- subset(df,df$Subspecies!='OtherHexaploid' & df$Subspecies!='OtherTetraploid')
+df$Subspecies <- factor(df$Subspecies,
+                        levels = c("Ae.tauschii","Wild_emmer","Domesticated_emmer",
+                                   "Free_threshing_tetraploid","Landrace","Cultivar"),ordered = TRUE)
+p <-ggplot(df, aes(x=Sub,y=df$DeleteriousCountPerHaplotype,fill=Subspecies))+
+  ### box
+  stat_boxplot(geom = "errorbar",width=0.05,position = position_dodge(0.8))+ # add error bar
+  geom_boxplot(position = position_dodge(0.8),outlier.color = NA,alpha=0.2)+
+  geom_point(position = position_jitterdodge(0.6),alpha = 0.8,aes(col=Subspecies),size=1)+  #this
+  ### violin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=1.4) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.08, color="white", alpha=0.2) + #this
+  # geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  labs(y="No. derived SNP",x="")+
+  facet_grid(IfLoadisStrong~.,scales = "free")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+
+p
+# ggsave(p,fi  lename = "~/Documents/test.pdf",height = 3,width = 3.6)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 7.2*3/4,width = 7.2)
+```
+
+```{r}
+dataFile <- c("/Users/Aoyue/Downloads/df_burden.txt")
+df <- read.delim(dataFile)
+
+colB <- c("#87cef9","#ffd702","#7f5701","#016699","#fc6e6e","#9900ff","gray")
+
+df$fdBySubContinent <- factor(df$fdBySubContinent,
+                        levels = c("AT","WE","DE",
+                                   "FTT","LR","CL"),ordered = TRUE)
+
+p <-ggplot(df, aes(x=Sub,y=df$Burden,fill=df$fdBySubContinent))+
+  ### box
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(0.8))+ # add error bar
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.8)+
+  # geom_point(position = position_jitterdodge(0.2),alpha = 1,aes(col=Subspecies),size=0.3)+  #this
+  ### violin
+  geom_violin(position = position_dodge(0.8),alpha=0.8,width=1.4) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.08, color="white", alpha=0.2) + #this
+  geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  labs(y="Mutation burden",x="")+
+  facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    # ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+
+p
+# ggsave(p,fi  lename = "~/Documents/test.pdf",height = 3,width = 3.6)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 7.2*3/4,width = 7.2)
+
+```
+
+
+
+- 在分析显著性差异前，先将数据框赋予一个新的变量，存储下来。
+```{r}
+dfdf <- df
+```
+## 显著性分析
+### significance test - slightly
+- 先计算平均值 标准差之类的
+```{r}
+### 平均数，标准差，方差等统计
+  
+df <- dfdf %>% filter(IfLoadisStrong == "Slightly") %>% 
+  mutate(Subspecies = factor(Subspecies)) %>% 
+  group_by(Sub,Subspecies) %>% 
+summarise(n=n(),mean=mean(Ratio_delVSsyn_bycount),median=median(Ratio_delVSsyn_bycount),max=max(Ratio_delVSsyn_bycount),min=min(Ratio_delVSsyn_bycount),sd=sd(Ratio_delVSsyn_bycount), se = sd/sqrt(n))
+
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+
+```
+
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,4],df[2,4])
+aochangePercent(df[6,4],df[7,4])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[2,4],df[3,4])
+aochangePercent(df[7,4],df[8,4])
+print("******************************")
+## ftt-lr 
+print("ftt - lr")
+aochangePercent(df[3,4],df[4,4])
+aochangePercent(df[8,4],df[9,4])
+print("******************************")
+## ae-lr cl
+print("ae - lr cl")
+aochangePercent(df[11,4],df[12,4])
+aochangePercent(df[11,4],df[13,4])
+print("******************************")
+## lr - cl
+print("lr - cl")
+aochangePercent(df[4,4],df[5,4])
+aochangePercent(df[9,4],df[10,4])
+aochangePercent(df[12,4],df[13,4])
+print("******************************")
+
+```
+
+[1] "we -de"
+[1] "before 0.767318181818182 \n after 0.774538461538462 out 0.00940975972076026"
+[1] "before 0.704015151515151 \n after 0.711326923076923 out 0.0103858156263192"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.774538461538462 \n after 0.7725 out -0.00263184030191678"
+[1] "before 0.711326923076923 \n after 0.7132 out 0.00263321528021844"
+[1] "******************************"
+[1] "ftt - lr"
+[1] "before 0.7725 \n after 0.776118644067797 out 0.00468432889035167"
+[1] "before 0.7132 \n after 0.707559322033898 out -0.00790897078814033"
+[1] "******************************"
+[1] "ae - lr cl"
+[1] "before 0.738694444444444 \n after 0.750101694915254 out 0.0154424478979112"
+[1] "before 0.738694444444444 \n after 0.750606060606061 out 0.0161252277598685"
+[1] "******************************"
+[1] "lr - cl"
+[1] "before 0.776118644067797 \n after 0.776560606060606 out 0.000569451586026878"
+[1] "before 0.707559322033898 \n after 0.708893939393939 out 0.00188622680597968"
+[1] "before 0.750101694915254 \n after 0.750606060606061 out 0.000672396415346516"
+[1] "******************************"
+
+- 正态分布检验和同质性检验
+```{r}
+### 先检验 slightly load
+
+df <- dfdf %>% filter(IfLoadisStrong == "Slightly") %>% 
+  filter(Sub == "A") %>% 
+  mutate(Subspecies = factor(Subspecies))
+
+#### 检验 A亚基因组中各个亚群是否为正态分布
+factor1 <- levels(df$Subspecies)
+for (i in factor1){
+  p <- with(df, shapiro.test(Ratio_delVSsyn_bycount[Subspecies == i]))
+  print(paste(p[2],i))
+}
+
+
+#### 再检验各组数据是否具有同质性,这里只进行不同倍性的同质性检验
+dfhomogeneity <- dfdf %>% 
+  filter(IfLoadisStrong == "Slightly") %>% 
+  filter(Sub == "A") %>% 
+  filter(Group == "Tetraploid" | Group == "Hexaploid")
+res.ftest <- var.test(Ratio_delVSsyn_bycount ~ Group, data = dfhomogeneity)
+res.ftest
+
+dfhomogeneity <- dfdf %>% 
+  filter(IfLoadisStrong == "Slightly") %>% 
+  filter(Sub == "D") %>% 
+  filter(Group == "Ae.tauschii" | Group == "Hexaploid")
+res.ftest <- var.test(Ratio_delVSsyn_bycount ~ Group, data = dfhomogeneity)
+res.ftest
+
+### 结论： 有显著性差别，不来自同一整体
+
+### 因为其个数都大于30，可以用t检验
+```
+- 显著性检验
+```{r}
+### 先检验 slightly load
+
+df <- dfdf %>% filter(IfLoadisStrong == "Slightly") %>% 
+  filter(Sub == "A") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+```
+
+- A sub 的两两比较 slightly
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+                          Wild_emmer Domesticated_emmer Free_threshing_tetraploid Landrace
+Domesticated_emmer        2.0e-09    -                  -                         -       
+Free_threshing_tetraploid 0.00041    0.08536            -                         -       
+Landrace                  1.9e-13    0.03362            0.00192                   -       
+Cultivar                  1.7e-13    0.01540            0.00100                   0.51052 
+
+P value adjustment method: BH 
+
+- B sub 的两两比较  slightly
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+                          Wild_emmer Domesticated_emmer Free_threshing_tetraploid Landrace
+Domesticated_emmer        3.0e-10    -                  -                         -       
+Free_threshing_tetraploid 3.4e-12    0.02020            -                         -       
+Landrace                  0.00066    7.5e-09            6.9e-10                   -       
+Cultivar                  6.6e-06    0.00012            9.5e-07                   0.02856 
+
+P value adjustment method: BH 
+
+- D sub 的两两比较  slightly
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+         Ae.tauschii Landrace
+Landrace 2.4e-10     -       
+Cultivar 1.4e-10     0.42    
+
+P value adjustment method: BH 
+
+
+### significance test - strongly
+
+- 先计算平均值 标准差之类的
+```{r}
+### 平均数，标准差，方差等统计
+  
+df <- dfdf %>% filter(IfLoadisStrong == "Strongly") %>% 
+  mutate(Subspecies = factor(Subspecies)) %>% 
+  group_by(Sub,Subspecies) %>% 
+  summarise(count = n(),mean = mean(Ratio_delVSsyn_bycount,na.rm=T),sd = sd(Ratio_delVSsyn_bycount,na.rm = T))
+
+df
+
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+
+```
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,4],df[2,4])
+aochangePercent(df[6,4],df[7,4])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[2,4],df[3,4])
+aochangePercent(df[7,4],df[8,4])
+print("******************************")
+## ftt-lr 
+print("ftt - lr")
+aochangePercent(df[3,4],df[4,4])
+aochangePercent(df[8,4],df[9,4])
+print("******************************")
+## ae-lr cl
+print("ae - lr cl")
+aochangePercent(df[11,4],df[12,4])
+aochangePercent(df[11,4],df[13,4])
+print("******************************")
+## lr - cl
+print("lr - cl")
+aochangePercent(df[4,4],df[5,4])
+aochangePercent(df[9,4],df[10,4])
+aochangePercent(df[12,4],df[13,4])
+print("******************************")
+
+```
+- result
+[1] "we -de"
+[1] "before 0.0799242424242424 \n after 0.0778076923076923 out -0.0264819540648924"
+[1] "before 0.0741818181818182 \n after 0.0705769230769231 out -0.0485953996983409"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.0778076923076923 \n after 0.07414 out -0.0471379139891252"
+[1] "before 0.0705769230769231 \n after 0.06966 out -0.012991825613079"
+[1] "******************************"
+[1] "ftt - lr"
+[1] "before 0.07414 \n after 0.0713559322033898 out -0.0375514944241997"
+[1] "before 0.06966 \n after 0.0626610169491525 out -0.100473486230942"
+[1] "******************************"
+[1] "ae - lr cl"
+[1] "before 0.0511388888888889 \n after 0.0426610169491525 out -0.165781308979092"
+[1] "before 0.0511388888888889 \n after 0.0431060606060606 out -0.157078662782085"
+[1] "******************************"
+[1] "lr - cl"
+[1] "before 0.0713559322033898 \n after 0.0705909090909091 out -0.0107212265169509"
+[1] "before 0.0626610169491525 \n after 0.063 out 0.00540979172301858"
+[1] "before 0.0426610169491525 \n after 0.0431060606060606 out 0.0104320920769073"
+[1] "******************************"
+
+
+
+- 显著性检验
+```{r}
+### 先检验 slightly load
+
+df <- dfdf %>% filter(IfLoadisStrong == "Strongly") %>% 
+  filter(Sub == "D") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+ 
+  p[3]
+ 
+ test <- data.frame(matrix(unlist( p[3]), nrow=length( p[3]), byrow=TRUE))
+ test
+```
+
+- A sub 的两两比较 strongly
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+                          Wild_emmer Domesticated_emmer Free_threshing_tetraploid Landrace
+Domesticated_emmer        1.3e-05    -                  -                         -       
+Free_threshing_tetraploid < 2e-16    4.9e-16            -                         -       
+Landrace                  < 2e-16    < 2e-16            1.1e-09                   -       
+Cultivar                  < 2e-16    < 2e-16            3.8e-15                   0.039   
+
+P value adjustment method: BH 
+
+- B sub 的两两比较 strongly
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+                          Wild_emmer Domesticated_emmer Free_threshing_tetraploid Landrace
+Domesticated_emmer        1.5e-09    -                  -                         -       
+Free_threshing_tetraploid 1.3e-12    0.013              -                         -       
+Landrace                  < 2e-16    < 2e-16            < 2e-16                   -       
+Cultivar                  < 2e-16    < 2e-16            < 2e-16                   0.363   
+
+P value adjustment method: BH 
+
+- D sub 的两两比较 strongly
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+         Ae.tauschii Landrace
+Landrace 1.1e-13     -       
+Cultivar 2.1e-13     0.11    
+
+P value adjustment method: BH 
+
+## **合并AB亚基因组的结果
+```{r}
+dataFile <- c("data/fig3/load_mergeABsub/delCount_filterLR_CL.txt")
+df <- read.delim(dataFile)
+
+df1 <- df %>% 
+  select(c(Taxa,Sub=mergedSub,DeleteriousCountPerHaplotype=del_DeleteriousCountPerHaplotype,SiteCountWithMinDepth=del_SiteCountWithMinDepth,Group,Subspecies,GroupID,Ratio =del_Ratio,Ratio_delVSsyn= Ratio_delVSsyn,Ratio_delVSsyn_bycount=Ratio_delVSsyn_bycount)) %>% 
+  mutate(IfLoadisStrong="Strongly")
+
+
+
+df2 <- df %>% 
+  select(c(Taxa,Sub=mergedSub,DeleteriousCountPerHaplotype=nonsyn_DeleteriousCountPerHaplotype,SiteCountWithMinDepth=nonsyn_SiteCountWithMinDepth,Group,Subspecies,GroupID,Ratio =nonsyn_Ratio,Ratio_delVSsyn= Ratio_nonsynVSsyn,Ratio_delVSsyn_bycount=Ratio_nonsynVSsyn_bycount)) %>% 
+mutate(IfLoadisStrong="Slightly")
+
+df <- rbind(df1,df2)
+colB <- c("#87cef9","#ffd702","#7f5701","#016699","#fc6e6e","#9900ff")
+nrow(df)
+## 过滤 OtherHexaploid OtherTetraploid
+df <- subset(df,df$Subspecies!='OtherHexaploid' & df$Subspecies!='OtherTetraploid')
+df$Subspecies <- factor(df$Subspecies,
+                        levels = c("Ae.tauschii","Wild_emmer","Domesticated_emmer",
+                                   "Free_threshing_tetraploid","Landrace","Cultivar"),ordered = TRUE)
+p <-ggplot(df, aes(x=Sub,y=df$Ratio_delVSsyn_bycount,fill=Subspecies))+
+  ### box
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(0.8))+ # add error bar
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.8)+
+  # geom_point(position = position_jitterdodge(0.2),alpha = 1,aes(col=Subspecies),size=0.3)+  #this
+  ### violin
+  geom_violin(position = position_dodge(0.8),alpha=0.8,width=1.4) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.08, color="white", alpha=0.2) + #this
+  geom_boxplot(position = position_dodge(0.8), width=0.2, color="white", alpha=0.2) +
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  labs(y="Mutation burden",x="")+
+  facet_grid(IfLoadisStrong~.,scales = "free")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 16))
+
+
+p
+# ggsave(p,fi  lename = "~/Documents/test.pdf",height = 3,width = 3.6)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 7.2*3/4,width = 7.2)
+ggsave(p,filename = "~/Documents/test.png",height = 7.2*3/4,width = 7.2)
+
+## summary:
+# plot1: 字体：7 大小 3 4
+# plot1: 字体：12 大小 7.2*3/4 7.2
+```
+
+### legend
+```{r}
+dataFile <- c("data/fig3/load_mergeABsub/delCount_filterLR_CL.txt")
+df <- read.delim(dataFile)
+
+df1 <- df %>% 
+  select(c(Taxa,Sub=mergedSub,DeleteriousCountPerHaplotype=del_DeleteriousCountPerHaplotype,SiteCountWithMinDepth=del_SiteCountWithMinDepth,Group,Subspecies,GroupID,Ratio =del_Ratio,Ratio_delVSsyn= Ratio_delVSsyn,Ratio_delVSsyn_bycount=Ratio_delVSsyn_bycount)) %>% 
+  mutate(IfLoadisStrong="Strongly")
+
+
+
+df2 <- df %>% 
+  select(c(Taxa,Sub=mergedSub,DeleteriousCountPerHaplotype=nonsyn_DeleteriousCountPerHaplotype,SiteCountWithMinDepth=nonsyn_SiteCountWithMinDepth,Group,Subspecies,GroupID,Ratio =nonsyn_Ratio,Ratio_delVSsyn= Ratio_nonsynVSsyn,Ratio_delVSsyn_bycount=Ratio_nonsynVSsyn_bycount)) %>% 
+mutate(IfLoadisStrong="Slightly")
+
+df <- rbind(df1,df2)
+colB <- c("#87cef9","#ffd702","#7f5701","#016699","#fc6e6e","#9900ff")
+nrow(df)
+## 过滤 OtherHexaploid OtherTetraploid
+df <- subset(df,df$Subspecies!='OtherHexaploid' & df$Subspecies!='OtherTetraploid')
+df$Subspecies <- factor(df$Subspecies,
+                        levels = c("Ae.tauschii","Wild_emmer","Domesticated_emmer",
+                                   "Free_threshing_tetraploid","Landrace","Cultivar"),ordered = TRUE)
+p <-ggplot(df, aes(x=Sub,y=df$Ratio_delVSsyn_bycount,fill=Subspecies))+
+  ### box
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(0.8))+ # add error bar
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.8)+
+  # geom_point(position = position_jitterdodge(0.2),alpha = 1,aes(col=Subspecies),size=0.3)+  #this
+  ### violin
+  geom_violin(position = position_dodge(0.8),alpha=0.8,width=1.4) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.08, color="white", alpha=0.2) + #this
+  geom_boxplot(position = position_dodge(0.8), width=0.2, color="white", alpha=0.2) +
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  labs(y="Mutation burden",x="")+
+  facet_grid(IfLoadisStrong~.,scales = "free")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    # ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+
+p
+# ggsave(p,fi  lename = "~/Documents/test.pdf",height = 3,width = 3.6)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 7.2*3/4,width = 7.2)
+
+```
+
+
+- 在分析显著性差异前，先将数据框赋予一个新的变量，存储下来。
+```{r}
+dfdf <- df
+```
+## 显著性分析
+### significance test - slightly
+- 先计算平均值 标准差之类的
+```{r}
+### 平均数，标准差，方差等统计
+  
+df <- dfdf %>% filter(IfLoadisStrong == "Slightly") %>% 
+  mutate(Subspecies = factor(Subspecies)) %>% 
+  group_by(Sub,Subspecies) %>% 
+  summarise(count = n(),mean = mean(Ratio_delVSsyn_bycount,na.rm=T),sd = sd(Ratio_delVSsyn_bycount,na.rm = T))
+
+df
+```
+
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,4],df[2,4])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[2,4],df[3,4])
+print("******************************")
+## ftt-lr 
+print("ftt - lr")
+aochangePercent(df[3,4],df[4,4])
+print("******************************")
+## ae-lr cl
+print("ae - lr cl")
+aochangePercent(df[6,4],df[7,4])
+aochangePercent(df[6,4],df[8,4])
+print("******************************")
+## lr - cl
+print("lr - cl")
+aochangePercent(df[4,4],df[5,4])
+aochangePercent(df[7,4],df[8,4])
+print("******************************")
+
+```
+
+[1] "we -de"
+[1] "before 0.733944130107465 \n after 0.741204964385123 out 0.00989289781034783"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.741204964385123 \n after 0.741174076719054 out -4.1672233123837e-05"
+[1] "******************************"
+[1] "ftt - lr"
+[1] "before 0.741174076719054 \n after 0.739887822176049 out -0.00173542840124501"
+[1] "******************************"
+[1] "ae - lr cl"
+[1] "before 0.738692030009708 \n after 0.750019512738652 out 0.0153345132595994"
+[1] "before 0.738692030009708 \n after 0.750636805208536 out 0.0161701693176129"
+[1] "******************************"
+[1] "lr - cl"
+[1] "before 0.739887822176049 \n after 0.740968825204823 out 0.0014610363846697"
+[1] "before 0.750019512738652 \n after 0.750636805208536 out 0.000823035213617242"
+[1] "******************************"
+
+- 显著性检验
+```{r}
+### 先检验 slightly load
+
+df <- dfdf %>% filter(IfLoadisStrong == "Slightly") %>% 
+  # filter(Sub == "AB") %>%  #### 这里可以切换亚基因组
+  filter(Sub == "D") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+```
+
+- AB sub 的两两比较 slightly
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+                          Wild_emmer Domesticated_emmer Free_threshing_tetraploid Landrace
+Domesticated_emmer        3.1e-11    -                  -                         -       
+Free_threshing_tetraploid 2.3e-09    0.969              -                         -       
+Landrace                  4.3e-09    0.021              0.141                     -       
+Cultivar                  6.0e-11    0.839              0.887                     0.066   
+
+P value adjustment method: BH 
+
+ 
+
+- D sub 的两两比较  slightly
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+         Ae.tauschii Landrace
+Landrace 3.0e-10     -       
+Cultivar 1.4e-10     0.33    
+
+P value adjustment method: BH 
+
+
+
+
+### significance test - strongly
+
+- 先计算平均值 标准差之类的
+```{r}
+### 平均数，标准差，方差等统计
+
+df <- dfdf %>% filter(IfLoadisStrong == "Strongly") %>% 
+  mutate(Subspecies = factor(Subspecies)) %>% 
+  group_by(Sub,Subspecies) %>% 
+summarise(n=n(),mean=mean(Ratio_delVSsyn_bycount),median=median(Ratio_delVSsyn_bycount),max=max(Ratio_delVSsyn_bycount),min=min(Ratio_delVSsyn_bycount),sd=sd(Ratio_delVSsyn_bycount), se = sd/sqrt(n))
+
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+
+```
+
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,4],df[2,4])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[2,4],df[3,4])
+print("******************************")
+## ftt-lr 
+print("ftt - lr")
+aochangePercent(df[3,4],df[4,4])
+print("******************************")
+
+## ae-lr cl
+print("ae - lr cl")
+aochangePercent(df[6,4],df[7,4])
+aochangePercent(df[6,4],df[8,4])
+print("******************************")
+## lr - cl
+print("lr - cl")
+aochangePercent(df[4,4],df[5,4])
+aochangePercent(df[7,4],df[8,4])
+print("******************************")
+
+```
+- result
+[1] "we -de"
+[1] "before 0.0769024775301932 \n after 0.0739948188324028 out -0.0378096882073643"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.0739948188324028 \n after 0.0717364140896277 out -0.0305211199704452"
+[1] "******************************"
+[1] "ftt - lr"
+[1] "before 0.0717364140896277 \n after 0.0668109573997636 out -0.0686604809059759"
+[1] "******************************"
+[1] "ae - lr cl"
+[1] "before 0.0511812489034657 \n after 0.0426850810669788 out -0.166001573203337"
+[1] "before 0.0511812489034657 \n after 0.0430766647243941 out -0.158350652879884"
+[1] "******************************"
+[1] "lr - cl"
+[1] "before 0.0668109573997636 \n after 0.0665955496457528 out -0.00322413811138714"
+[1] "before 0.0426850810669788 \n after 0.0430766647243941 out 0.00917378268067007"
+[1] "******************************"
+
+
+- 显著性检验
+```{r}
+### 先检验 slightly load
+
+df <- dfdf %>% filter(IfLoadisStrong == "Strongly") %>% 
+  filter(Sub == "AB") %>%  #### 这里可以切换亚基因组
+  # filter(Sub == "D") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+ #  p[3]
+ # 
+ # test <- data.frame(matrix(unlist( p[3]), nrow=length( p[3]), byrow=TRUE))
+ # test
+```
+
+- AB sub 的两两比较 strongly
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+                          Wild_emmer Domesticated_emmer Free_threshing_tetraploid Landrace
+Domesticated_emmer        3.0e-08    -                  -                         -       
+Free_threshing_tetraploid < 2e-16    6.7e-11            -                         -       
+Landrace                  < 2e-16    < 2e-16            < 2e-16                   -       
+Cultivar                  < 2e-16    < 2e-16            < 2e-16                   0.51    
+
+P value adjustment method: BH 
+
+
+
+- D sub 的两两比较 strongly
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Ratio_delVSsyn_bycount and df$Subspecies 
+
+         Ae.tauschii Landrace
+Landrace 1.3e-13     -       
+Cultivar 2.0e-13     0.15    
+
+P value adjustment method: BH 
+
+
+## =======================
+## PGI
+```{r}
+tablePGI <- read.delim("data/fig3/fd/PGI100SNPwindow_50Step.BySub.thresh0.5.txt")
+tablePGI$P3 <- factor(tablePGI$P3, levels = c("WE","DE","FT","AT"))
+```
+
+## x=Sub
+```{r}
+colBySubspeciesP3<- c("#ffd702","#7f5701","#016699","#87cef9")
+ggplot(tablePGI, aes(x=Sub, y=PGI, fill=P3))+
+  geom_boxplot()+
+  # facet_grid(.~GroupBySubspecies)+
+  scale_fill_manual(values = colBySubspeciesP3)+
+  theme_classic()+
+  theme(legend.position = "none", legend.title = element_blank(),
+        panel.background = element_rect(fill="transparent"),
+        # legend.text = element_text(size = 10),
+        # legend.key.size = unit(1,"cm"),
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 14),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+```
+
+## x=subspecies
+```{r}
+colB<- c("#ffd702","#7f5701","#016699","#87cef9")
+
+dftaxaSubspeciesMap <- tablePGI %>% select(IntrogressionID,GroupBySubspecies,GroupBySubcontinent) %>% distinct(.,IntrogressionID,.keep_all = T)
+
+df <- tablePGI %>% 
+  group_by(IntrogressionID,P3) %>% 
+  summarise(TotalPGI = sum(PGI)) %>% 
+  left_join(.,dftaxaSubspeciesMap,by="IntrogressionID") 
+
+## 求每个P3的最大值和最小值
+dfvalue <- df %>% 
+  group_by(P3) %>% 
+  summarise(max = max(TotalPGI),min = min(TotalPGI))
+  
+p <- df %>% 
+  ggplot(aes(x=P3, y=TotalPGI, fill=P3))+
+  ### box
+  stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(0.8))+ # add error bar
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=1)+
+  geom_point(position = position_jitterdodge(0.8),alpha = 0.5,aes(col=P3),size=0.3)+  #this
+   ### violin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=1.4) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.08, color="white", alpha=0.2) + #this
+  # geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  labs(y="The proportion of genome\nintrogression (PGI)",x="")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 4*3/4,width = 4)
+```
+
+
+## x=hexaploid
+想看六倍体基因渗入的量达到基因组的多少
+```{r}
+dftaxaSubspeciesMap <- tablePGI %>% select(IntrogressionID,GroupBySubspecies,GroupBySubcontinent) %>% distinct(.,IntrogressionID,.keep_all = T)
+
+df <- tablePGI %>% 
+  group_by(IntrogressionID) %>% 
+  summarise(TotalPGI = sum(PGI)) %>% 
+  left_join(.,dftaxaSubspeciesMap,by="IntrogressionID") 
+
+## 求每个P3的最大值和最小值
+dfvalue <- df %>% 
+  group_by(IntrogressionID) %>% 
+  summarise(max = max(TotalPGI))
+  
+factor1 <- c("OtherHexaploid","NA")
+df <- df %>% filter(!GroupBySubcontinent %in% factor1) %>% filter(!is.na(GroupBySubcontinent)) %>% droplevels()
+
+## 排序
+dforder <- df %>% group_by(GroupBySubcontinent) %>% 
+  summarise(mean = mean(TotalPGI)) %>% 
+  arrange(desc(mean))
+
+df$GroupBySubcontinent <- factor(df$GroupBySubcontinent,levels = dforder$GroupBySubcontinent)
+colB <- colorRampPalette(brewer.pal(9,"Reds")[c(6,5,4,3,2)])(nlevels(df$GroupBySubcontinent))
+p <- df %>% 
+  ggplot(aes(x=GroupBySubcontinent, y=TotalPGI, fill=GroupBySubcontinent))+
+  ### box
+  stat_boxplot(geom = "errorbar",width=0.12,position = position_dodge(0.8))+ # add error bar
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=1)+
+  # geom_point(position = position_jitterdodge(0.8),alpha = 0.5,aes(col=GroupBySubcontinent),size=0.3)+  #this
+   ### violin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=1.4) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.08, color="white", alpha=0.2) + #this
+  # geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
+  stat_summary(fun=mean, geom="point", color="white",position = position_dodge(0.8),size=0.5)+
+  scale_fill_manual(values = colB)+
+  labs(y="The proportion of genome\nintrogression (PGI)",x="")+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))
+
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 4*3/4,width = 4)
+
+```
+
+
+
+## ======================
+## Introgression VS deleterious
+```{r}
+df <- read.table("data/fig3/fd/fdLoadBySubspecies100SNPwindow_50Step.txt.gz", header = T, sep = "\t")
+df <- df %>% mutate(Sub=substring(Chr, 2,2))
+df$P2 <- factor(df$P2, levels = c("Landrace", "Cultivar"), labels = c("LR","CL"), ordered = T)
+# unique(table$P3)
+df$P3 <- factor(df$P3, levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","Ae"),labels = c("WE","DE","FTT","AT"), ordered = T)
+df$Sub <- factor(df$Sub, levels = c("A","B","D"), ordered = T)
+df <- mutate(df,SubID = substr(Chr, 1, 1))
+
+df$IntrogressedWeaklyLoad <- (df$IntrogressedNonTotalCount + df$IntrogressedDelTotalCount)/df$IntrogressedSynTotalCount
+
+df$IntrogressedStronglyLoad <- (df$IntrogressedDelTotalCount)/df$IntrogressedSynTotalCount
+
+df$NonIntrogressedWeaklyLoad <- (df$NonIntrogressedNonTotalCount + df$NonIntrogressedDelTotalCount)/ df$NonIntrogressedSynTotalCount
+
+df$NonIntrogressedStronglyLoad <- (df$NonIntrogressedDelTotalCount)/df$NonIntrogressedSynTotalCount
+
+df$WeaklyLoad <- df$IntrogressedWeaklyLoad / df$NonIntrogressedWeaklyLoad
+df$StronglyLoad <- df$IntrogressedStronglyLoad / df$NonIntrogressedStronglyLoad
+
+```
+
+
+```{r}
+### Slightly load
+## inf -> max
+maxWeaklyLoadDf <- df %>% 
+  filter(!is.na(WeaklyLoad),!is.nan(WeaklyLoad),is.finite(WeaklyLoad)) %>% 
+  arrange(desc(WeaklyLoad))
+
+maxWeaklyLoad <- maxWeaklyLoadDf$WeaklyLoad[1]
+
+WeaklyLoadDf <- df %>% 
+  filter(!is.na(WeaklyLoad),!is.nan(WeaklyLoad)) %>% 
+  mutate(WeaklyLoad = if_else(is.infinite(WeaklyLoad),maxWeaklyLoad,WeaklyLoad),LoadLevel = "Slightly") %>%  
+  select(1:5,Sub,RatioOfIntroVSnonIntro = WeaklyLoad,LoadLevel)
+
+### Strongly load
+maxStronglyLoadDf <- df %>% 
+  filter(!is.na(StronglyLoad),!is.nan(StronglyLoad),is.finite(StronglyLoad)) %>% 
+  arrange(desc(StronglyLoad))
+
+maxStronglyLoad <- maxStronglyLoadDf$StronglyLoad[1]
+
+StronglyLoadDf <- df %>% 
+  filter(!is.na(StronglyLoad),!is.nan(StronglyLoad),is.finite(StronglyLoad)) %>% 
+  mutate(StronglyLoad = if_else(is.infinite(StronglyLoad),maxStronglyLoad,StronglyLoad),LoadLevel = "Strongly") %>% 
+  select(1:5, Sub, RatioOfIntroVSnonIntro = StronglyLoad, LoadLevel)
+
+### Strongly 和 sligtly 合并起来
+dfnew <- rbind(WeaklyLoadDf,StronglyLoadDf)
+```
+
+接上
+```{r}
+## boxplot
+colBySubspeciesP3<- c("#ffd702","#7f5701","#016699","#87cef9")
+
+p <- ggplot(dfnew, aes(x=P3, y=RatioOfIntroVSnonIntro+0.000001, fill=P3))+ ## 由于大部分值是0，所以相加一个增量来进行比较
+  geom_hline(yintercept = 1, linetype=2, color="grey")+
+  stat_summary(geom = "pointrange", fun.data = mean_cl_boot, aes(color=P3), 
+               position = position_dodge(0.8))+
+  facet_grid(LoadLevel~., scales = "free_y")+
+  labs(y= "Introgression burden vs nointrogression burden",x="")+
+  scale_fill_manual(values = colBySubspeciesP3)+
+  scale_color_manual(values = colBySubspeciesP3)+
+  scale_y_log10(breaks = scales::trans_breaks("log2", function(x) 2^x),
+                labels = scales::trans_format("log2", scales::math_format(2^.x)))+
+  coord_flip()+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 4*3/4,width = 4)
+
+```
+```{r}
+## boxplot
+colBySubspeciesP3<- c("#ffd702","#7f5701","#016699","#87cef9")
+
+p <- ggplot(dfnew, aes(x=Sub, y=RatioOfIntroVSnonIntro+0.000001, fill=P3))+ ## 由于大部分值是0，所以相加一个增量来进行比较
+  geom_hline(yintercept = 1, linetype=2, color="grey")+
+  stat_summary(geom = "pointrange", fun.data = mean_cl_boot, aes(color=P3), 
+               position = position_dodge(0.8))+
+  facet_grid(.~LoadLevel, scales = "free_y")+
+  labs(y= "Introgression burden vs\nnon-introgression burden",x="Subgenome")+
+  scale_fill_manual(values = colBySubspeciesP3)+
+  scale_color_manual(values = colBySubspeciesP3)+
+  scale_y_log10(breaks = scales::trans_breaks("log2", function(x) 2^x),
+                labels = scales::trans_format("log2", scales::math_format(2^.x)))+
+  # coord_flip()+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 6)
+```
+- Discussion:
+```{r}
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 6)
+
+```
+
+
+
+
+## del load count in introgression
+
+```{r} 
+
+```
+
+## =================
+## XPCLR deleterious
+```{r}
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/003_nonsynGERPandDerivedSIFT_ifselected1_wede_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df1 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df1 <- mutate(df1,Refobj = "WE_DE", loadGroup = "Strongly", Ifselected = "1")
+
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/003_nonsynGERPandDerivedSIFT_ifselected1_dedurum_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df2 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df2 <- mutate(df2,Refobj = "DE_Durum",loadGroup = "Strongly",Ifselected = "1")
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/003_nonsynGERPandDerivedSIFT_ifselected1_lrcul_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df3 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df3 <- mutate(df3,Refobj = "LR_CL",loadGroup = "Strongly", Ifselected = "1")
+
+df_strongly <- rbind(df1,df2,df3)
+
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/002_nonsynonymous_ifselected1_wede_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df4 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df4 <- mutate(df4,Refobj = "WE_DE", loadGroup = "Slightly", Ifselected = "1")
+
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/002_nonsynonymous_ifselected1_dedurum_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df5 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df5 <- mutate(df5,Refobj = "DE_Durum",loadGroup = "Slightly",Ifselected = "1")
+
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/002_nonsynonymous_ifselected1_lrcul_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df6 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df6 <- mutate(df6,Refobj = "LR_CL",loadGroup = "Slightly", Ifselected = "1")
+
+df_slightly <- rbind(df4,df5,df6)
+
+dftotal <- rbind(df_strongly, df_slightly)
+df <- dftotal
+df$Subspecies <- factor(df$Subspecies, levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","Landrace","Cultivar"))
+df$Refobj <- factor(df$Refobj,levels = c("WE_DE","DE_Durum","LR_CL"))
+colB <- c("#ffd702","#7f5701","#016699","#fc6e6e","#9900ff")
+
+p <- ggplot(df,aes(x=Sub,y=Ratio_delVSsyn_bycount,col=Subspecies))+
+  ylab("Mutation burden")+xlab("")+
+  # stat_summary(aes(color=Subspecies),fun = median, geom="point",position = position_dodge(0.5),size=3,shape=4)+
+  stat_summary(aes(color=Subspecies),fun.data=mean_sdl,position = position_dodge(0.5),geom="pointrange",size=0.3)+
+  scale_color_manual(values = colB,name='')+
+  facet_grid(loadGroup~df$Refobj,scales = "free")+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+p
+
+ggsave(p,filename = "~/Documents/test3.pdf",height = 3,width = 4)
+
+```
+
+### 画出选择区的count
+```{r}
+df <- dftotal
+df$Subspecies <- factor(df$Subspecies, levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","Landrace","Cultivar"))
+df$Refobj <- factor(df$Refobj,levels = c("WE_DE","DE_Durum","LR_CL"))
+colB <- c("#ffd702","#7f5701","#016699","#fc6e6e","#9900ff")
+
+p <- ggplot(df,aes(x=Sub,y=DeleteriousCountPerHaplotype,col=Subspecies))+
+  ylab("Count")+xlab("")+
+  # stat_summary(aes(color=Subspecies),fun = median, geom="point",position = position_dodge(0.5),size=3,shape=4)+
+  stat_summary(aes(color=Subspecies),fun.data=mean_sdl,position = position_dodge(0.5),geom="pointrange",size=0.3)+
+  scale_color_manual(values = colB,name='')+
+  facet_grid(loadGroup~df$Refobj,scales = "free")+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+p
+
+ggsave(p,filename = "~/Documents/test3.pdf",height = 3,width = 4)
+
+```
+
+
+## 显著性分析
+```{r}
+dfdf <- df
+```
+### significance test - slightly
+- 先计算平均值 标准差之类的
+```{r}
+df <- dfdf %>% 
+  filter(loadGroup == "Slightly") %>% 
+  group_by(Refobj,Sub,Subspecies) %>% 
+summarise(n=n(),mean=mean(Ratio_delVSsyn_bycount),median=median(Ratio_delVSsyn_bycount),max=max(Ratio_delVSsyn_bycount),min=min(Ratio_delVSsyn_bycount),sd=sd(Ratio_delVSsyn_bycount), se = sd/sqrt(n))
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+```
+
+- 自定义函数，比较高低
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,5],df[2,5])
+aochangePercent(df[3,5],df[4,5])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[5,5],df[6,5])
+aochangePercent(df[7,5],df[8,5])
+print("******************************")
+## lr - cl
+print("lr - cl")
+aochangePercent(df[9,5],df[10,5])
+aochangePercent(df[11,5],df[12,5])
+aochangePercent(df[13,5],df[14,5])
+print("******************************")
+```
+
+[1] "we -de"
+[1] "before 0.773954545454545 \n after 0.813365384615385 out 0.0509213872989054"
+[1] "before 0.657257575757576 \n after 0.674269230769231 out 0.0258827827005978"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.918730769230769 \n after 0.905111111111111 out -0.0148244279780262"
+[1] "before 0.747307692307692 \n after 0.776555555555556 out 0.0391376451077943"
+[1] "******************************"
+[1] "lr - cl"
+[1] "before 0.897035087719298 \n after 0.892045454545455 out -0.00556236120766446"
+[1] "before 0.822350877192982 \n after 0.819409090909091 out -0.00357728843669874"
+[1] "before 0.767859649122807 \n after 0.768060606060606 out 0.00026171050663837"
+[1] "******************************"
+
+
+
+```{r}
+### ************************** WE_DE 手动调节 A B D亚基因组的值
+df <- dfdf %>% 
+  filter(loadGroup == "Slightly") %>% 
+  filter(Refobj == "WE_DE") %>% 
+  filter(Sub == "B") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+p
+
+```
+- A sub  **** slightly
+                   Wild_emmer
+Domesticated_emmer <2e-16 
+
+- B sub  **** slightly
+Wild_emmer
+Domesticated_emmer 6.7e-05   
+
+```{r}
+### ************************** DE_Durum 手动调节 A B D亚基因组的值
+df <- dfdf %>% 
+  filter(loadGroup == "Slightly") %>% 
+  filter(Refobj == "DE_Durum") %>% 
+  filter(Sub == "B") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+p
+```
+
+- A sub  **** slightly
+Domesticated_emmer
+Free_threshing_tetraploid 0.083 
+
+- B sub  **** slightly
+Domesticated_emmer
+Free_threshing_tetraploid 1.8e-05  
+```{r}
+### ************************** LR_CL 手动调节 A B D亚基因组的值
+df <- dfdf %>% 
+  filter(loadGroup == "Slightly") %>% 
+  filter(Refobj == "LR_CL") %>% 
+  filter(Sub == "D") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+p
+```
+- A sub  **** slightly
+Landrace
+Cultivar 0.12   
+
+- B sub  **** slightly
+Landrace
+Cultivar 0.46  
+
+- D sub  **** slightly
+Landrace
+Cultivar 0.93 
+
+
+### significance test - strongly
+- 先计算平均值 标准差之类的
+```{r}
+df <- dfdf %>% 
+  filter(loadGroup == "Strongly") %>% 
+  group_by(Refobj,Sub,Subspecies) %>% 
+summarise(n=n(),mean=mean(Ratio_delVSsyn_bycount),median=median(Ratio_delVSsyn_bycount),max=max(Ratio_delVSsyn_bycount),min=min(Ratio_delVSsyn_bycount),sd=sd(Ratio_delVSsyn_bycount), se = sd/sqrt(n))
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+  
+```
+
+- 自定义函数，比较高低
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,5],df[2,5])
+aochangePercent(df[3,5],df[4,5])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[5,5],df[6,5])
+aochangePercent(df[7,5],df[8,5])
+print("******************************")
+## lr - cl
+print("lr - cl")
+aochangePercent(df[9,5],df[10,5])
+aochangePercent(df[11,5],df[12,5])
+aochangePercent(df[13,5],df[14,5])
+print("******************************")
+```
+[1] "we -de"
+[1] "before 0.124136363636364 \n after 0.112807692307692 out -0.0912598935301243"
+[1] "before 0.0879848484848485 \n after 0.0834038461538461 out -0.052065809169305"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.107230769230769 \n after 0.0966111111111111 out -0.0990355491790212"
+[1] "before 0.0939423076923077 \n after 0.0987777777777778 out 0.0514727624246561"
+[1] "******************************"
+[1] "lr - cl"
+[1] "before 0.125175438596491 \n after 0.112136363636364 out -0.104166401223164"
+[1] "before 0.111684210526316 \n after 0.106893939393939 out -0.042891211835604"
+[1] "before 0.0425964912280702 \n after 0.0443636363636364 out 0.0414856971693874"
+[1] "******************************"
+
+```{r}
+### ************************** WE_DE 手动调节 A B D亚基因组的值
+df <- dfdf %>% 
+  filter(loadGroup == "Strongly") %>% 
+  filter(Refobj == "WE_DE") %>% 
+  filter(Sub == "B") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+p
+
+```
+- A sub  **** strongly
+                   Wild_emmer
+Domesticated_emmer 1.6e-11   
+
+- B sub  **** strongly
+Wild_emmer
+Domesticated_emmer 0.0098   
+
+```{r}
+### ************************** DE_Durum 手动调节 A B D亚基因组的值
+df <- dfdf %>% 
+  filter(loadGroup == "Strongly") %>% 
+  filter(Refobj == "DE_Durum") %>% 
+  filter(Sub == "B") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+p
+```
+
+- A sub  **** strongly
+Domesticated_emmer
+Free_threshing_tetraploid 4.1e-05 
+
+- B sub  **** strongly
+Domesticated_emmer
+Free_threshing_tetraploid 0.024  
+```{r}
+### ************************** LR_CL 手动调节 A B D亚基因组的值
+df <- dfdf %>% 
+  filter(loadGroup == "Strongly") %>% 
+  filter(Refobj == "LR_CL") %>% 
+  filter(Sub == "D") %>%  #### 这里可以切换亚基因组
+  mutate(Subspecies = factor(Subspecies))
+
+#### 两两比较，默认是 two.side
+p <- pairwise.t.test(df$Ratio_delVSsyn_bycount,df$Subspecies
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+p
+```
+- A sub  **** strongly
+Landrace
+Cultivar 3.4e-09  
+
+- B sub  **** strongly
+Landrace
+Cultivar 0.0016  
+
+- D sub  **** strongly
+Landrace
+Cultivar 0.0061
+
+## **合并AB亚基因组的结果
+```{r}
+### 根据文件倒推synonymous的个数和深度值，再进行合并计算
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/003_nonsynGERPandDerivedSIFT_ifselected1_wede_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df1 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df1 <- mutate(df1,Refobj = "WE_DE", loadGroup = "Strongly", Ifselected = "1")
+
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/003_nonsynGERPandDerivedSIFT_ifselected1_dedurum_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df2 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df2 <- mutate(df2,Refobj = "DE_Durum",loadGroup = "Strongly",Ifselected = "1")
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/003_nonsynGERPandDerivedSIFT_ifselected1_lrcul_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df3 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df3 <- mutate(df3,Refobj = "LR_CL",loadGroup = "Strongly", Ifselected = "1")
+
+df_strongly <- rbind(df1,df2,df3)
+
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/002_nonsynonymous_ifselected1_wede_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df4 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df4 <- mutate(df4,Refobj = "WE_DE", loadGroup = "Slightly", Ifselected = "1")
+
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/002_nonsynonymous_ifselected1_dedurum_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df5 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df5 <- mutate(df5,Refobj = "DE_Durum",loadGroup = "Slightly",Ifselected = "1")
+
+dataFile <- c("data/fig3/xpclr/003_filter_bysub/002_nonsynonymous_ifselected1_lrcul_additiveDeleterious_ANCbarleyVSsecalePasimony_vmap2_bychr_bySub_delVSsynonymous.txt")
+df6 <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+df6 <- mutate(df6,Refobj = "LR_CL",loadGroup = "Slightly", Ifselected = "1")
+
+df_slightly <- rbind(df4,df5,df6)
+
+dftotal <- rbind(df_strongly, df_slightly)
+df <- dftotal
+df$Subspecies <- factor(df$Subspecies, levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploid","Landrace","Cultivar"))
+df$Refobj <- factor(df$Refobj,levels = c("WE_DE","DE_Durum","LR_CL"))
+colB <- c("#ffd702","#7f5701","#016699","#fc6e6e","#9900ff")
+
+p <- ggplot(df,aes(x=Sub,y=Ratio_delVSsyn_bycount,col=Subspecies))+
+  ylab("Mutation burden")+xlab("")+
+  # stat_summary(aes(color=Subspecies),fun = median, geom="point",position = position_dodge(0.5),size=3,shape=4)+
+  stat_summary(aes(color=Subspecies),fun.data=mean_sdl,position = position_dodge(0.5),geom="pointrange",size=0.3)+
+  scale_color_manual(values = colB,name='')+
+  facet_grid(loadGroup~df$Refobj,scales = "free")+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+p
+
+ggsave(p,filename = "~/Documents/test3.pdf",height = 3,width = 4)
+
+
+```
+
+##=====================
+## ***XPCLR score
+## WE vs. DE manhattan plot for add signal dot
+
+```{r}
+################################# ##
+#                               #
+#  XPCLR genome line -- manhattan 100kb 50 kb 
+#                               #
+################################# ##
+library(tidyverse)
+
+# ### log2 snp method whole-genome SNP 3%
+dataFile <- c("data/015_forPlot_snp_whole-genome/ab_WE_DE_log2_0.0001_200_100000.clrgs.txt.gz")
+df_wede <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/015_forPlot_snp_whole-genome/ab_DE_Durum_log2_0.0001_200_100000.clrgs.txt.gz")
+df_dedm <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/015_forPlot_snp_whole-genome/abd_log2_0.0001_200_100000.clrgs.txt.gz")
+df_lrcl <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+# df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+### ******************************************************************************
+### choice: 1.df 2.color 3.threshold  
+### ******************************************************************************
+### 1. data
+df <- df_wede
+# df <- df_dedm
+# df <- df_lrcl
+### 2.color
+test <- "wede"
+# test <- "dedm"
+# test <- "lrcl"
+colB <- NULL
+labelB <- NULL
+
+# colB1 <- c("#ffd702","#7f5701") ### we de
+# colB2 <- c("#7f5701","#016699") ### de durum
+# colB3 <- c("#fc6e6e","#9900ff")  ### lr cl
+## use subgenome color
+colB1 <- c("#fd8582","#967bce") ### we de
+colB2 <- c("#fd8582","#967bce") ### de durum
+colB3 <- c("#fd8582","#967bce","#4bcdc6")  ### lr cl
+
+### if else failed to use
+if(test == "wede"){
+  colB <- colB1
+  labelB <- "WE vs. DE"
+} 
+if(test == "dedm"){
+  colB <- colB2
+  labelB <- "DE vs. Durum"
+}
+if(test == "lrcl"){
+  colB <- colB3
+  labelB <- "Landrace vs. Cultivar"
+}
+
+### 3. 
+# top <- 0.01
+top <- 0.05
+
+# head(df)
+# nrow(df)
+### step2: 修改列名，使之固定
+names(df)[names(df)=="XPCLR_100score"] = "Ave"
+names(df)[names(df)=="CHROM"] = "Chr"
+names(df)[names(df)=="ChrRef"] = "CHROM"
+names(df)[names(df)=="PosRef"] = "BIN_START"
+max(df$Ave)
+min(df$Ave)
+### step3: 去除NA和无限小的值
+df <- dplyr::filter(df,!is.na(Ave) & is.finite(Ave))
+nrow(df)
+head(df)
+max(df$Ave) # 48.50477
+min(df$Ave) # 0
+### step4: 获取TOP K 截距
+### step4a: 排序
+df_sorted <- df %>% 
+  dplyr::arrange(-Ave) 
+head(df_sorted)
+### step4b: 获取top1% 的值，即水平截距
+threshod <- df_sorted[top*nrow(df_sorted),8]
+threshod
+
+# write.table(d,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+### step5: 建立累积坐标系统和x轴标签位置
+don <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len) %>% ##去除 chr_len这一列
+  # Add this info to the initial dataset
+  left_join(df, ., by=c("CHROM"="CHROM")) %>%  ## 将原数据框和don数据框进行合并
+  # Add a cumulative position of each SNP
+  arrange(CHROM, BIN_START) %>% ##根据CHROM BIN_START 进行排序
+  mutate( BPcum=BIN_START+tot)  ##增加新的一列，改变每行点的位置
+
+### 记录增量
+dfadd <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len)  ##去除 chr_len这一列
+# dfadd  
+
+## x轴标签位置：求出每条染色体在坐标轴上的中间位置
+axisdf = don %>% group_by(CHROM) %>% summarize(center=( max(BPcum) + min(BPcum) ) / 2 )
+
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+geneList <- read.table("data/016_genesList/gene.txt",sep = "\t",header = T)
+geneList
+geneList$Gene <- as.vector(geneList$Gene)
+geneList$Chromosome <- as.vector(geneList$Chromosome)
+geneList$Start <- as.numeric(geneList$Start)  ## 为了可以进行预测
+geneList$End <- as.numeric(geneList$End)
+
+### 写一个函数，返回基因的标签，以及在图上的range位置
+aoGetGenepos <- function(geneRow){
+  gene <- geneList[geneRow,] ### get gene's dataframe, only has one line
+  labelgene <- gene[1,1]### get gene's label
+  chrGene <- as.vector(gene[1,2]) ### get gene's chr
+  posSignal <- gene[,3:4] ### get gene's pos, a dataframe
+  posOnchr <- c(posSignal[1,1],posSignal[1,2]) ### change to x 
+  ### select chr, only one line
+  dfadd_one <- dfadd %>% 
+    filter(CHROM == chrGene) 
+  # dfadd_one
+  posSignalCum <- posOnchr + as.numeric(dfadd_one[1,2])
+  # geneSummary <- list( labelgene,as.numeric(posSignalCum[1]),as.numeric(posSignalCum[2]))
+  geneSummary <- list( labelgene,posSignalCum[1],posSignalCum[2])
+  
+  return(geneSummary)
+}
+ 
+#### btr1 
+btra1 <- aoGetGenepos(5)
+btrb1 <- aoGetGenepos(6)
+btra2 <- aoGetGenepos(8)
+btrb2 <- aoGetGenepos(9)
+
+### step6: 颜色设置并画图
+### 开始作图
+
+### sample
+don <- sample_frac(don,0.5)
+p <- ggplot(don, aes(x=BPcum, y=Ave)) +  ##新的横坐标，Y轴的XPCLR值不变
+  # Show all points
+  # geom_point( aes(color=as.factor(CHROM)), alpha=0.2, size=0.5) +  ## alpha=0.5 first test
+  geom_line(aes(color=as.factor(CHROM)), alpha=0.9, size=0.2) +  ## alpha=0.5 first test
+  annotate("text",x=Inf,y= threshod ,hjust= 2,vjust= -0.3,label="top 5%", size = 3)+
+  geom_hline(yintercept = threshod, linetype= "dashed", color = "gray",size=0.2)+
+  annotate("text",x=0,y= Inf ,hjust= -0.2,vjust= 1.1,label= labelB, size = 2)+ ## add group annotation
+  scale_color_manual(values = rep(colB, 14 )) + ##合计42条染色体。故21*2=42
+  # custom X axis: 每条染色体对应一个中间位置，完美！
+  scale_x_continuous(expand = c(0,0), label = axisdf$CHROM, breaks= axisdf$center) +
+  scale_y_continuous(expand = c(0,1),limits = c(-6,54)) +
+  # scale_y_continuous(expand = c(0, 0),limits = c(-1,52) ) +     # remove space between plot area and x axis
+  
+  ## add arrow to represent the selection signal 
+  # geom_vline(xintercept = unlist(btra1[2]),color="black",size=0.2)+
+  # geom_segment(aes(x=unlist(btra1[2]) ,xend = unlist(btra1[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(btra1[2]) ,xend = unlist(btra1[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") + 
+  annotate(geom = "text",x = unlist(btra1[3]),y=0.2,label= unlist(btra1[1]),fontface = 'italic',hjust = -0.2,size=1.4,color="blue") +
+
+  # geom_segment(aes(x=unlist(btrb1[2]) ,xend = unlist(btrb1[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(btrb1[2]),xend = unlist(btrb1[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(btrb1[3]),y=0.2,label=unlist(btrb1[1]),fontface = 'italic',hjust = -0.2,size=1.4,color="blue") +
+  
+  # annotate(geom = "segment",x=unlist(btra2[2]),xend = unlist(btra2[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(btra2[3]),y=-4,label=unlist(btra2[1]),fontface = 'italic',hjust = -0.3,size=1.4,color="blue") +
+  # geom_vline(xintercept = unlist(btra2[2]),color="red",size=0.5)+
+  
+  # annotate(geom = "segment",x=unlist(btrb2[2]),xend = unlist(btrb2[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(btrb2[3]),y=-4,label=unlist(btrb2[1]),fontface = 'italic',hjust = -0.3,size=1.4,color="blue") +
+  # geom_vline(xintercept = unlist(btrb2[2]),color="red",size=0.5)+
+  
+   # Custom the theme:
+  xlab("")+ylab("XP-CLR")+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(),axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 9),legend.position = 'none')
+
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.png",width = 7,height = 7*3/16)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",width = 7,height = 7*3/16)
+
+```
+
+```{r eval=FALSE, include=FALSE}
+### 最初添加pos 设计代码
+## 选择 btr2, 某一行依旧为数据框
+btrb1 <- geneList[6,]
+btrb1
+gene <- btrb1
+gene
+labelBtrb1 <- gene[1,1] 
+chrGene <- as.vector(gene[1,2])  
+posSignal <- gene[,3:4]
+posOnplot <- data.frame(x=c(posSignal[1,1],posSignal[1,2])) 
+### select chr
+donSignal <- don %>% 
+  filter(CHROM == chrGene) 
+donSignal
+y <- donSignal$BPcum
+x <- donSignal$BIN_START
+### build regression
+relation <- lm( y ~ x )
+relation
+# summary(relation)
+### input data frame
+posSignalCum <-  predict(relation,posOnplot)
+posSignalCum
+
+
+  ## add arrow to represent the selection signal 
+  # geom_segment(data=genes, mapping=aes(x=x, y= -5, xend=xend, yend=0), arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="red") + 
+  annotate(geom = "segment",x=posSignalCum[1],xend = posSignalCum[2],y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="red") + 
+  annotate(geom = "text",x = posSignalCum[2],y=-3,label=labelBtrb1,fontface = 'italic',hjust = -0.5,size=1.2,color="red") 
+
+```
+
+## DE vs. Durum manhattan plot for add signal dot
+
+```{r}
+################################# ##
+#                               #
+#  XPCLR genome line -- manhattan 100kb 50 kb 
+#                               #
+################################# ##
+library(tidyverse)
+
+# ### log2 snp method whole-genome SNP 3%
+dataFile <- c("data/015_forPlot_snp_whole-genome/ab_WE_DE_log2_0.0001_200_100000.clrgs.txt.gz")
+df_wede <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/015_forPlot_snp_whole-genome/ab_DE_Durum_log2_0.0001_200_100000.clrgs.txt.gz")
+df_dedm <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/015_forPlot_snp_whole-genome/abd_log2_0.0001_200_100000.clrgs.txt.gz")
+df_lrcl <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+# df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+### ******************************************************************************
+### choice: 1.df 2.color 3.threshold  
+### ******************************************************************************
+### 1. data
+# df <- df_wede
+df <- df_dedm
+# df <- df_lrcl
+### 2.color
+# test <- "wede"
+test <- "dedm"
+# test <- "lrcl"
+colB <- NULL
+labelB <- NULL
+
+# colB1 <- c("#ffd702","#7f5701") ### we de
+# colB2 <- c("#7f5701","#016699") ### de durum
+# colB3 <- c("#fc6e6e","#9900ff")  ### lr cl
+## use subgenome color
+colB1 <- c("#fd8582","#967bce") ### we de
+colB2 <- c("#fd8582","#967bce") ### de durum
+colB3 <- c("#fd8582","#967bce","#4bcdc6")  ### lr cl
+
+### if else failed to use
+if(test == "wede"){
+  colB <- colB1
+  labelB <- "WE vs. DE"
+} 
+if(test == "dedm"){
+  colB <- colB2
+  labelB <- "DE vs. Durum"
+}
+if(test == "lrcl"){
+  colB <- colB3
+  labelB <- "Landrace vs. Cultivar"
+}
+
+### 3. 
+ # top <- 0.01
+top <- 0.05
+
+# head(df)
+# nrow(df)
+### step2: 修改列名，使之固定
+names(df)[names(df)=="XPCLR_100score"] = "Ave"
+names(df)[names(df)=="CHROM"] = "Chr"
+names(df)[names(df)=="ChrRef"] = "CHROM"
+names(df)[names(df)=="PosRef"] = "BIN_START"
+max(df$Ave)
+min(df$Ave)
+### step3: 去除NA和无限小的值
+df <- dplyr::filter(df,!is.na(Ave) & is.finite(Ave))
+nrow(df)
+head(df)
+max(df$Ave) # 48.50477
+min(df$Ave) # 0
+### step4: 获取TOP K 截距
+### step4a: 排序
+df_sorted <- df %>% 
+  dplyr::arrange(-Ave) 
+head(df_sorted)
+### step4b: 获取top1% 的值，即水平截距
+threshod <- df_sorted[top*nrow(df_sorted),8]
+ print(paste(threshod," threshod ", top))
+
+# write.table(d,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+### step5: 建立累积坐标系统和x轴标签位置
+don <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len) %>% ##去除 chr_len这一列
+  # Add this info to the initial dataset
+  left_join(df, ., by=c("CHROM"="CHROM")) %>%  ## 将原数据框和don数据框进行合并
+  # Add a cumulative position of each SNP
+  arrange(CHROM, BIN_START) %>% ##根据CHROM BIN_START 进行排序
+  mutate( BPcum=BIN_START+tot)  ##增加新的一列，改变每行点的位置
+
+### 记录增量
+dfadd <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len)  ##去除 chr_len这一列
+dfadd  
+  
+# don
+# write.table(don,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+## x轴标签位置：求出每条染色体在坐标轴上的中间位置
+axisdf = don %>% group_by(CHROM) %>% summarize(center=( max(BPcum) + min(BPcum) ) / 2 )
+
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+geneList <- read.table("data/016_genesList/gene.txt",sep = "\t",header = T)
+geneList
+geneList$Gene <- as.vector(geneList$Gene)
+geneList$Chromosome <- as.vector(geneList$Chromosome)
+geneList$Start <- as.numeric(geneList$Start)  ## 为了可以进行预测
+geneList$End <- as.numeric(geneList$End)
+
+### 写一个函数，返回基因的标签，以及在图上的range位置
+aoGetGenepos <- function(geneRow){
+  gene <- geneList[geneRow,] ### get gene's dataframe, only has one line
+  labelgene <- gene[1,1]### get gene's label
+  chrGene <- as.vector(gene[1,2]) ### get gene's chr
+  posSignal <- gene[,3:4] ### get gene's pos, a dataframe
+  posOnchr <- c(posSignal[1,1],posSignal[1,2]) ### change to x 
+  ### select chr, only one line
+  dfadd_one <- dfadd %>% 
+    filter(CHROM == chrGene) 
+  # dfadd_one
+  posSignalCum <- posOnchr + as.numeric(dfadd_one[1,2])
+  # geneSummary <- list( labelgene,as.numeric(posSignalCum[1]),as.numeric(posSignalCum[2]))
+  geneSummary <- list( labelgene,posSignalCum[1],posSignalCum[2])
+  
+  return(geneSummary)
+}
+ 
+#### btr1 
+q <- aoGetGenepos(1)
+q2 <- aoGetGenepos(2)
+tg <- aoGetGenepos(4)
+
+### step6: 颜色设置并画图
+### 开始作图
+
+### sample
+don <- sample_frac(don,0.5)
+p <- ggplot(don, aes(x=BPcum, y=Ave)) +  ##新的横坐标，Y轴的XPCLR值不变
+  # Show all points
+  # geom_point( aes(color=as.factor(CHROM)), alpha=0.2, size=0.5) +  ## alpha=0.5 first test
+  geom_line(aes(color=as.factor(CHROM)), alpha=0.9, size=0.2) +  ## alpha=0.5 first test
+  annotate("text",x=Inf,y= threshod ,hjust= 2,vjust= -0.3,label="top 5%", size = 3)+
+  geom_hline(yintercept = threshod, linetype= "dashed", color = "gray",size=0.2)+
+  annotate("text",x=0,y= Inf ,hjust= -0.2,vjust= 1.1,label= labelB, size = 2)+ ## add group annotation
+  scale_color_manual(values = rep(colB, 14 )) + ##合计42条染色体。故21*2=42
+  # custom X axis: 每条染色体对应一个中间位置，完美！
+  scale_x_continuous(expand = c(0,0), label = axisdf$CHROM, breaks= axisdf$center) +
+  scale_y_continuous(expand = c(0,1),limits = c(-6,54)) +
+  # scale_y_continuous(expand = c(0, 0),limits = c(-1,52) ) +     # remove space between plot area and x axis
+  
+  ## add arrow to represent the selection signal 
+  # geom_vline(xintercept = 5838260571,color="black",size=0.2)+
+  # geom_segment(aes(x=6490914897,xend = 6490914897,y=0,yend = Inf) , size=0.2, color="blue") +
+  # annotate(geom = "segment",x=6490914897 ,xend = 6490914897,y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") + 
+  # annotate(geom = "text",x = 6490914897,y=-3,label= unlist(q[1]),fontface = 'italic',hjust = -0.4,size=1.2,color="blue") +
+  # 
+  # geom_segment(aes(x=7202289667 ,xend = 7202289667,y=0,yend = Inf) , size=0.2, color="blue") +
+  # annotate(geom = "segment",x=7202289667,xend = 7202289667,y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  # annotate(geom = "text",x = 7202289667,y=-3,label=unlist(q2[1]),fontface = 'italic',hjust = -0.4,size=1.2,color="blue") +
+  # # 
+  # geom_segment(aes(x=2076798318 ,xend = 2076798318,y=0,yend = Inf) , size=0.2, color="blue") +
+  # annotate(geom = "segment",x=2076798318,xend = 2080198318,y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  # annotate(geom = "text",x = 2080198318,y=-3,label=unlist(tg[1]),fontface = 'italic',hjust = -0.4,size=1.2,color="blue") +
+
+  
+  # geom_segment(aes(x=unlist(q[2]) ,xend = unlist(q[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(q[2]) ,xend = unlist(q[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") + 
+  annotate(geom = "text",x = unlist(q[3]),y=-3,label= unlist(q[1]),fontface = 'italic',hjust = -0.4,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(q2[2]) ,xend = unlist(q2[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(q2[2]),xend = unlist(q2[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(q2[3]),y=-3,label=unlist(q2[1]),fontface = 'italic',hjust = -0.4,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(tg[2]) ,xend = unlist(tg[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(tg[2]),xend = unlist(tg[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(tg[3]),y=-3,label=unlist(tg[1]),fontface = 'italic',hjust = -0.4,size=1.4,color="blue") +
+  
+   # Custom the theme:
+  xlab("")+ylab("XP-CLR")+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(),axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 9),legend.position = 'none')
+
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.png",width = 7,height = 7*3/16)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",width = 7,height = 7*3/16)
+
+
+```
+
+## LR vs. Cultivar manhattan plot for add signal dot
+
+```{r}
+################################# ##
+#                               #
+#  XPCLR genome line -- manhattan 100kb 50 kb 
+#                               #
+################################# ##
+library(tidyverse)
+
+# ### log2 snp method whole-genome SNP 3%
+dataFile <- c("data/015_forPlot_snp_whole-genome/ab_WE_DE_log2_0.0001_200_100000.clrgs.txt.gz")
+df_wede <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/015_forPlot_snp_whole-genome/ab_DE_Durum_log2_0.0001_200_100000.clrgs.txt.gz")
+df_dedm <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/015_forPlot_snp_whole-genome/abd_log2_0.0001_200_100000.clrgs.txt.gz")
+df_lrcl <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+# df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+### ******************************************************************************
+### choice: 1.df 2.color 3.threshold  
+### ******************************************************************************
+### 1. data
+# df <- df_wede
+# df <- df_dedm
+df <- df_lrcl
+### 2.color
+# test <- "wede"
+# test <- "dedm"
+test <- "lrcl"
+colB <- NULL
+labelB <- NULL
+
+# colB1 <- c("#ffd702","#7f5701") ### we de
+# colB2 <- c("#7f5701","#016699") ### de durum
+# colB3 <- c("#fc6e6e","#9900ff")  ### lr cl
+## use subgenome color
+colB1 <- c("#fd8582","#967bce") ### we de
+colB2 <- c("#fd8582","#967bce") ### de durum
+colB3 <- c("#fd8582","#967bce","#4bcdc6")  ### lr cl
+
+### if else failed to use
+if(test == "wede"){
+  colB <- colB1
+  labelB <- "WE vs. DE"
+} 
+if(test == "dedm"){
+  colB <- colB2
+  labelB <- "DE vs. Durum"
+}
+if(test == "lrcl"){
+  colB <- colB3
+  labelB <- "Landrace vs. Cultivar"
+}
+
+### 3. 
+# top <- 0.01
+top <- 0.05
+
+# head(df)
+# nrow(df)
+### step2: 修改列名，使之固定
+names(df)[names(df)=="XPCLR_100score"] = "Ave"
+names(df)[names(df)=="CHROM"] = "Chr"
+names(df)[names(df)=="ChrRef"] = "CHROM"
+names(df)[names(df)=="PosRef"] = "BIN_START"
+max(df$Ave)
+min(df$Ave)
+### step3: 去除NA和无限小的值
+df <- dplyr::filter(df,!is.na(Ave) & is.finite(Ave))
+nrow(df)
+head(df)
+max(df$Ave) # 48.50477
+min(df$Ave) # 0
+### step4: 获取TOP K 截距
+### step4a: 排序
+df_sorted <- df %>% 
+  dplyr::arrange(-Ave) 
+head(df_sorted)
+### step4b: 获取top1% 的值，即水平截距
+threshod <- df_sorted[top*nrow(df_sorted),8]
+ print(paste(threshod," threshod ", top))
+
+# write.table(d,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+### step5: 建立累积坐标系统和x轴标签位置
+don <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len) %>% ##去除 chr_len这一列
+  # Add this info to the initial dataset
+  left_join(df, ., by=c("CHROM"="CHROM")) %>%  ## 将原数据框和don数据框进行合并
+  # Add a cumulative position of each SNP
+  arrange(CHROM, BIN_START) %>% ##根据CHROM BIN_START 进行排序
+  mutate( BPcum=BIN_START+tot)  ##增加新的一列，改变每行点的位置
+
+### 记录增量
+dfadd <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len)  ##去除 chr_len这一列
+dfadd  
+  
+# don
+# write.table(don,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+## x轴标签位置：求出每条染色体在坐标轴上的中间位置
+axisdf = don %>% group_by(CHROM) %>% summarize(center=( max(BPcum) + min(BPcum) ) / 2 )
+
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+geneList <- read.table("data/016_genesList/gene.txt",sep = "\t",header = T)
+geneList
+geneList$Gene <- as.vector(geneList$Gene)
+geneList$Chromosome <- as.vector(geneList$Chromosome)
+geneList$Start <- as.numeric(geneList$Start)  ## 为了可以进行预测
+geneList$End <- as.numeric(geneList$End)
+
+### 写一个函数，返回基因的标签，以及在图上的range位置
+aoGetGenepos <- function(geneRow){
+  gene <- geneList[geneRow,] ### get gene's dataframe, only has one line
+  labelgene <- gene[1,1]### get gene's label
+  chrGene <- as.vector(gene[1,2]) ### get gene's chr
+  posSignal <- gene[,3:4] ### get gene's pos, a dataframe
+  posOnchr <- c(posSignal[1,1],posSignal[1,2]) ### change to x 
+  ### select chr, only one line
+  dfadd_one <- dfadd %>% 
+    filter(CHROM == chrGene) 
+  # dfadd_one
+  posSignalCum <- posOnchr + as.numeric(dfadd_one[1,2])
+  # geneSummary <- list( labelgene,as.numeric(posSignalCum[1]),as.numeric(posSignalCum[2]))
+  geneSummary <- list( labelgene,posSignalCum[1],posSignalCum[2])
+  
+  return(geneSummary)
+}
+ 
+#### btr1 
+q <- aoGetGenepos(11)
+q2 <- aoGetGenepos(12)
+tg <- aoGetGenepos(13)
+sig4 <- aoGetGenepos(20)
+sig5 <- aoGetGenepos(21)
+sig6 <- aoGetGenepos(22)
+sig7 <- aoGetGenepos(23)
+sig8 <- aoGetGenepos(24)
+
+
+### step6: 颜色设置并画图
+### 开始作图
+
+### sample
+# don <- sample_frac(don,0.1)
+p <- ggplot(don, aes(x=BPcum, y=Ave)) +  ##新的横坐标，Y轴的XPCLR值不变
+  # Show all points
+  # geom_point( aes(color=as.factor(CHROM)), alpha=0.2, size=0.5) +  ## alpha=0.5 first test
+  geom_line(aes(color=as.factor(CHROM)), alpha=0.9, size=0.2) +  ## alpha=0.5 first test
+  annotate("text",x=Inf,y= threshod ,hjust= 2,vjust= -0.3,label="top 5%", size = 3)+
+  geom_hline(yintercept = threshod, linetype= "dashed", color = "gray",size=0.2)+
+  annotate("text",x=0,y= Inf ,hjust= -0.2,vjust= 1.1,label= labelB, size = 2)+ ## add group annotation
+  scale_color_manual(values = rep(colB, 14 )) + ##合计42条染色体。故21*2=42
+  # custom X axis: 每条染色体对应一个中间位置，完美！
+  scale_x_continuous(expand = c(0,0), label = axisdf$CHROM, breaks= axisdf$center) +
+  scale_y_continuous(expand = c(0,1),limits = c(-6,54)) +
+  # scale_y_continuous(expand = c(0, 0),limits = c(-1,52) ) +     # remove space between plot area and x axis
+  
+  ## add arrow to represent the selection signal 
+  # geom_vline(xintercept = 5838260571,color="black",size=0.2)+
+  #geom_segment(aes(x=unlist(q[2]) ,xend = unlist(q[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(q[2]) ,xend = unlist(q[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") + 
+  annotate(geom = "text",x = unlist(q[3]),y=-3,label= unlist(q[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  #geom_segment(aes(x=unlist(q2[2]) ,xend = unlist(q2[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(q2[2]),xend = unlist(q2[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(q2[3]),y=-3,label=unlist(q2[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  #geom_segment(aes(x=unlist(tg[2]) ,xend = unlist(tg[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(tg[2]),xend = unlist(tg[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(tg[3]),y=-3,label=unlist(tg[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig4[2]) ,xend = unlist(sig4[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig4[2]),xend = unlist(sig4[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig4[3]),y=-3,label=unlist(sig4[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig5[2]) ,xend = unlist(sig5[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig5[2]),xend = unlist(sig5[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig5[3]),y=-3,label=unlist(sig5[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig6[2]) ,xend = unlist(sig6[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig6[2]),xend = unlist(sig6[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig6[3]),y=-3,label=unlist(sig6[1]),fontface = 'italic',hjust = 1.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig7[2]) ,xend = unlist(sig7[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig7[2]),xend = unlist(sig7[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig7[3]),y=-3,label=unlist(sig7[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig8[2]) ,xend = unlist(sig8[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig8[2]),xend = unlist(sig8[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig8[3]),y=-3,label=unlist(sig8[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+   # Custom the theme:
+  xlab("")+ylab("XP-CLR")+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(),axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 9),legend.position = 'none')
+
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.png",width = 7,height = 7*3/16)
+
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",width = 7,height = 7*3/16)
+
+```
+
+### Top 5%
+```{r}
+# ### log2 snp method whole-genome SNP 3%
+dataFile <- c("data/015_forPlot_snp_whole-genome/ab_WE_DE_log2_0.0001_200_100000.clrgs.txt.gz")
+df_wede <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+### 找到 top5 的值域是多少，并且输出bins数目  
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+dftest <- df %>% slice_max(XPCLR_100score,prop = 0.05)
+dffinalline <- dftest %>% slice(n())
+regions <- nrow(dftest)
+print(paste("Threshod is",round(dffinalline[1,8],3) ,"Regions total",regions))
+```
+
+```{r}
+dataFile <- c("data/015_forPlot_snp_whole-genome/ab_DE_Durum_log2_0.0001_200_100000.clrgs.txt.gz")
+df_dedm <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+### 找到 top5 的值域是多少，并且输出bins数目  
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+dftest <- df %>% slice_max(XPCLR_100score,prop = 0.05)
+dffinalline <- dftest %>% slice(n())
+regions <- nrow(dftest)
+print(paste("Threshod is",round(dffinalline[1,8],3) ,"Regions total",regions))
+```
+
+```{r}
+dataFile <- c("data/015_forPlot_snp_whole-genome/abd_log2_0.0001_200_100000.clrgs.txt.gz")
+df_lrcl <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+### 找到 top5 的值域是多少，并且输出bins数目  
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+dftest <- df %>% slice_max(XPCLR_100score,prop = 0.05)
+dffinalline <- dftest %>% slice(n())
+regions <- nrow(dftest)
+print(paste("Threshod is",round(dffinalline[1,8],3) ,"Regions total",regions))
+```
+
+
+
+
+## ================
+## Tajima's D
+```{r}
+library(reshape2)
+library(ggridges)
+dataFile <- c("data/fig3/tajimaD/001_TajimaD_2Mwindow_1Mstep.txt")
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+df <- df %>% 
+  filter(!is.na(Ave)) %>% 
+  mutate(Sub = substring(CHROM,2,2))
+
+df$Sub <- factor(df$Sub,levels = c("A","B","D"),labels = c("A subgenome","B subgenome","D subgenome"),ordered=TRUE)
+
+head(df)
+df$Group <- factor(df$Group,
+                        levels = c("Wild_emmer","Domesticated_emmer",
+                                   "Free_threshing_tetraploid","Landrace","Cultivar","Ae.tauschii"),ordered = TRUE)
+
+df <- transform(df,num=as.numeric(df$Group))
+
+
+colB <- c("#ffd702","#7f5701","#016699","#fc6e6e","#9900ff","#87cef9")
+
+max(df$Ave)
+min(df$Ave)
+p <- ggplot(df,aes(x=Ave,y=as.factor(num),fill=Group,color=Group))+
+  stat_density_ridges( quantile_lines = TRUE, quantiles = 2
+                       ,scale=1.6,alpha=0.7, color='black'
+                       )+
+  # scale_y_discrete(expand = c(0.01, 0)) +
+  # scale_x_continuous(expand = c(0, 0),limits = c(-7,4),breaks = seq(-7,4,1))+
+  # theme_ridges(grid = FALSE,center_axis_labels = TRUE)+ 
+  # theme_pubr()+
+  labs(x= expression(paste("Tajima's ",italic(D))), y = "Group number")+
+  # xlab("Tajiama's D")  + ylab("Group number")+
+  geom_vline(xintercept = 0, linetype="dotted", color = "blue", size=1)+
+  scale_fill_manual(values = colB)+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size=0.4, colour = "black"),
+        text = element_text(size = 12),legend.position = 'none')
+
+  # theme(legend.position = 'right',text = element_text(size = 12))+
+
+q <- p + facet_wrap(~Sub)+
+  theme(strip.background = element_blank())
+
+  # theme(strip.background = element_rect(color = 'white'))
+q
+# ggsave(q,filename = "~/Documents/test.pdf",height = 6,width = 8)
+ggsave(q,filename = "~/Documents/test.png",height = 3,width = 4)
+
+```
+
+## chr5D Vrn-D1 test failed
+```{r}
+dffst <- read.delim("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/039_popGen/001_Fst/002_fst_based100000window_50000step/001/Cultivar_VS_Landrace_chr5D.windowed.weir.fst") 
+
+dfpi1 <- read.delim("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/039_popGen/002_Pi/002_pi_based100000window_50000step/001/Cultivar_chr5D_based100000Window_50000step.windowed.pi") %>% mutate(GeneticGroup = "Cultivar")
+
+dfpi2 <- read.delim("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/039_popGen/002_Pi/002_pi_based100000window_50000step/001/Landrace_chr5D_based100000Window_50000step.windowed.pi") %>% mutate(GeneticGroup = "Landrace")
+
+ggplot()+
+  # geom_line(data=dffst,mapping = aes(x=BIN_START/1000000,y=WEIGHTED_FST))+
+  geom_line(data=dfpi1,mapping = aes(x=BIN_START/1000000,y=PI),color="pink")+
+  geom_line(data=dfpi2,mapping = aes(x=BIN_START/1000000,y=PI),color="green")+
+  scale_x_continuous(limits = c(475,477))+
+  geom_point(aes(x=476.167,y=0),color="red")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
