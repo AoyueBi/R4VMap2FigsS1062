@@ -1109,8 +1109,20 @@ dftest <- df_delCount %>%
   group_by(Method) %>% 
   summarise(sum=sum(n))
 
-dftest %>% 
-  ggplot()
+p <- dftest %>% 
+  ggplot(aes(x=Method,y=sum,fill=Method))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  geom_text(aes(label=sum),size=3,
+            position = position_dodge(0.9))+
+  labs(x="", y="Del SNP count")+
+  scale_fill_brewer(palette = "Set3")+
+  theme_classic()+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
+          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
+p
+
+ggsave(p,filename = "~/Documents/test2.pdf",height = 3.6,width = 6)
 
 ```
 
@@ -1220,11 +1232,11 @@ q <- df %>%
 
 q
 # ggsave(q,filename = "~/Documents/temp.png",height = 6,width = 8)
-ggsave(q,filename = "~/Documents/test1.pdf",height = 3.6,width = 7.2)
+ggsave(q,filename = "~/Documents/test1.pdf",height = 3,width = 8)
 
 
 #### facet by sub
-methodColordf <-  tibble(Method=c("SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff","Alt_PPH2","Derived_PPH2"),Color=RColorBrewer::brewer.pal(8,"Set2"))
+methodColordf <-  tibble(Method=c("SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff","Alt_PPH2","Derived_PPH2","GERP+PPH2"),Color=RColorBrewer::brewer.pal(9,"Set3"))
 
 
 df_su <- df %>%
@@ -1251,7 +1263,7 @@ q <- df %>%
     # plot.margin=unit(rep(1,4),'lines'),
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    legend.position = 'none',
+    # legend.position = 'none',
     text = element_text(size = 12))
 
 q
@@ -1291,7 +1303,7 @@ p <- df %>%
   scale_x_discrete(label = c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
   scale_color_manual(values = colB)+
   # facet_grid(.~Method,scales = "free")+
-  facet_wrap(~Method,scales = "free",ncol = 4)+
+  facet_wrap(~Method,scales = "free",ncol = 3)+
   # facet_wrap(~Method,scales = "free",ncol = 6)+
   scale_y_continuous(limits = c(0,1))+
   theme(strip.background = element_blank())+
@@ -1316,7 +1328,7 @@ p <- df %>%
 p
 # ggsave(p, filename = "~/Documents/temp.png", height = 7.2*9/16,width = 7.2)
 
-ggsave(p,filename = "~/Documents/temp2.pdf",height = 3.6,width = 7.2)
+ggsave(p,filename = "~/Documents/temp2.pdf",height = 5,width = 7.2)
 
 ```
 ## 5.delRatio
@@ -1388,44 +1400,50 @@ p
 ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
 ```
 
+## 6. scatter plot
 ```{r}
-df_GERP <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="GERP")
+df2 <- dftotal %>% filter(Variant_type %in% c("SYNONYMOUS","NONSYNONYMOUS"))%>% 
+  mutate(LoadGroup = ifelse(Variant_type=="NONSYNONYMOUS" & Gerp_16way > 2.14 & Derived_PolyPhen2_prob >= 0.453, "Deleterious",
+                            ifelse(Variant_type=="NONSYNONYMOUS","Nonsynonymous",
+                                   ifelse(Variant_type=="SYNONYMOUS","Synonymous",NA)))) %>% 
+  # filter(!is.na(Gerp_16way),!is.na(Derived_PolyPhen2_prob)) %>%
+  filter(!is.na(Ancestral))
+  
+df <- sample_n(df2,5000)
 
-
-df_polyphen2_derived <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.452 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="Derived_PolyPhen_2")
-
-df_GERPandPPH2 <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.452 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="GERPandPPH2")
-
-dfcount <- df_GERPandPPH2 %>% group_by(LoadGroup) %>% count()
-
-# Deleterious
-# 29321
-# Nonsynonymous
-# 170543
-# Synonymous
-# 156595
 ```
 
+```{r}
+df$LoadGroup <- factor(df$LoadGroup, levels = c("Synonymous","Nonsynonymous","Deleterious"))
+colB <- c("#004680","#e69f00","#d5311c")
 
+p <- df %>%
+  ggplot(aes(x=Gerp_16way,y=Derived_PolyPhen2_prob,fill=LoadGroup))+
+  geom_point(size=2, shape=21,color="white",alpha=0.8)+
+  # scale_color_manual(values = colB)+
+  scale_fill_manual(values = colB)+
+  labs(x="GERP score",y="PolyPhen-2 score")+
+  theme(
+    panel.background = element_blank(),
+    # legend.position = 'none',
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7))
+   
+p
 
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3.6*3/4,width = 3.6)
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+```
+
+```{r}
+df <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("possibly damaging","probably damaging") ) %>% 
+  filter(Derived_PolyPhen2_class %in% c("deleterious"))
+
+df1 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("benign") )
+
+df2 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("possibly damaging") ) %>% 
+  filter(Derived_PolyPhen2_class %in% c("neutral") )
+```
 
 
 
