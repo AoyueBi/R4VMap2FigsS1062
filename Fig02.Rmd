@@ -19,7 +19,7 @@ output:
 
 ```{r setup, echo =F, message = T, warning = F}
 library(tidyverse)
-# library(RColorBrewer)
+library(RColorBrewer)
 library(ggpubr)
 # library(egg)
 ## eval 代码要不要运行
@@ -29,12 +29,245 @@ library(ggpubr)
 ## message 默认Bin等信息要不要输出
 ```
 
-## SNP count only derived allele by Sub
-
-import data
+## dftotal
 ```{r}
 dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>%
   mutate(Sub=str_sub(Transcript, 9, 9))
+
+  # filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
+  # mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+```
+
+### VariantsType count all region
+```{r}
+### 需要手动选择
+factor1 <- "Region"
+factor2 <- "Variant_type"
+factor3 <- "Effect_VEP"
+factor4 <- "Effect_snpEff"
+
+df_variantsType1 <- dftotal %>% group_by(Region) %>% 
+  # filter(!is.na(Region)) %>% 
+  summarise(n=n()) %>% 
+  rename(Type=Region)
+
+df_variantsType2 <- dftotal %>% group_by(Variant_type) %>% 
+  filter(!is.na(Variant_type)) %>% 
+  summarise(n=n()) %>% 
+  rename(Type=Variant_type)
+
+df_variantsType3 <- dftotal %>% group_by(Effect_VEP) %>% 
+  filter(!is.na(Effect_VEP)) %>% 
+  summarise(n=n()) %>% 
+  rename(Type=Effect_VEP)
+
+df_variantsType4 <- dftotal %>% group_by(Effect_snpEff) %>% 
+  filter(!is.na(Effect_snpEff)) %>% 
+  summarise(n=n()) %>% 
+  rename(Type=Effect_snpEff)
+
+colB <- brewer.pal(9,"Blues")[c(2,3,4,5,6,7)]
+
+p <- df_variantsType1 %>% 
+ggplot(aes(x=Type,y=n,fill=Type))+
+  geom_bar(stat = 'identity',position = "stack")+
+  geom_text(aes(label=n),size=3,nudge_y = 1)+
+  labs(x="", y="SNP count")+
+  scale_fill_brewer(palette = "Set2")+
+  # scale_fill_manual(values = colB)+
+  # scale_fill_brewer(palette = "Blues")+
+  theme_classic()+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
+          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
+
+p
+```
+
+
+
+
+
+### filter test
+```{r}
+df <- dftotal %>% 
+  # filter(Region=="Intron") %>% 
+  # filter(Variant_type=="NONCODING") %>%
+  # filter(Variant_type=="STOP-LOSS") %>%
+  filter(Impact_VEP=="HIGH") %>%
+  filter(str_detect(Effect_VEP,"splice_")) %>%
+  select(Region,Variant_type,Effect_VEP,Effect_snpEff,Impact_VEP,Impact_snpEff) 
+  # filter(Effect_VEP!="intron_variant")
+  # filter(str_detect(Effect_VEP, pattern = "stop_gained")) 
+  # filter(Variant_type != "STOP-GAIN")
+
+
+sum(df_variantsType1$n) 
+sum(df_variantsType2$n) 
+sum(df_variantsType3$n) 
+sum(df_variantsType4$n) 
+levels(factor(df$Effect_VEP))
+levels(factor(dftotal$Effect_VEP))
+levels(factor(df$Impact_VEP))
+```
+### Fig2:variants count all region
+```{r}
+df1 <- dftotal %>% group_by(Region) %>% 
+  # filter(!is.na(Region)) %>% 
+  summarise(n=n()) %>% 
+  rename(Type=Region) %>% 
+  filter(!Type=="CDS")
+
+df2 <- dftotal %>% group_by(Variant_type) %>% 
+  filter(!is.na(Variant_type)) %>% 
+  summarise(n=n()) %>% 
+  rename(Type=Variant_type) %>% 
+  filter(!Type %in%  c("NONCODING","START-LOST","STOP-LOSS")) 
+
+# expression(paste("Length-Freq of", italic("E. coruscans"), "by Gear")) 
+
+df3 <- dftotal %>% 
+  filter(Impact_VEP=="HIGH") %>%
+  filter(str_detect(Effect_VEP,"splice_")) %>% 
+  count() %>% 
+  mutate(Type="Essential splice") %>% 
+  relocate(Type,.before = n)
+
+df4 <- tibble(Type="Intergenic",n=193285480)
+  
+df <- rbind(df1,df2,df3,df4)
+
+factorA <- c("Intergenic","Intron","UTR_5","UTR_3","SYNONYMOUS","NONSYNONYMOUS","Essential splice","STOP-GAIN")
+labelsA <- c("Intergenic","Intron","UTR_5","UTR_3","Synonymous","Nonsynonymous","Essential splice","Nonsense")
+colB <- c(rep("gray70",4),"#004680","#e69f00","darkred","darkred")
+
+colB <- rev(colB)
+
+df$Type <- factor(df$Type,levels = rev(factorA),labels = rev(labelsA))
+
+# p <- df %>% 
+#   ggplot(aes(Type,y=n,fill=Type))+
+#   geom_bar(stat = 'identity',position = "stack")+
+#   geom_text(aes(label=n),size=3,nudge_y = 1)+
+#   labs(x="", y="SNP count")+
+#   # scale_fill_brewer(palette = "Set2")+
+#   scale_fill_manual(values = colB)+
+#   # scale_fill_brewer(palette = "Blues")+
+#   theme_classic()+
+#   theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+#   theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
+#           axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
+# 
+# p
+```
+
+### plot
+```{r}
+library(ggbreak)
+p <- df %>% 
+  ggplot(aes(x= Type,y=n,fill=Type))+
+  geom_bar(stat = 'identity',position = "stack")+
+  # geom_text(aes(label=n),size=3,nudge_y = 1)+
+  geom_hline(yintercept =c(400000,1400000), linetype="dashed", color = "gray")+
+  geom_hline(yintercept =c(2000000,190000000), linetype="dashed", color = "gray")+
+  scale_fill_manual(values = colB)+
+  scale_y_break(c(400000, 1400000), scales = 0.5)+
+  scale_y_break(c(2000000, 190000000), scales = 0.5)+
+  scale_y_continuous(labels = scales::comma_format(big.mark = ','))+
+  labs(x="",y="SNP count")+
+  theme_classic()+
+  coord_flip()+
+  theme(axis.text.x= element_text(angle=90, vjust=0,hjust = 0))+
+  theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
+          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 12))
+
+
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf", width = 4, height = 5)
+ggsave(p,filename = "~/Documents/snpNum.pdf", width = 3, height = 6)
+
+# ggsave(p,filename = "~/Documents/test.png", width = 4, height = 5)
+
+```
+
+## GERP distribution
+```{r}
+gerpDir <- "data/006_Fig2/gerp/001_gerp_subset"
+
+ChrRef <-rep(str_c(rep(1:7,each=3),rep(c("A","B","D"),7)),each=2)  
+df_chrConvertion <- tibble(Chr=c(1:42),ChrRef=ChrRef,Sub=str_sub(ChrRef,2))
+
+df_intergenic <- dir(gerpDir, full.names = T, pattern = ".txt.gz") %>% 
+  map(read_tsv) %>% 
+  bind_rows() %>% 
+  filter(GeneFuture=="INTERGENIC") %>% 
+  rename(Chr=ChrID) %>% 
+  left_join(.,df_chrConvertion, by = "Chr")
+
+df_region <- dftotal %>% 
+  filter(Region %in%  c("Intron","UTR_5","UTR_3")) %>%
+  select(Chr,Pos,GERP=Gerp_16way,GeneFuture=Region) %>% 
+  left_join(.,df_chrConvertion, by = "Chr") 
+
+df_variantsType <- dftotal %>% 
+  filter(Variant_type %in%  c("NONSYNONYMOUS","SYNONYMOUS","STOP-GAIN")) %>%
+  select(Chr,Pos,GERP=Gerp_16way,GeneFuture=Variant_type) %>% 
+  left_join(.,df_chrConvertion, by = "Chr") 
+
+df_splice <- dftotal %>% 
+  filter(Impact_VEP=="HIGH") %>%
+  filter(str_detect(Effect_VEP,"splice_")) %>% 
+  select(Chr,Pos,GERP=Gerp_16way) %>% 
+  mutate(GeneFuture="Essential splice") %>% 
+  left_join(.,df_chrConvertion, by = "Chr") 
+
+df <- rbind(df_intergenic,df_region,df_variantsType,df_splice)
+
+factorA <- c("INTERGENIC","Intron","UTR_5","UTR_3","SYNONYMOUS","NONSYNONYMOUS","Essential splice","STOP-GAIN")
+labelsA <- c("Intergenic","Intron","UTR_5","UTR_3","Synonymous","Nonsynonymous","Essential splice","Nonsense")
+colB <- c(rep("gray70",4),"#004680","#e69f00","darkred","darkred")
+
+df$GeneFuture <- factor(df$GeneFuture,levels = factorA,labels = labelsA)
+
+dfgerpdis <- df %>% 
+    slice_sample(prop = 0.3) 
+
+```
+
+### plot
+```{r}
+## histogram
+p <- dfgerpdis %>%
+  group_by(GeneFuture) %>% 
+  ggplot(aes(x=GERP,fill=GeneFuture))+
+  geom_histogram(aes(y=..ndensity..), alpha=0.95)+
+  facet_grid(GeneFuture~., scales = "free")+
+  # facet_grid(.~GeneFuture, scales = "free")+
+  labs(x="GERP score",y="Density")+
+  scale_y_continuous(breaks = seq(0,1,0.5))+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  theme(
+    strip.background = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 12))
+
+  # theme_classic()+
+  # theme(
+  #   # plot.margin=unit(rep(1,4),'lines'),
+  #   strip.background = element_blank(),
+  #   legend.position ="none",
+  #   legend.title = element_blank(),
+  #   axis.line = element_line(size=0.4, colour = "black"),
+  #   text = element_text(size = 12))
+
+p
+ggsave(plot = p, "~/Documents/test.pdf", width = 3, height = 5)
+# ggsave(plot = p, "~/Documents/test.pdf", width = 5, height = 2)
+
 ```
 
 
@@ -143,6 +376,15 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 
 sum(df$n)
 ```
+
+
+
+
+
+
+
+
+## ********* 以下是上一版本文件
 ## 只取有害突变的位点，
 ```{r}
 df <- dftotal %>% filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 

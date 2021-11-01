@@ -1052,12 +1052,10 @@ df_polyphen2_derived <- dftotal %>%
 df_GERPandPPH2 <- dftotal %>% 
   filter(HaveAncestralState==1) %>% 
   filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.452 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.452 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
   filter(!is.na(LoadGroup)) %>% 
   select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
   mutate(Method="GERP+PPH2")
-
-
 
 
 df_AllMethod <- bind_rows(df_vep,df_SIFT,df_GERP,
@@ -1439,10 +1437,10 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 df <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("possibly damaging","probably damaging") ) %>% 
   filter(Derived_PolyPhen2_class %in% c("deleterious"))
 
-df1 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("benign") )
+df1 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("benign"))
 
-df2 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("possibly damaging") ) %>% 
-  filter(Derived_PolyPhen2_class %in% c("neutral") )
+df2 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("possibly damaging")) %>%
+  filter(Derived_PolyPhen2_class %in% c("neutral"))
 ```
 
 
