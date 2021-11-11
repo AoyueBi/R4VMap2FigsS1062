@@ -36,6 +36,8 @@ dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>%
 
   # filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
   # mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  # mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
+
 ```
 
 ### VariantsType count all region
@@ -91,16 +93,18 @@ p
 ### filter test
 ```{r}
 df <- dftotal %>% 
+  filter(Region=="CDS") %>% 
+  group_by(Variant_type) %>% 
+  count()
   # filter(Region=="Intron") %>% 
   # filter(Variant_type=="NONCODING") %>%
   # filter(Variant_type=="STOP-LOSS") %>%
-  filter(Impact_VEP=="HIGH") %>%
-  filter(str_detect(Effect_VEP,"splice_")) %>%
-  select(Region,Variant_type,Effect_VEP,Effect_snpEff,Impact_VEP,Impact_snpEff) 
+  # filter(Impact_VEP=="HIGH") %>%
+  # filter(str_detect(Effect_VEP,"splice_")) %>%
+  # select(Region,Variant_type,Effect_VEP,Effect_snpEff,Impact_VEP,Impact_snpEff) 
   # filter(Effect_VEP!="intron_variant")
   # filter(str_detect(Effect_VEP, pattern = "stop_gained")) 
   # filter(Variant_type != "STOP-GAIN")
-
 
 sum(df_variantsType1$n) 
 sum(df_variantsType2$n) 
@@ -109,8 +113,12 @@ sum(df_variantsType4$n)
 levels(factor(df$Effect_VEP))
 levels(factor(dftotal$Effect_VEP))
 levels(factor(df$Impact_VEP))
+
 ```
-### Fig2:variants count all region
+
+#### ==============
+## variants count all region
+#### ==============
 ```{r}
 df1 <- dftotal %>% group_by(Region) %>% 
   # filter(!is.na(Region)) %>% 
@@ -161,7 +169,7 @@ df$Type <- factor(df$Type,levels = rev(factorA),labels = rev(labelsA))
 # p
 ```
 
-### plot
+### *plot
 ```{r}
 library(ggbreak)
 p <- df %>% 
@@ -237,7 +245,7 @@ dfgerpdis <- df %>%
 
 ### plot
 ```{r}
-## histogram
+### histogram
 p <- dfgerpdis %>%
   group_by(GeneFuture) %>% 
   ggplot(aes(x=GERP,fill=GeneFuture))+
@@ -255,105 +263,136 @@ p <- dfgerpdis %>%
     legend.position = 'none',
     text = element_text(size = 12))
 
-  # theme_classic()+
-  # theme(
-  #   # plot.margin=unit(rep(1,4),'lines'),
-  #   strip.background = element_blank(),
-  #   legend.position ="none",
-  #   legend.title = element_blank(),
-  #   axis.line = element_line(size=0.4, colour = "black"),
-  #   text = element_text(size = 12))
-
 p
 ggsave(plot = p, "~/Documents/test.pdf", width = 3, height = 5)
-# ggsave(plot = p, "~/Documents/test.pdf", width = 5, height = 2)
 
 ```
 
-
-```{r}
+#### ============
+## Deleterious count 
+#### ============
 ### 区分亚基因组
+```{r}
+### GERP & PPH2 方法定义有害突变
 df <- dftotal %>% 
   mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
-  filter(!is.na(Ancestral)) %>%
-  filter(Ancestral==Ref|Ancestral==Alt) %>%
-  # filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>% 
+  # filter(!is.na(DAF)) %>%
+  # mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  # mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>%
+  group_by(Sub) %>% 
+  count(LoadGroup) %>% 
+  mutate(fre=n/sum(n)) %>% 
+  arrange(Sub,desc(LoadGroup))
+
+df
+
+### GERP 方法定义有害突变
+df2 <- dftotal %>% 
+  mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
+  filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
+  filter(!is.na(DAF)) %>%
+  # mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>% 
+  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
   filter(!is.na(LoadGroup)) %>% 
   group_by(Sub) %>% 
   count(LoadGroup) %>% 
   mutate(fre=n/sum(n)) %>% 
   arrange(Sub,desc(LoadGroup))
 
-### 不区分亚基因组
-df <- dftotal %>% 
-  mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
-  filter(!is.na(Ancestral)) %>%
-  filter(Ancestral==Ref|Ancestral==Alt) %>%
-  # filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  # group_by(Sub) %>%
-  count(LoadGroup) %>% 
-  mutate(fre=n/sum(n)) 
-
-### 只画柱状图 dodge
-# colB <- c("#d5311c","#004680","#e69f00")
-# p <- df %>% 
-# ggplot(aes(x=Sub,y=n,fill=LoadGroup))+
-#   geom_bar(stat = 'identity',position = "dodge")+
-#   geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,
-#             position = position_dodge(0.9))+
-#   # geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,nudge_y = 1)+
-#   labs(x="", y="SNP count")+
-#   scale_fill_brewer(palette = "Set2")+
-#   scale_fill_manual(values = colB)+
-#   # scale_fill_brewer(palette = "Blues")+
-#   theme_classic()+
-#   # theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
-#   theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
-#           axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
-# 
-# p
-
-### 只画柱状图 stack
+df2
 
 colB <- c("#d5311c","#e69f00","#004680")
 df$LoadGroup <- factor(df$LoadGroup,levels = c("Deleterious","Nonsynonymous","Synonymous"))
+
+### 只画柱状图 dodge
+p <- df %>%
+ggplot(aes(x=Sub,y=n,fill=LoadGroup))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,
+            position = position_dodge(0.9))+
+  # geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,nudge_y = 1)+
+  labs(x="", y="SNP count")+
+  scale_fill_manual(values = colB)+
+  theme_classic()+
+  # theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
+          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
+
+p
+
+### 只画柱状图 stack
+
 p <- df %>% 
   ggplot(aes(x=Sub, y=n,fill=LoadGroup)) +
   geom_bar(stat="identity",alpha = 1)+  #,position=position_dodge()
   geom_text(aes(label=  paste(prettyNum(n,big.mark = ","),"(",round(fre,2),")")),position =  position_stack(),vjust=1.5, size=3) +
   scale_fill_manual(values=colB)+
-  # ylab("SNP count (kb)") +
   labs(y="SNP count",x="")+
   theme(panel.background = element_rect(size = 0.7, colour = 'black',fill = 'white'),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 12)
         ,legend.position = 'none'
         )
 
 p
+
+### 只画柱状图 stack 百分比是1
+p <- df %>% 
+  ggplot(aes(x=Sub, y=n,fill=LoadGroup)) +
+  geom_bar(stat="identity",alpha = 1,position = "fill")+  #,position=position_dodge()
+  geom_text(aes(label=  paste(prettyNum(n,big.mark = ","),"(",round(fre,2),")")),position = position_fill(),vjust=1.5, size=3) +
+  scale_fill_manual(values=colB)+
+  labs(y="Proportion",x="")+
+  theme(panel.background = element_rect(size = 0.7, colour = 'black',fill = 'white'),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 12)
+        ,legend.position = 'none'
+        )
+
+p
+
 ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 
 ```
 
-### Total count by LoadGroup
-- 只计算有祖先状态的位点
+
+### 不区分亚基因组
 ```{r}
-df <- dftotal %>% filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
-  mutate(Derived_SIFT = ifelse(is.na(Derived_SIFT),100,Derived_SIFT)) %>% 
-  mutate(Gerp = ifelse(is.na(Gerp),-100,Gerp)) %>% 
-  mutate(LoadGroup = ifelse(Variant_type=="NONSYNONYMOUS",ifelse(Derived_SIFT<0.05&Gerp>=1,"Deleterious","Nonsynonymous"),"Synonymous")) %>% 
-  filter(!Ancestral == "NA") %>% 
-  filter(Ancestral==Ref|Ancestral==Alt) %>% 
-  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
-  # select(Variant_type,Derived_SIFT,Gerp,LoadGroup)
-  # group_by(Sub) %>% 
+### 不区分亚基因组
+### GERP & PPH2 方法定义有害突变
+df <- dftotal %>% 
+  mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
+  filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
+  filter(!is.na(DAF)) %>%
+  # mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  # mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  # filter(Sub=="B") %>%
   count(LoadGroup) %>% 
-  mutate(fre=n/sum(n))
+  mutate(fre=n/sum(n)) %>% 
+  arrange(desc(LoadGroup))
+
+df
+
+### GERP 方法定义有害突变
+df2 <- dftotal %>% 
+  mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
+  filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
+  filter(!is.na(DAF)) %>%
+  # mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>% 
+  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  # filter(Sub=="B") %>% 
+  count(LoadGroup) %>% 
+  mutate(fre=n/sum(n)) %>% 
+  arrange(desc(LoadGroup))
+
+df2
+
+colB <- c("#d5311c","#e69f00","#004680")
+df$LoadGroup <- factor(df$LoadGroup,levels = c("Deleterious","Nonsynonymous","Synonymous"))
 
 ### 只画柱状图 dodge
-colB <- c("#d5311c","#e69f00","#004680")
-
 p <- df %>%
 ggplot(aes(x=LoadGroup,y=n,fill=LoadGroup))+
   geom_bar(stat = 'identity',position = "dodge")+
@@ -361,20 +400,380 @@ ggplot(aes(x=LoadGroup,y=n,fill=LoadGroup))+
             position = position_dodge(0.9))+
   # geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,nudge_y = 1)+
   labs(x="", y="SNP count")+
-  scale_fill_brewer(palette = "Set2")+
   scale_fill_manual(values = colB)+
-  # scale_fill_brewer(palette = "Blues")+
   theme_classic()+
-  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  # theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
   theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
-          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 12))
+          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
+
+p
+```
+
+
+
+#### ========
+## Deleterious count on Gene level
+#### ========
+```{r}
+### 记得导入dftotal 数据框
+df_stage1 <- dftotal %>% 
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(Ancestral),Ancestral %in% c(Ref,Alt)) %>%
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>%  ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
+  # select(Variant_type,Derived_SIFT,Gerp,LoadGroup)
+  group_by(Transcript,CommonOrRare) %>% 
+  count(LoadGroup) %>% 
+  mutate(Sub = str_sub(Transcript,9,9)) %>% 
+  spread(key = CommonOrRare, value = n,fill = 0)
+
+```
+接上，
+```{r}
+### 计算多少个基因含有突变 47615
+genenum <- length(unique(df_stage1$Transcript))
+print(paste("Gene num with SNP: ",genenum))
+
+### 变异在基因中的分布：分类三类基因1.common 2.rare 3.common and rare
+### 计算有多少个基因即有稀有变异,又有common变异
+dfgenenum <- dftotal %>%
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(Ancestral),Ancestral %in% c(Ref,Alt)) %>%
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>%  ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
+  # select(Variant_type,Derived_SIFT,Gerp,LoadGroup)
+  group_by(Transcript) %>% 
+  count(CommonOrRare)
+
+dftest <- dfgenenum %>%  ### 20495 个基因，即有稀有变异,又有common变异
+  group_by(Transcript) %>% 
+  count(Transcript) %>% 
+  filter(n==2)
+
+print(paste("gene num with rare and common", nrow(dftest)))
+
+### 计算有多少个基因只有稀有变异，或者只有common变异
+dftest <- dfgenenum %>% 
+  group_by(Transcript) %>% 
+  count(Transcript) %>% 
+  filter(n==1) %>% 
+  left_join(.,dfgenenum,by="Transcript") %>% 
+  group_by(CommonOrRare) %>% 
+  count(CommonOrRare)
+
+print(str_c("gene num with only rare snp ",dftest[2,2]))
+print(str_c("gene num with only common snp ",dftest[1,2]))
+
+#############################################################################
+### 有害变异在基因中的分布：分类三类基因1.common 2.rare 3.common and rare
+### 1.rare
+dfrare <- dftotal %>% 
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(LoadGroup == "Deleterious") %>%
+  group_by(Transcript) %>% 
+  count(Transcript)
+
+dftest <- dfgenenum %>% 
+  group_by(Transcript) %>% 
+  count(Transcript) %>% 
+  filter(n==1) %>% 
+  left_join(.,dfgenenum,by="Transcript") %>% 
+  filter(CommonOrRare=="Rare") %>% 
+  left_join(.,dfrare,by="Transcript") %>% 
+  filter(!is.na(n))
+
+ print(str_c("gene num with only rare snp ",nrow(dftest)," (has deleterious)"))
+
+### 2. common
+  dfrare <- dftotal %>% 
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(LoadGroup == "Deleterious") %>%
+  group_by(Transcript) %>% 
+  count(Transcript)
+
+dftest <- dfgenenum %>% 
+  group_by(Transcript) %>% 
+  count(Transcript) %>% 
+  filter(n==1) %>% 
+  left_join(.,dfgenenum,by="Transcript") %>% 
+  filter(CommonOrRare=="Common") %>% 
+  left_join(.,dfrare,by="Transcript") %>% 
+  filter(!is.na(n))
+
+ print(str_c("gene num with only common snp ", nrow(dftest)," (has deleterious)"))
+ 
+ 
+ ### 3. common and rare
+  dfrare <- dftotal %>% 
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(LoadGroup == "Deleterious") %>%
+  group_by(Transcript) %>% 
+  count(Transcript)
+
+dftest <- dfgenenum %>% 
+  group_by(Transcript) %>% 
+  count(Transcript) %>% 
+  filter(n==2) %>% 
+  left_join(.,dfgenenum,by="Transcript") %>% 
+  distinct(.,Transcript) %>% 
+  left_join(.,dfrare,by="Transcript") %>% 
+  filter(!is.na(n))
+
+ print(str_c("gene num with common and rare snp ",nrow(dftest)," (has deleterious)") )
+
+```
+
+```{r}
+### 上述 common rare common and rare 
+df <- read.delim("data/006_Fig2/geneCount/geneCount.txt")
+head(df)
+colB <- c("#d5311c","gray")
+p <- df %>% 
+  ggplot(aes(x=Group1, y=Count,fill=Group2)) +
+  geom_bar(stat="identity",alpha = 1)+  #,position=position_dodge()
+  geom_text(aes(label=prettyNum(Count,big.mark = ",")),position =  position_stack(),vjust=1.5, size=3) +
+  scale_fill_manual(values=colB)+
+  # ylab("SNP count (kb)") +
+  labs(y="Gene count",x="")+
+  # theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme(panel.background = element_rect(size = 0.7, colour = 'black',fill = 'white'),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 12)
+        ,legend.position = 'none'
+        )
 
 p
 
-### 求某一列的和
-ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 
-sum(df$n)
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+```
+
+
+开始画图
+```{r}
+
+### 含有 common 基因的基因列表
+dfcommon <- dftotal %>% 
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(Ancestral),Ancestral %in% c(Ref,Alt)) %>%
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>%  ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
+  # select(Variant_type,Derived_SIFT,Gerp,LoadGroup)
+  group_by(Transcript) %>% 
+  count(CommonOrRare) %>% 
+  filter(CommonOrRare == "Common") %>% 
+  distinct(.,Transcript) 
+
+### 含有 rare 基因的基因列表
+dfrare <- dftotal %>% 
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(Ancestral),Ancestral %in% c(Ref,Alt)) %>%
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>%  ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
+  # select(Variant_type,Derived_SIFT,Gerp,LoadGroup)
+  group_by(Transcript) %>% 
+  count(CommonOrRare) %>% 
+  filter(CommonOrRare == "Rare") %>% 
+  distinct(.,Transcript) 
+
+
+library(VennDiagram)
+#Make the plot
+venn.diagram(
+  x = list(dfcommon$Transcript,dfrare$Transcript), 
+  main = "common and rare genes",
+  category.names = c("common" , "rare" ),
+  filename = "gene statistic.png",
+  output = T ,
+  
+  # Output features
+  imagetype="png" ,
+  # height = 480 , 
+  # width = 480 , 
+  # resolution = 300,
+  # compression = "lzw",
+  
+  # Circles
+  lwd = 1,
+  col=c("#440154ff", '#21908dff'),
+  fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3)),
+  
+  # Numbers
+  cex = 0.5,
+  fontfamily = "sans",
+  cat.cex = 0.3,
+  cat.default.pos = "outer",
+  ## cat.pos = c(-27, 27, 135),
+  ## cat.dist = c(0.055, 0.055, 0.085),
+  cat.pos = c(-27, 27),
+  cat.dist = c(0.055, 0.055),
+  cat.fontfamily = "sans",
+  cat.col = c("#440154ff", '#21908dff')
+  # rotation = 1
+)
+```
+
+接上
+```{r}
+## 每个基因至少出现3次，即每个基因至少含有Synonymous Nonsynonymous Deleterious
+## 过滤后，每个基因按照rare的总数进行排序，由低到高，并进行间隔抽样，抽取100个试试看
+
+## 每个基因含有的rare变异的分布范围
+df_common_rare <- dftotal %>%
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(Ancestral),Ancestral %in% c(Ref,Alt)) %>%
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>%  ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
+  group_by(CommonOrRare) %>% 
+  count(Transcript) %>% 
+  ungroup() %>% 
+  filter(CommonOrRare == "Rare") %>% 
+  select(Transcript,n)
+
+df_filter <- df_stage1 %>% 
+  count(Transcript) %>% 
+  filter(n == 3) %>% 
+  select(Transcript) %>% 
+  left_join(.,df_common_rare,by="Transcript") %>% 
+  rename(RareVariantsCount = n) %>% 
+  filter(!is.na(RareVariantsCount)) %>% 
+  ungroup()
+  ### nuique 一下计数
+
+df_sample <- df_filter %>% 
+  distinct(RareVariantsCount,.keep_all=TRUE) %>%
+  # slice_sample(.,n=120) %>% 
+  arrange(RareVariantsCount)
+
+df_filter %>% 
+  ggplot(aes(x=RareVariantsCount))+
+  geom_histogram(color="white")+
+  theme_bw()
+
+```
+
+接上
+```{r}
+df <- df_sample %>% 
+  left_join(.,df_stage1,by="Transcript") %>% 
+  rename(Gene = Transcript)
+
+## 处理抽样基因的CDS长度
+df_geneInfo <- read.delim("data/006_Fig2/wheat_v1.1_nonoverlap_addPos.txt")
+
+df_geneInfo <- df_geneInfo %>% select(Longest_transcript,CDSLength) %>% 
+  rename(Transcript=Longest_transcript)
+
+df_geneCDSlength <- df_sample %>% 
+  left_join(.,df_geneInfo,by="Transcript") %>% 
+  rename(Gene = Transcript)
+
+### 接下来看每个基因的长度，也画到图上，表示基因长度和变异数的关系
+```
+
+```{r}
+colB <- c("#d5311c","#e69f00","#004680")
+p <- ggplot()+
+  geom_bar(data = df, mapping = aes(x=reorder(Gene,RareVariantsCount) ,y=-Rare,fill=LoadGroup),stat = 'identity')+
+  geom_bar(data = df, mapping = aes(x=Gene,y=Common,fill = LoadGroup),stat = 'identity')+
+  geom_segment(x=0,xend= 100000,y=0,yend=0,size=1,color='white')+
+  geom_line(data = df_geneCDSlength,mapping = aes(x=Gene,y= 7*CDSLength/1000,group = 1),color = "gray")+
+  annotate("text",x=-Inf,y= 0 ,hjust=-0.3,vjust=4,label="MAF <= 5%",size=3)+
+  annotate("text",x=-Inf,y= 0,hjust=-0.3,vjust=-4,label="MAF > 5%",size=3)+
+  scale_y_continuous(limit = c(-200,120), breaks = seq(-200,100,50),labels = c(200,150,100,50,0,50,100)
+                     ,sec.axis = sec_axis(~./7, name="CDS length (kb)",breaks = seq(0,15,5))
+                     )+
+  xlab("Gene rank (by number of rare coding SNVs)")+ylab("Number of variants")+
+  scale_fill_manual(values = colB,name="")+
+  theme(legend.position = 'none')+
+  scale_x_discrete(limits = df_sample$Transcript, breaks = c("TraesCS1A02G169600.1","TraesCS1A02G040600.1","TraesCS1A02G091500.1","TraesCS1B02G160800.1")
+                   ,labels = c(1,25,50,75)
+                   )+
+  # theme(axis.text.x = element_blank(),axis.ticks.x = element_blank(),axis.line.x = element_blank())+
+  theme(panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),text = element_text(size = 12))
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 6)
+
+```
+
+
+
+
+```{r}
+### 稀有变异数分布
+
+df_filter %>% 
+  ggplot(aes(x=.$RareVariantsCount))+
+  geom_histogram()
+```
+
+
+数目统计
+```{r}
+## 每个基因含有的变异数范围
+df <- dftotal %>% filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Derived_SIFT = ifelse(is.na(Derived_SIFT),100,Derived_SIFT)) %>% 
+  mutate(Gerp = ifelse(is.na(Gerp),-100,Gerp)) %>% 
+  mutate(LoadGroup = ifelse(Variant_type=="NONSYNONYMOUS",ifelse(Derived_SIFT<0.05&Gerp>=1,"Deleterious","Nonsynonymous"),"Synonymous")) %>% 
+  filter(!Ancestral == "NA") %>% 
+  filter(Ancestral== Ref|Ancestral==Alt) %>% 
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>%  ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
+  count(Transcript) 
+
+## 1-199 个变异
+
+## 每个基因含有的common和rare变异的分布范围
+df <- dftotal %>% filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Derived_SIFT = ifelse(is.na(Derived_SIFT),100,Derived_SIFT)) %>% 
+  mutate(Gerp = ifelse(is.na(Gerp),-100,Gerp)) %>% 
+  mutate(LoadGroup = ifelse(Variant_type=="NONSYNONYMOUS",ifelse(Derived_SIFT<0.05&Gerp>=1,"Deleterious","Nonsynonymous"),"Synonymous")) %>% 
+  filter(!Ancestral == "NA") %>% 
+  filter(Ancestral== Ref|Ancestral==Alt) %>% 
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>%  ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
+  group_by(CommonOrRare) %>% 
+  count(Transcript) %>% 
+  summarise(maxNum = max(n),minNum = min(n))
+
+
+
+## 每个基因含有的不同loadGroup变异的分布范围
+df <- dftotal %>% filter(Region=="CDS",Variant_type == "SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>% 
+  mutate(Derived_SIFT = ifelse(is.na(Derived_SIFT),100,Derived_SIFT)) %>% 
+  mutate(Gerp = ifelse(is.na(Gerp),-100,Gerp)) %>% 
+  mutate(LoadGroup = ifelse(Variant_type=="NONSYNONYMOUS",ifelse(Derived_SIFT<0.05&Gerp>=1,"Deleterious","Nonsynonymous"),"Synonymous")) %>% 
+  filter(!Ancestral == "NA") %>% 
+  filter(Ancestral== Ref|Ancestral==Alt) %>% 
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>%  ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
+  group_by(LoadGroup) %>% 
+  count(Transcript) %>% 
+  summarise(maxNum = max(n),minNum = min(n))
+
 ```
 
 
@@ -383,7 +782,11 @@ sum(df$n)
 
 
 
-
+## ********* 以下是上一版本文件
+## ********* 以下是上一版本文件
+## ********* 以下是上一版本文件
+## ********* 以下是上一版本文件
+## ********* 以下是上一版本文件
 ## ********* 以下是上一版本文件
 ## 只取有害突变的位点，
 ```{r}

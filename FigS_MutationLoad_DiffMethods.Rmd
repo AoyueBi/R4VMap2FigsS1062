@@ -36,7 +36,7 @@ library(doParallel)
 
 ## Tidy BIG DATA
 ```{r}
-dftotal <- read_tsv("data/004_delCount/007_geneSNPAnno.txt.gz") %>% 
+dftotal <- read_tsv("data/004_delCount/011_geneSNPAnno.txt.gz") %>% 
   mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
   mutate(HaveAncestralState=ifelse(is.na(Ancestral), "0", 
                                    ifelse(Ancestral==Ref | Ancestral==Alt, "1", "0"))) %>% 
@@ -122,9 +122,15 @@ dfthreshold <- tibble(Method= rep(labelsA,2),
 ```{r}
 
 p <- df %>% 
+  filter(Method == "GERP") %>%
+  droplevels() %>% 
   ggplot(aes(x=Score, color=Variant_type,fill=Variant_type)) +
-  geom_histogram(aes(y=..ndensity..),alpha=0.5,position="identity",bins = 30)+
-  geom_vline(data = dfthreshold,aes(xintercept = Line),color="blue",linetype="dashed")+
+  geom_histogram(aes(y=..ndensity..),alpha=0.5,position="identity",bins = 50)+
+  # geom_vline(data = dfthreshold,aes(xintercept = Line),color="blue",linetype="dashed")+
+    geom_vline(aes(xintercept = 1.25),color="blue",linetype="dashed")+
+      geom_vline(aes(xintercept = 1.5),color="blue",linetype="dashed")+
+    geom_vline(aes(xintercept = 1.78),color="blue",linetype="dashed")+
+    geom_vline(aes(xintercept = 2.14),color="blue",linetype="dashed")+
   scale_color_manual(values = c("#e69f00","#004680"))+
   scale_fill_manual(values = c("#e69f00","#004680"))+
   facet_grid(Variant_type~as.factor(Method),scales = "free")+
@@ -1442,6 +1448,13 @@ df1 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("benign"))
 df2 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("possibly damaging")) %>%
   filter(Derived_PolyPhen2_class %in% c("neutral"))
 ```
+
+2. Fig2 
+1. 1B1R 
+3. Introgression and selection
+4. GERP 1.5 PolyPhen2 0.5
+
+
 
 
 

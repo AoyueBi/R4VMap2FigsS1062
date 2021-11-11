@@ -28,6 +28,163 @@ library(tidyverse)
 ## message 默认Bin等信息要不要输出
 ```
 
+## ===DelLoad===
+```{r}
+choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
+
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
+labelsB <- c("Nonsynonymous","Deleterious","High impact")
+
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  select(-c("IfSelected","Group_refobj","DelCountGroup")) %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(Stand_LoadGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB))
+
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray90")
+
+```
+
+### plot
+```{r}
+p <- df %>%
+  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
+  ylab("Mutation burden")+xlab("")+
+  ### volin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+
+  ### boxplot
+  geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  
+  ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 1)+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "figs/Fig3/misc/whole_load.pdf",height = 4,width = 4)
+```
+
+## XPCLR Load ratio
+```{r}
+dfdelRatio <- read.delim("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/004_summary_XPCLR_top005/012_merge/delRatio.txt")
+
+### 导入种质数据库,并选取特定的列
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,GroupbyContinent,IfOnVmap2_S643)
+
+df <- dfdelRatio %>% left_join(.,dftaxaDB,by="Taxa")
+df$GroupbyContinent <- factor(df$GroupbyContinent, levels = c("WE","DE","FTT","LR_EU","CL"))
+colB <- c("#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")
+
+df$Stand_LoadGroup <- factor(df$Stand_LoadGroup,levels = c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP"), labels = c("Nonsynonymous","Deleterious","High impact"))
+
+df$Group_refobj <- factor(df$Group_refobj, levels = c("wede","dedurum","lrcul"))
+
+p <- df %>% 
+  filter(IfSelected == 1) %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  ggplot(aes(x=Subgenome,y=Stand_delCount))+
+  ylab("Mutation burden")+xlab("")+
+  ### pointrange
+  stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position=position_dodge(0.8),geom="pointrange")+
+  stat_summary(aes(group = GroupbyContinent), fun=mean, geom="point", color="white",position = position_dodge(0.8))+
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_grid(Stand_LoadGroup~Group_refobj,scales = "free")+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.pdf",height =6,width = 6)
+
+```
+
+## XPCLR load count
+```{r}
+dfdelcount <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/004_summary_XPCLR_top005/012_merge/delCount_xpclr.txt")
+
+### 导入种质数据库,并选取特定的列
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5","007_VEP")
+labelsA <- c("Nonsynonymous","Deleterious","High impact")
+
+df <- dfdelcount %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(VariantsGroup %in% factorA)
+
+df$GroupbyContinent <- factor(df$GroupbyContinent, levels = c("WE","DE","FTT","LR_EU","CL"))
+colB <- c("#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")
+df$VariantsGroup <- factor(df$VariantsGroup,levels = factorA, labels = labelsA)
+df$Group_refobj <- factor(df$Group_refobj, levels = c("wede","dedurum","lrcul"))
+
+p <- df %>% 
+  filter(IfSelected == 1) %>% 
+  ggplot(aes(x=Subgenome,y=TotalDerivedSNPCount))+
+  ylab("Derived allele count per accession")+xlab("")+
+  ### pointrange
+  stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position=position_dodge(0.8),geom="pointrange")+
+  stat_summary(aes(group = GroupbyContinent), fun=mean, geom="point", color="white",position = position_dodge(0.8))+
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_grid(VariantsGroup~Group_refobj,scales = "free")+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 4,width = 4)
+```
+
+
+
+
+## ********* 以下是上一版本文件
+## ********* 以下是上一版本文件
+## ********* 以下是上一版本文件
+## ********* 以下是上一版本文件
+## ********* 以下是上一版本文件
+## ********* 以下是上一版本文件
+
 ## delterious ratio
 ## 5.delRatio
 ```{r}

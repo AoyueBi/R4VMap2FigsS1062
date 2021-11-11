@@ -1088,7 +1088,8 @@ p
 
 ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 
-
+### 求每个倍性的深度平均值
+dfave <- df1 %>% group_by(GenomeType) %>% summarise(mean=mean(MeanDepth))
 ```
 
 ## MAF
@@ -1363,56 +1364,7 @@ ggsave(q,filename = "~/Documents/test.pdf",height = 3,width = 4)
 
 ```
 
-## Variants rate
 
-```{r}
-dataFile <- c("data/002_variantsRate_byRefChr.txt")
-df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
-head(df)
-p <- ggplot(df, aes(x=ID_Chr_Part, y=VariantRate)) +
-  geom_segment( aes(x=df$ID_Chr_Part, xend=df$ID_Chr_Part, y=0, yend=df$VariantRate), color="grey") +
-  geom_point( color="orange", size=4) +
-  # theme_light() +
-  xlab("") +
-  ylab("Variant rate") +
-  scale_y_continuous(limits = c(0,110), breaks = seq(0,110,25))+
-  # theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
-  theme(
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
-    text = element_text(size = 10),legend.position = 'none')+
-    theme(axis.text.x = element_text(size = 7))
-
-p
-# ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4.5,width = 6)
-ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4.5,width = 6)
-
-#####
-################################# ##
-#                               #
-#  求每一组的总和，平均值
-#                               #
-################################# ##
-out <- df %>% 
-  mutate(Sub = substring(ID_Chr_Part,2,2)) %>% 
-  group_by(Sub) %>% 
-  summarise(sum1=sum(as.numeric(Length)),sum2=sum(as.numeric(N_BiallelicSNPs)),   variantRatebySub=sum1/sum2) %>% 
-  arrange(desc(variantRatebySub))
-  
-out
-  
-# write.table(out,file="/Users/Aoyue/Documents/value2.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
-
-q <- p +
-  annotate("text",x=-Inf,y= Inf ,hjust=-0.1,vjust=1.5,label="A sub (Variant rate) = 50 bp",size=3)+
-  annotate("text",x=-Inf,y= Inf,hjust=-0.1,vjust=3,label="B sub (Variant rate) = 50 bp",size=3)+
-  annotate("text",x=-Inf,y= Inf,hjust=-0.1,vjust=4.5,label="D sub (Variant rate) = 99 bp",size=3)
-q
-ggsave(q,filename = "~/Documents/test.pdf",height = 3.6*3/4,width = 3.6)
-
-
-
-```
 
 
 
