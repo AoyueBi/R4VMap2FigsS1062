@@ -1,0 +1,266 @@
+---
+title: "Data analysis"
+author: "Aoyue Bi, Daxing Xu"
+date: "`r Sys.Date()`"
+output: 
+  html_document: # html_notebook, html_document
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
+    # bibliography: bibliography.json
+---
+
+# Fig4 Expansion Load
+
+```{r setup, echo =F, message = T, warning = F}
+library(tidyverse)
+# library(RColorBrewer)
+# library(ggpubr)
+# library(egg)
+## eval 代码要不要运行
+## echo 代码要不要输出
+## include 图要不要输出
+## warning 警告要不要输出
+## message 默认Bin等信息要不要输出
+```
+
+
+## === World map ===
+```{r}
+choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,Longitude,Latitude)
+
+df <- dfdel %>% right_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GenomeType=="AABBDD") %>% 
+  filter(Subgenome=="D") %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  filter(Stand_LoadGroup == choiceA) %>% 
+  select(-c("GenomeType","Subgenome","DelCountGroup","Stand_LoadGroup")) %>% filter(!is.na(Longitude)) ### 802个个体 -> 543 个有经纬度信息
+
+mp<-NULL #定义一个空的地图  
+# 注意： borders函数中的colour是地图国家边界线的颜色,fill是国家的填充颜色
+mapworld<-borders("world",colour = "#dedfe0",fill="#dedfe0") #绘制基本地图
+mpvoid<-ggplot()+ mapworld + ylim(-55,90)+theme_void()
+
+colB <- c("#ffd702","#fc6e6e","#87cef9")
+mp<-mpvoid +
+  geom_point(data=df,aes(x=Longitude,y=Latitude
+),shape=21,alpha=0.8,size=2,fill="orange")+
+  theme(legend.position = 'none')
+mp
+
+ggsave(mp,filename = "figs/map_s1062_1.pdf", height = 2.76,width = 6.89)
+```
+
+
+### Bubble map
+```{r}
+choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
+
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,Longitude,Latitude)
+
+df <- dfdel %>% right_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GenomeType=="AABBDD") %>% 
+  filter(Subgenome=="D") %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  filter(Stand_LoadGroup == choiceA) %>% ###******* choice
+  select(-c("GenomeType","Subgenome","DelCountGroup","Stand_LoadGroup")) %>% filter(!is.na(Longitude)) %>%  ### 802个个体 -> 543 个有经纬度信息
+  arrange(Stand_delCount)  #### 排序
+
+mp<-NULL #定义一个空的地图  
+# 注意： borders函数中的colour是地图国家边界线的颜色,fill是国家的填充颜色
+mapworld<-borders("world",colour = "#dedfe0",fill="#dedfe0") #绘制基本地图
+mpvoid<-ggplot()+ mapworld + ylim(-55,90)+theme_void()
+
+library(viridis)
+mp<-mpvoid +
+  geom_point(data = df,mapping = aes(x=Longitude,y=Latitude,
+  size=Stand_delCount, color=Stand_delCount),
+  alpha = 0.9)+
+  scale_size_continuous(range=c(1,3))+ ## 0.5-3
+  # scale_color_manual(values = colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100))+
+  # scale_fill_manual(values = colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100))
+  # scale_fill_gradientn(colours =rev(colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100)))+
+  scale_color_gradientn(colours = rev(colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100)))
+  # scale_color_viridis(trans="log") +
+  # scale_fill_viridis(trans="log")
+  # theme(legend.position = 'none')
+mp
+
+ggsave(mp,filename = "figs/map_s1062_2.pdf", height = 2.76,width = 6.89)
+```
+
+
+
+### Spatstat world map
+```{r}
+choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
+
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,Longitude,Latitude)
+
+set.seed(123)
+df1 <- dfdel %>% right_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GenomeType=="AABBDD") %>% 
+  filter(Subgenome=="D") %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  filter(Stand_LoadGroup == choiceA) %>% 
+  select(-IfSelected,-Group_refobj) %>% 
+  select(-c("GenomeType","Subgenome","DelCountGroup","Stand_LoadGroup")) %>% 
+  filter(!is.na(Longitude)) %>%  ### 802个个体 -> 543 个有经纬度信息
+  arrange(Stand_delCount) 
+
+df <- df1 %>% 
+  mutate(Longitude = Longitude + runif(nrow(df1),0.001,0.005)) ##通过添加随机数，避免重复
+  
+```
+
+#### plot
+```{r}
+library(raster)
+# detach(package:raster,unload = T)
+library(spatstat)
+library(RColorBrewer)
+
+ppp.df <- ppp(df$Longitude, df$Latitude, c(-180, 180), c(-60, 90))
+marks(ppp.df) <- df[, 2] ### load ratio 做为 marks 信息
+# plot(density(ppp.df)) ###画出点的聚集程度 测试
+ppp.df2 <- Smooth(ppp.df) ### 求每个点对应的load值的大小
+ppp.df2.m <- ppp.df2$v  ### 获取矩阵内的密度数据
+###矩阵上下颠倒128 -> 1 ,依次减一
+ppp.df2.m1 <- ppp.df2.m[seq(128, 1, by = -1), ] 
+
+### 创建 raster 类，并将密度的结果填充进去
+df.raster <- raster(nrows = 128, ncols = 128, xmn = -180, xmx = 180, ymn = -60, ymx = 90)
+values(df.raster) <- as.vector(t(as.matrix(ppp.df2.m1)))
+plot(df.raster)
+
+world.shp <- shapefile("data/002_spatstat/spatstat/shapefile/TM_WORLD_BORDERS_SIMPL-0.3/TM_WORLD_BORDERS_SIMPL-0.3.shp")
+df.raster.final <- mask(df.raster, world.shp)
+par(mfrow = c(1,1))
+
+# pdf(file = str_c("figs/Fig4/misc",choiceA,"_wholeWorld.pdf"),height = 3,width = 4)
+### whole world
+png(filename = str_c("~/Documents/",choiceA,"_wholemap.png"),units = 'in',height = 4,width = 5.3,res = 300)
+plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xaxt="n",yaxt="n")
+points(df$Longitude, df$Latitude, pch = 16, cex = 0.5,col=rgb(252, 110, 110,90,maxColorValue=255))
+axis(1,at=seq(-150,180,60))
+axis(2,at=seq(-90,90,60))
+dev.off()
+
+### 亚欧大陆和非洲
+png(filename =str_c("~/Documents/",choiceA,"_Eurasia.png"),units = 'in',height = 4,width = 5.3,res = 300)
+# pdf( "~/Documents/test.pdf")
+plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xlim=c(-20,150),ylim=c(-35,62),xaxt="n",yaxt="n")
+points(df$Longitude, df$Latitude, pch = 16, cex = 0.8,col=rgb(252, 110, 110,90,maxColorValue=255))
+axis(1,at=seq(0,150,30))
+axis(2,at=seq(-20,62,20))
+# axis(1,at=seq(0,150,30),labels = c("0","","","","",""))
+# axis(2,at=seq(0,62,20))
+dev.off()
+
+### 美洲和非洲
+png(filename = str_c("~/Documents/",choiceA,"_American.png"),units = 'in',height = 4,width = 5.3,res = 300)
+plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xlim=c(-150,60),ylim=c(-60,62),xaxt="n",yaxt="n")
+points(df$Longitude, df$Latitude, pch = 16, cex = 0.8,col=rgb(252, 110, 110,90,maxColorValue=255))
+axis(1,at=seq(-150,60,30))
+axis(2,at=seq(-60,62,30))
+dev.off()
+
+```
+
+
+
+## === boxplot ===
+- 可以选择定义有害突变的方式 
+unique(dfdel$Stand_LoadGroup)
+```{r}
+choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+### ********************** Section1 *********************************###
+### taxa 属性数据框
+factorA <- c("Landrace","Cultivar","OtherHexaploids","compactum","sphaerococcum","tibeticum","vavilovii","petropavlovskyi","yunna-nense","macha","spelta","dicoccoides","dicoccum","durum","turanicum","polonicum","turgidum","karamyschevii","ispahanicum","carthlicum","strangulata")
+
+labelsA <- c("Landrace","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Wild emmer","Domesticated emmer","Durum","Khorasan wheat ","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","Strangulata")
+
+dfhash <- tibble(Subspecies_by22_TreeValidated=factorA,Subspecies22=labelsA) 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,Subspecies_by22_TreeValidated,GroupbyContinent) %>%
+  left_join(.,dfhash,by="Subspecies_by22_TreeValidated") %>% 
+  mutate(GroupforExpansionLoad = if_else(Subspecies22=="Landrace",GroupbyContinent,Subspecies22)) %>% 
+  select(Taxa,GenomeType,GroupforExpansionLoad)
+
+### ********************** Section2 *********************************###
+### del load 数据框
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(Subgenome=="D") %>% 
+  filter(DelCountGroup=="TotalDerivedSNPCount") %>% 
+  filter(GenomeType=="AABBDD") %>% 
+  select(-c(DelCountGroup,IfSelected,Group_refobj,GenomeType)) %>% 
+  filter(!is.na(GroupforExpansionLoad))
+
+### 统计每个亚基因组内，以亚洲为单位的均值，按照D亚基因组排序
+### dfV2 为排序后的亚洲列表
+dfV1 <- df %>% 
+  group_by(Subgenome,Stand_LoadGroup,GroupforExpansionLoad) %>%
+  summarise(mean = mean(Stand_delCount)) %>%
+  arrange(.,Subgenome,Stand_LoadGroup,mean) %>% 
+  ungroup() %>%  
+  filter(Subgenome=="D",Stand_LoadGroup== choiceA) %>% 
+  select(GroupforExpansionLoad)
+### 因子排序,排序后计数
+df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = dfV1$GroupforExpansionLoad)
+
+### 计算每个亚群的个数
+### 千万注意数据框的分组情况，如sub VariantsGroup ，计算后核查确认！！！
+dftaxaCount <- df %>% 
+  group_by(Subgenome,Stand_LoadGroup,GroupforExpansionLoad) %>%
+  count() %>% ungroup() %>%  
+  distinct(.,GroupforExpansionLoad,.keep_all = T) %>%
+  select(-Subgenome) %>% 
+  mutate(GroupforExpansionLoad_AddCount = str_c(GroupforExpansionLoad," (", n, ")",sep = "")) %>%
+  select(-n)
+```
+
+### plot
+```{r}
+library(RColorBrewer)
+p <- df %>% 
+  filter(Stand_LoadGroup==choiceA) %>%
+  ggplot(aes(x=GroupforExpansionLoad,y= Stand_delCount))+
+  labs(y=str_c("Mutation load per accession\nby ",choiceA),x="")+
+  geom_boxplot(aes(fill=GroupforExpansionLoad), outlier.color =NA,alpha=0.6)+ ### width=0.1
+  geom_point(position = position_jitterdodge(0.6),alpha = 0.5,aes(color=Subgenome),size=0.5)+
+  stat_summary(aes(group = Subgenome), fun=mean, geom="point", color="blue",position = position_dodge(1),size=0.7)+
+  scale_color_manual(values =c("#fd8582","#967bce","#4bcdc6"),name='')+
+  scale_fill_manual(values = colorRampPalette(rev(brewer.pal(n = 1, name = "RdBu")))(16))+
+  scale_x_discrete(labels = dftaxaCount$GroupforExpansionLoad_AddCount)+
+  theme(strip.background = element_blank())+
+  theme(plot.margin=unit(rep(1.3,4),'lines'))+
+  coord_flip()+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    text = element_text(size = 12),legend.position = 'none')
+p
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 6,width = 5)
+```
+
+
+

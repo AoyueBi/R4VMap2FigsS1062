@@ -61,15 +61,15 @@ p <- df %>%
   ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
   ylab("Mutation burden")+xlab("")+
   ### volin
-  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
-  # geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
+  geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
   # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
-  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
 
   ### boxplot
-  geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
-  geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
-  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
   
   ### pointrange
   # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
@@ -90,6 +90,69 @@ p
 ggsave(p,filename = "figs/Fig3/misc/whole_load.pdf",height = 4,width = 4)
 ```
 
+
+- 在分析显著性差异前，先将数据框赋予一个新的变量，存储下来。
+```{r}
+dfdf <- df
+```
+## 显著性分析
+### significance test - slightly
+- 先计算平均值 标准差之类的
+```{r}
+### 平均数，标准差，方差等统计
+  
+df <- dfdf %>% filter(Stand_LoadGroup == "Nonsynonymous") %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
+  group_by(Subgenome,GroupbyContinent) %>% 
+summarise(n=n(),mean=mean(Stand_delCount),median=median(Stand_delCount),max=max(Stand_delCount),min=min(Stand_delCount),sd=sd(Stand_delCount), se = sd/sqrt(n))
+
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+
+```
+
+
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,4],df[2,4])
+aochangePercent(df[7,4],df[8,4])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[2,4],df[3,4])
+aochangePercent(df[8,4],df[9,4])
+print("******************************")
+## ftt-lr 
+print("ftt - lr")
+aochangePercent(df[3,4],df[4,4])
+aochangePercent(df[9,4],df[10,4])
+print("******************************")
+## ae-lr cl
+print("ae - lr cl")
+aochangePercent(df[13,4],df[14,4])
+aochangePercent(df[13,4],df[15,4])
+print("******************************")
+## lr - cl
+print("lr - cl")
+aochangePercent(df[4,4],df[5,4])
+aochangePercent(df[10,4],df[11,4])
+aochangePercent(df[14,4],df[15,4])
+print("******************************")
+
+```
+
+
+
+#### =============
 ## XPCLR Load ratio
 ```{r}
 dfdelRatio <- read.delim("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/004_summary_XPCLR_top005/012_merge/delRatio.txt")
@@ -175,6 +238,72 @@ p
 ggsave(p,filename = "~/Documents/test.pdf",height = 4,width = 4)
 ```
 
+
+## ===DelLoad only Hexaploid===
+```{r}
+choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
+
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("LR_EU","CL","LR_EA")
+
+# factorB <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
+# labelsB <- c("Nonsynonymous","Deleterious","High impact")
+
+factorB <- c("Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5")
+labelsB <- c("Deleterious")
+
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  select(-c("IfSelected","Group_refobj","DelCountGroup")) %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(Stand_LoadGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB))
+
+colB <- c( "#fc6e6e","#9900ff","gray90")
+
+```
+
+### plot
+```{r}
+p <- df %>%
+  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
+  ylab("Mutation burden")+xlab("")+
+  ### volin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+
+  ### boxplot
+  geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  
+  ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 1)+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "figs/Fig3/misc/whole_load.pdf",height = 3,width = 4)
+```
 
 
 

@@ -1,0 +1,423 @@
+---
+title: "Data analysis"
+author: "Aoyue Bi, Daxing Xu"
+date: "`r Sys.Date()`"
+output: 
+  html_document: # html_notebook, html_document
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
+    # bibliography: bibliography.json
+---
+
+```{r setup, echo =F, message = T, warning = F}
+library(tidyverse)
+library(RColorBrewer)
+# library(ggpubr)
+# library(egg)
+## eval 代码要不要运行
+## echo 代码要不要输出
+## include 图要不要输出
+## warning 警告要不要输出
+## message 默认Bin等信息要不要输出
+```
+
+# Fig 1B1R
+## chromoMap
+```{r}
+library(chromoMap)
+library(shiny)
+chromFile <- c("data/007_1B1R/ChrLenCentPosi.txt")
+annoFile <- c("data/007_1B1R/Anno.txt")
+p <- chromoMap(chromFile,annoFile,
+          chr_color = c("#bdbebe"),
+          anno_col = c("#004680"),
+          segment_annotation = T)
+
+
+p
+
+#### 图片的保存
+ui <- fluidPage(
+   
+   # Application title
+   titlePanel("An example of chromoMap in Shiny"),
+   
+   # you can use GUI controls for your chromoMap
+   sidebarLayout(
+      sidebarPanel(
+         #some code
+      ),
+      # Show a plot of the generated distribution
+      mainPanel(
+         chromoMapOutput("myChromoMap")
+      )
+   )
+)
+
+# Define server logic required to draw chromoMap
+server <- function(input, output) {
+   output$myChromoMap <- renderChromoMap({
+     p
+     # chromoMap(chromFile,annoFile,
+     #      chr_color = c("gray"),
+     #      anno_col = c("#004680"),
+     #      segment_annotation = T)
+   })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+
+# colB <- brewer.pal(7,"Set1")[c(1,2)]
+# chromoMap(chromFile,annoFile,
+#           title = "",
+#           chr_color = c("bisque"), #染色体的颜色
+#           # v_align=T,
+#           legend = T,lg_x = 500,lg_y = 125,labels=F,
+#           data_based_color_map = T,
+#           data_type = "numeric",aggregate_func = "sum",
+#           # data_type = "categorical",
+#           data_colors = list(colB),
+#           canvas_width = 550, #调节画布大小,默认600
+#           canvas_height = 500, #调节画布大小，默认700
+#           # top_margin = 8, #
+#           top_margin = 40, # 默认25
+#           left_margin = 50, # 默认15
+#           chr_width = 16, # 默认4
+#           chr_length = 4, # 默认5
+#           ch_gap = 5, # 默认6
+#           chr_text = T # 是否显示染色体号
+# )
+```
+
+## Load pattern
+```{r message=FALSE, warning=FALSE}
+dfTaxaInfo <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  filter(GroupbyContinent=="CL")
+
+df_delCount <- dir("data/fromDaxing/1B1R/001_data/002_byGene/003_GERP1.5_PPH0.5", full.names = T) %>%
+  keep(~str_remove_all(basename(.x), ".txt.gz") %in% dfTaxaInfo$VcfID) %>% 
+  map(~read_tsv(.x) %>% mutate(Taxa=str_remove_all(basename(.x), ".txt.gz"))) %>% 
+  bind_rows() %>%
+  mutate(Sub=str_sub(geneName, 9,9)) %>%
+  mutate(Chr=str_sub(geneName,8,9)) %>% 
+  group_by(Taxa,Sub, Chr) %>%
+  summarise(n=n(),
+            synNum=sum(numDerivedInSyn),
+            synHeteroNum=sum(numHeterInSyn*0.5),
+            nonNum=sum(numDerivedInNonsyn),
+            nonHeteroNum=sum(numHeterInNonsyn*0.5),
+            delNum=sum(numDerivedInHGDeleterious),
+            delHeteroNum=sum(numHeterInHGDeleterious*0.5))
+```
+
+### plot
+```{r}
+dfWith1B1R <- read_tsv("data/007_1B1R/000_group/With1B1R.txt",col_names = F) %>%
+  mutate(If1B1R="With1B1R")
+dfNo1B1R <- read_tsv("data/007_1B1R/000_group/No1B1R.txt",col_names = F) %>% 
+  mutate(If1B1R="No1B1R")
+df_if1B1R <- rbind(dfWith1B1R,dfNo1B1R) %>% rename(Taxa=X1)
+
+df_Ratio <- df_delCount %>% 
+  mutate(Nonsyn=(nonNum+nonHeteroNum)/(synNum+synHeteroNum),
+         Deleterious=(delNum+delHeteroNum)/(synNum+synHeteroNum)) %>%
+  dplyr::select(Taxa,Sub,Chr,Nonsyn,Deleterious) %>%
+  filter(Chr %in% c("1A","1B","1D")) %>% 
+  pivot_longer(cols = Nonsyn:Deleterious, 
+               names_to = "Methods", values_to = "Burden")
+
+colB <- c("skyblue","#004680")
+
+p <- df_Ratio %>%
+  right_join(.,df_if1B1R,by="Taxa") %>% 
+  mutate(SubID=str_sub(Chr,1,1)) %>%
+  ggplot(aes(x=Chr,y=Burden,fill=If1B1R,color=If1B1R))+
+  geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.3) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.8),alpha=0.1)+
+  scale_color_manual(values = colB)+
+  scale_fill_manual(values = colB)+
+  # scale_color_manual(values = c("Gray50","steelblue"))+
+  # scale_fill_manual(values = c("Gray50","steelblue"))+
+  # scale_fill_brewer(palette = "Set2")+
+  # scale_color_brewer(palette = "Set2")+
+  facet_grid(Methods~.,scales = "free")+
+  labs(y="Mutation burden")+ 
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        # legend.position ="none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        axis.title.x = element_blank(),
+        text = element_text(size = 12),
+        # axis.text = element_text(size = 7),
+        # axis.title = element_text(size = 8),
+        # strip.text.y = element_text(size = 6),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+```
+
+
+
+## Pop所有数据都滑窗
+```{r}
+
+# fun_windowScanPi <- function(filename){
+#   library(windowscanr)
+#   if1B1R <- str_split_fixed(basename(filename),"_",n=2)[1,1]
+#   df <- read_tsv(filename)
+#   colname <- colnames(df)[5]
+#   df <- df %>% filter(!is.na(PI))
+#   
+#    pos_win <- winScan(x=df,
+#                    groups = "CHROM", 
+#                    position = "BIN_START" , 
+#                    values = c(colname), 
+#                    win_size = 10000000,
+#                    win_step = 1000000,
+#                    funs = c("mean", "sd"))
+# 
+#   df <- pos_win %>% mutate(If1B1R=if1B1R)
+#   
+#   return(df)
+# }
+# 
+# df_pi <- dir("data/fromDaxing/1B1R/002_1B1R/004_popGen/001_pi", full.names = T) %>% 
+#   map(~fun_windowScanPi(.x)) %>%
+#   bind_rows() %>% 
+#   write_tsv("data/007_1B1R/001_PopGenetics/Pi.txt")
+# 
+# fun_windowScanFst <- function(filename){
+#   library(windowscanr)
+#   df <- read_tsv(filename)
+#   colname <- colnames(df)[5]
+#   df <- df %>% filter(!is.na(WEIGHTED_FST),WEIGHTED_FST>0)
+#   
+#    pos_win <- winScan(x=df,
+#                    groups = "CHROM", 
+#                    position = "BIN_START" , 
+#                    values = c(colname), 
+#                    win_size = 10000000,
+#                    win_step = 1000000,
+#                    funs = c("mean", "sd"))
+# 
+#   df <- pos_win
+#   
+#   return(df)
+# }
+# 
+# df <- dir("data/fromDaxing/1B1R/002_1B1R/004_popGen/002_fst", full.names = T) %>% 
+#   map(~fun_windowScanFst(.x)) %>%
+#   bind_rows() %>% 
+#   write_tsv("data/007_1B1R/001_PopGenetics/Fst.txt")
+# 
+# fun_windowScanTajimaD <- function(filename){
+#   library(windowscanr)
+#   if1B1R <- str_split_fixed(basename(filename),"_",n=2)[1,1]
+#   df <- read_tsv(filename)
+#   colname <- colnames(df)[4]
+#   df <- df %>% filter(!is.na(TajimaD))
+#   
+#    pos_win <- winScan(x=df,
+#                    groups = "CHROM", 
+#                    position = "BIN_START" , 
+#                    values = c(colname), 
+#                    win_size = 10000000,
+#                    win_step = 1000000,
+#                    funs = c("mean", "sd"))
+# 
+#   df <- pos_win %>% mutate(If1B1R=if1B1R)
+#   
+#   return(df)
+# }
+# 
+# df <- dir("data/fromDaxing/1B1R/002_1B1R/004_popGen/003_tajimaD", full.names = T) %>% 
+#   map(~fun_windowScanTajimaD(.x)) %>%
+#   bind_rows() %>% 
+#   write_tsv("data/007_1B1R/001_PopGenetics/TajimaD.txt")
+
+```
+
+
+
+```{r}
+dfChr_point <- read_tsv("data/fromDaxing/1B1R/centromereStartEnd.txt") %>%
+  mutate(ChrID=str_sub(Chr,4,5)) %>%
+  select(CHROM=ChrID,Mid) %>%
+  filter(CHROM %in% c("1A","1B","1D"))
+
+df_pi <- dir("data/fromDaxing/1B1R/002_1B1R/004_popGen/001_pi", full.names = T) %>% 
+  map(~read_tsv(.x) %>% mutate(If1B1R=map_chr(str_split(basename(.x),"_"),1))) %>%
+  bind_rows() %>% 
+  left_join(dfChr,by = c("CHROM"="ChrID")) %>% 
+  mutate(IfLongArm=ifelse(((BIN_START+BIN_END)/2)< Mid, "ShortArm", "LongArm")) %>% 
+  mutate(IfLongArm=factor(IfLongArm,levels = c("ShortArm","LongArm")))
+
+q <- df_pi %>% 
+  group_by(If1B1R) %>% 
+  # slice_sample(prop = 0.05) %>% 
+  ggplot(aes(x=(BIN_START+BIN_END)/2000000,y=PI))+
+  geom_point(alpha=0.1, aes(fill=If1B1R, color=If1B1R))+
+  geom_smooth(method = "loess",span=0.1, n=200,level=0.99, aes(fill=If1B1R, color=If1B1R))+
+  geom_point(data = dfChr_point, aes(x=Mid/1000000,y=0), size=2)+
+  # labs(x=expression(pi))+
+  facet_grid(CHROM~.)+
+  scale_color_manual(values = col_1B1R)+
+  scale_fill_manual(values = col_1B1R)+
+  labs(x="Genomic position (Mb)")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        panel.background = element_rect(fill="transparent"),
+        # legend.text = element_text(size = 10),
+        # legend.key.size = unit(1,"cm"),
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        # axis.title.x = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 14),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+
+```
+
+
+### 合并在一个数据框
+```{r}
+dffst <- read_tsv("data/007_1B1R/001_PopGenetics/Fst.txt") 
+dfpi <- read_tsv("data/007_1B1R/001_PopGenetics/Pi.txt")
+dftajimaD <- read_tsv("data/007_1B1R/001_PopGenetics/TajimaD.txt")
+
+#### 设置每条染色体的点
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3) %>% filter(CHROM %in% c("1A","1B","1D") )
+
+
+colB <- c("skyblue","#004680")
+p <- ggplot(dfpi, aes(x=win_mid/1000000,y=PI_mean*1000,col=If1B1R))+
+  xlab("Physical distance (Mb)")+ylab(italic(pi)~(x~10^-3)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_area(data = dffst,aes(x=win_mid/1000000,y=WEIGHTED_FST_mean*3,alpha=0.7),fill="#808080",col='transparent')+
+  stat_smooth(method = "gam", formula = y ~ s(x,k=100), size = 1,se=FALSE) +
+  scale_color_manual(values = colB)+
+  scale_y_continuous(sec.axis = sec_axis( ~./3,name = "Fst"))+
+  facet_grid(CHROM~.,scales = "free")+
+  theme(strip.text = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 12))
+
+p
+ggsave(p,filename = "~/Documents/test.pdf",height=3,width=6)
+```
+
+### tajimaD
+```{r}
+dftajimaD <- read_tsv("data/007_1B1R/001_PopGenetics/TajimaD.txt")
+
+#### 设置每条染色体的点
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3) %>% filter(CHROM %in% c("1A","1B","1D") )
+
+colB <- c("skyblue","#004680")
+p <- ggplot(dftajimaD, aes(x=win_mid/1000000,y=TajimaD_mean*1000,col=If1B1R))+
+  labs(x="Physical position (Mb)", y = expression(paste("Tajima's ",italic(D))))+
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  stat_smooth(method = "gam", formula = y ~ s(x,k=100), size = 1,se=FALSE) +
+  scale_color_manual(values = colB)+
+  facet_grid(CHROM~.,scales = "free")+
+  theme(strip.text = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 12))
+
+p
+ggsave(p,filename = "~/Documents/test.pdf",height=3,width=6)
+```
+
+### fd
+```{r message=FALSE, warning=FALSE}
+dfChr <- read_tsv("data/fromDaxing/1B1R/centromereStartEnd.txt") %>% 
+  mutate(Chr=str_sub(Chr,4,5)) %>% 
+  dplyr::select(Chr,Mid) %>% 
+  filter(Chr %in% c("1A","1B","1D"))
+
+dfChr_point <- dfChr %>% 
+  dplyr::rename(scaffold=Chr)
+
+df_fd <- dir("data/fromDaxing/1B1R/002_1B1R/005_fd",full.names = T) %>%
+    # str_subset(., pattern %in% c("chr1A","chr1B","chr1D")) %>% 
+  map(~read_csv(.x) %>% 
+        mutate(P1=map_chr(map(str_split(basename(.x), "_"),`[`, c(3,4)), ~str_c(.x[[1]], .x[[2]],sep = "_")),
+               P2=map_chr(map(str_split(basename(.x), "_"),`[`, c(5,6)), ~str_c(.x[[1]], .x[[2]],sep = "_")))) %>% 
+  bind_rows() %>% 
+  mutate(P2=factor(P2,levels = c("CL_NonSV","CL_SV"),labels = c("No1B1R","With1B1R"))) %>% 
+  #fd is meaningless when D is negative, as it is designed to quantify the excess of ABBA over BABA only when an excess exists. We therefore convert all fd values to 0 at sites where D is negative
+  mutate(fdModify=ifelse(is.na(D) | D <= 0, 0, ifelse(fd > 1, 0, ifelse(fd < 0, 0, fd))))
+
+colB <- c("skyblue","#004680")
+
+p <- df_fd %>% 
+  filter(scaffold %in% c("1A","1B","1D"), P1=="LR_EU") %>% 
+  ggplot(aes(x=(start+end)/2000000,y=fdModify))+
+  geom_point(alpha=0.5,aes(color=P2))+
+  # geom_smooth(method = "loess")+
+  geom_line(aes(color=P2))+
+  geom_point(data = dfChr_point, aes(x=Mid/1000000,y=0), size=2)+
+  facet_grid(P2~scaffold)+
+  labs(x="Genomic position (Mb)",y=expression(italic("f"["d"])))+
+  scale_color_manual(values = colB)+
+  scale_fill_manual(values = colB)+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        panel.background = element_rect(fill="transparent"),
+        # legend.text = element_text(size = 10),
+        # legend.key.size = unit(1,"cm"),
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        # axis.title.x = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 14),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3.5,width = 5)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+

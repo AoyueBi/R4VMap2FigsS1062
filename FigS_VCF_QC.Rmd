@@ -1336,7 +1336,7 @@ p <- ggplot(df, aes(x=Chr, y=VariantRate)) +
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.4),
     text = element_text(size = 12),legend.position = 'none')+
-    theme(axis.text.x = element_text(size = 7))
+    theme(axis.text.x = element_text(size = 9))
 
 p
 # ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4.5,width = 6)

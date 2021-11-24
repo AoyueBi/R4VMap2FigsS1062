@@ -1,5 +1,5 @@
 ---
-title: "Data analysis"
+title: "Reference bias evalution on diff methods"
 author: "Aoyue Bi, Daxing Xu"
 date: "`r Sys.Date()`"
 output: 
@@ -36,101 +36,51 @@ library(doParallel)
 
 ## Tidy BIG DATA
 ```{r}
-dftotal <- read_tsv("data/004_delCount/011_geneSNPAnno.txt.gz") %>% 
+dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>% 
   mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
   mutate(HaveAncestralState=ifelse(is.na(Ancestral), "0", 
                                    ifelse(Ancestral==Ref | Ancestral==Alt, "1", "0"))) %>% 
   mutate(Impact_VEP=factor(Impact_VEP, levels = c("HIGH","MODERATE","LOW","MODIFIER")))
 
-df_SIFT <- dftotal %>%
-  filter(HaveAncestralState==1) %>%
-  filter(!is.na(DAF)) %>%
-  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Derived_SIFT < 0.05,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>%
-  filter(!is.na(LoadGroup)) %>%
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup) %>%
-  mutate(Method="SIFT")
-
-df_GERP <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup) %>%
-  mutate(Method="GERP")
-
-df_snpEff <- dftotal %>%
-  filter(HaveAncestralState==1) %>%
-  # filter(!is.na(Impact_VEP)) %>%
-  filter(!is.na(DAF)) %>%
-  mutate(LoadGroup=ifelse(Impact_snpEff=="HIGH","Deleterious", ifelse(Effect_snpEff=="missense_variant", "Nonsynonymous",ifelse(Effect_snpEff=="synonymous_variant", "Synonymous", NA)))) %>%
-  filter(!is.na(LoadGroup)) %>%
-select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup) %>%
-  mutate(Method="SnpEff")
-
-df_vep <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Impact_VEP=="HIGH","Deleterious", ifelse(Effect_VEP=="missense_variant", "Nonsynonymous", ifelse(Effect_VEP=="synonymous_variant", "Synonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup) %>%
-  mutate(Method="VEP")
-
-df_LIST2 <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(LIST_S2>=0.85 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup) %>%
-  mutate(Method="LIST_S2")
-
-df_PhyloP <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(PhyloP_RefMask>=1.5 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup) %>%
-  mutate(Method="PhyloP_RefMask")
-
-df_AllMethod <- bind_rows(df_vep,df_SIFT,df_GERP,
-                          df_snpEff,df_LIST2,df_PhyloP) %>%
-  mutate(Method=factor(Method, 
-                       levels = c("SIFT","GERP","PhyloP_RefMask","LIST_S2","VEP","SnpEff"), 
-                       labels = c("SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff")))
+  # filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
+  # mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  # mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
 ```
 
-## 1.Distribution
+## Distribution
 ```{r}
-factorA <- c("Derived_SIFT","LIST_S2","PhyloP_RefMask","Gerp_16way")
-labelsA <- c("SIFT","LIST-S2","PhyloP","GERP")
-thresholdA <- c(0.05,0.85,1.5,2.14)
+# factorA <- c("Derived_SIFT","LIST_S2","PhyloP_RefMask","Gerp_16way","Derived_PolyPhen2_prob")
+# labelsA <- c("SIFT","LIST-S2","PhyloP","GERP","PPH2")
+# thresholdA <- c(0.05,0.85,1.5,2.14,0.5)
+
+factorA <- c("Gerp_16way","LIST_S2","PhyloP_RefMask","Derived_PolyPhen2_prob","Derived_SIFT")
+labelsA <- c("GERP","LIST","PhyloP","PPH2","SIFT")
+thresholdA <- c(1.5,0.85,1.5,0.5,0.05)
+
 
 factorB <- c("NONSYNONYMOUS","SYNONYMOUS")
 labelsB <- c("Nonsynonymous","Synonymous")
+
 df <- dftotal %>% 
-  select(Variant_type,Derived_SIFT,Gerp_16way,LIST_S2,PhyloP_RefMask) %>% 
+  dplyr::select(Variant_type,Derived_SIFT,Gerp_16way,LIST_S2,PhyloP_RefMask,Derived_PolyPhen2_prob) %>% 
   filter(Variant_type %in% c("SYNONYMOUS","NONSYNONYMOUS")) %>% 
-  pivot_longer(col=c(Derived_SIFT:PhyloP_RefMask), names_to = "Method",values_to = "Score") %>% 
+  pivot_longer(col=c(Derived_SIFT:Derived_PolyPhen2_prob), names_to = "Method",values_to = "Score") %>% 
   filter(!is.na(Score)) %>% 
   mutate(Method=factor(Method,levels = factorA,labels = labelsA)) %>% 
   mutate(Variant_type=factor(Variant_type,levels = factorB,labels = labelsB ))
 
 dfthreshold <- tibble(Method= rep(labelsA,2),
-                 Variant_type=rep(labelsB,each=4),
+                 Variant_type=rep(labelsB,each=5),
                  Line=rep(thresholdA,2))
 ```
-### plot
-```{r}
+
+## plot
+```{r message=FALSE, warning=FALSE}
 
 p <- df %>% 
-  filter(Method == "GERP") %>%
-  droplevels() %>% 
   ggplot(aes(x=Score, color=Variant_type,fill=Variant_type)) +
-  geom_histogram(aes(y=..ndensity..),alpha=0.5,position="identity",bins = 50)+
-  # geom_vline(data = dfthreshold,aes(xintercept = Line),color="blue",linetype="dashed")+
-    geom_vline(aes(xintercept = 1.25),color="blue",linetype="dashed")+
-      geom_vline(aes(xintercept = 1.5),color="blue",linetype="dashed")+
-    geom_vline(aes(xintercept = 1.78),color="blue",linetype="dashed")+
-    geom_vline(aes(xintercept = 2.14),color="blue",linetype="dashed")+
+  geom_histogram(aes(y=..ndensity..),alpha=0.5,position="identity",bins = 30)+
+  geom_vline(data = dfthreshold,aes(xintercept = Line),color="blue",linetype="dashed")+
   scale_color_manual(values = c("#e69f00","#004680"))+
   scale_fill_manual(values = c("#e69f00","#004680"))+
   facet_grid(Variant_type~as.factor(Method),scales = "free")+
@@ -142,40 +92,85 @@ p <- df %>%
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
     legend.position = 'none',
-    text = element_text(size = 12))
+    text = element_text(size = 9))
 
 p
-ggsave(p,filename = "~/Documents/test.pdf",height = 3.6,width = 4.5)
+ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/distribution.pdf",height = 4.8*9/16,width = 4.8)
 
 ```
-## 2.Deleterious count
+
+## Diff methods
+```{r}
+dftotal_mini <- dftotal %>% 
+  filter(HaveAncestralState==1) %>%
+  filter(!is.na(DAF)) %>% 
+  dplyr::select(ID:Minor,Ancestral,DAF,Gerp,Region,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,Effect_snpEff,Impact_snpEff,
+                Gerp_16way,LIST_S2,PhyloP_RefMask,Derived_PolyPhen2_prob,Sub,HaveAncestralState)
+  
+df_SIFT <- dftotal_mini %>%
+  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Derived_SIFT < 0.05,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>%
+  filter(!is.na(LoadGroup)) %>%
+  mutate(Method="SIFT")
+
+df_GERP <- dftotal_mini %>% 
+  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  mutate(Method="GERP")
+
+df_snpEff <- dftotal_mini %>%
+  mutate(LoadGroup=ifelse(Impact_snpEff=="HIGH","Deleterious", ifelse(Effect_snpEff=="missense_variant", "Nonsynonymous",ifelse(Effect_snpEff=="synonymous_variant", "Synonymous", NA)))) %>%
+  filter(!is.na(LoadGroup)) %>%
+  mutate(Method="SnpEff")
+
+df_vep <- dftotal_mini %>% 
+  mutate(LoadGroup=ifelse(Impact_VEP=="HIGH","Deleterious", ifelse(Effect_VEP=="missense_variant", "Nonsynonymous", ifelse(Effect_VEP=="synonymous_variant", "Synonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  mutate(Method="VEP")
+
+df_LIST2 <- dftotal_mini %>% 
+  mutate(LoadGroup=ifelse(LIST_S2>=0.85 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  mutate(Method="LIST_S2")
+
+df_PhyloP <- dftotal_mini %>% 
+  mutate(LoadGroup=ifelse(PhyloP_RefMask>=1.5 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  mutate(Method="PhyloP_RefMask")
+
+df_polyphen2_derived <- dftotal_mini %>% 
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  mutate(Method="Derived_PPH2")
+
+df_GERPandPPH2 <- dftotal_mini %>% 
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>= 0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  mutate(Method="GERP+PPH2")
+
+
+factorA <- c("SIFT","LIST_S2","Derived_PPH2","GERP","GERP+PPH2","PhyloP_RefMask","VEP","SnpEff")
+labelsA <- c("SIFT","LIST-S2","PPH2","GERP","GERP+PPH2","PhyloP","VEP","SnpEff")
+
+### 合计8个数据框
+df_AllMethod <- bind_rows(df_SIFT,df_GERP,df_snpEff,df_vep,df_LIST2,df_PhyloP,df_polyphen2_derived,df_GERPandPPH2) %>% 
+  mutate(Method=factor(Method,levels = factorA,labels = labelsA))
+
+```
+
+## Deleterious count
 
 ```{r}
-df_SIFT_delCount <- df_SIFT %>% 
-  filter(LoadGroup %in% c("Deleterious"))
-  
-df_GERP_delCount <- df_GERP %>% 
-  filter(LoadGroup %in% c("Deleterious"))
 
-df_PhyloP_delCount <- df_PhyloP %>% 
-  filter(LoadGroup %in% c("Deleterious"))
-
-df_LIST2_delCount <- df_LIST2 %>% 
-  filter(LoadGroup %in% c("Deleterious"))
-
-df_vep_delCount <- df_vep %>% 
-  filter(LoadGroup %in% c("Deleterious"))
-
-df_snpEff_delCount <- df_snpEff %>% 
-  filter(LoadGroup %in% c("Deleterious"))
-
+library(RColorBrewer)
 df_delCount <- df_AllMethod %>% 
   filter(LoadGroup %in% c("Deleterious")) %>% 
   group_by(Method,Sub) %>% 
   count()
 
-methodColordf <-  tibble(Method=c("SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff"),Color=RColorBrewer::brewer.pal(6,"Set2"))
+methodColordf <-  tibble(Method=c("GERP+PPH2","GERP","PPH2","SIFT","PhyloP","LIST-S2","VEP","SnpEff"),
+                         Color= c(brewer.pal(12,"Paired")[c(2,6,10)],brewer.pal(8,"Set2")[c(1,2,3,6,7)]))
 
+### 按亚基因组排序
 df_delCount_color <- df_delCount %>% 
   filter(Sub=="A") %>% 
   arrange(desc(n)) %>% 
@@ -196,126 +191,329 @@ q <- df_delCount %>%
     # legend.position = 'none',
     text = element_text(size = 12))
 q
-# ggsave(plot = q, "~/Documents/temp.png", width = 4, height = 3, dpi = 300)
 
-ggsave(q,filename = "~/Documents/temp.pdf",height = 3.6,width = 2.7)
+ggsave(q,filename = "~/Documents/test.pdf",height = 3.6,width = 6)
+
+### 求总数
+df_delCount_sum <- df_delCount %>% 
+  group_by(Method) %>% 
+  summarise(sum=sum(n))
+
+p <- df_delCount_sum %>% 
+  mutate(Method=factor(Method,levels = df_delCount_color$Method)) %>% 
+  ggplot(aes(x=Method,y=sum,fill=Method))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  geom_text(aes(label=sum),size=2,
+            position = position_dodge(0.9))+
+  labs(x="", y="Deleterious SNPs count")+
+  scale_fill_manual(values = df_delCount_color$Color)+
+  theme_classic()+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme(legend.position = "none",
+        # plot.margin=unit(rep(1,4),'lines'),
+          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 9))
+p
+
+ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/delCount.pdf",height = 4.8*9/16,width = 2.4)
 
 ```
 
-## 2. Correlation
+## corrr 相关性
 ```{r}
-library(corrr)
+### 该数据框用于本chunck 的 code
 df <- df_AllMethod %>% 
   filter(LoadGroup=="Deleterious") %>% 
-  mutate(ID=str_c(Chr,Pos,sep = "_"), IfDel = 1) %>% 
-  select(ID,Sub,Method,IfDel) %>% 
+  mutate(IfDel = 1) %>% 
+  dplyr::select(ID,Method,IfDel) %>% 
   pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
-  select(-Sub,-ID) %>% 
+  dplyr::select(-ID)
+
+### 方案一：使用 corrr 包进行相关性计算
+### 方案一：使用 corrr 包进行相关性计算
+### 方案一：使用 corrr 包进行相关性计算
+### ①计算相关性并画图
+library(corrr)
+dfcorrr <- df %>% 
   correlate() %>% 
-  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
-  rearrange() %>%    # rearrange by correlations
+  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'VEP' and 'SnpEff'
+  rearrange()     # rearrange by correlations
   # shave() # Shave off the upper triangle for a clean result %>% 
   # map(~replace_na(.x,1)) %>% 
   # as_tibble() %>%
-  # column_to_rownames(var = "term") %>% 
+  # column_to_rownames(var = "car") %>%  ### var: Name of column to use for rownames.
+  # as_matrix(diagonal = 1)
+
+p <- rplot(dfcorrr) + theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+### ②计算相关性网络
+library(corrr)
+dfcorrr <- df %>% 
+  correlate() %>% 
+  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'VEP' and 'SnpEff'
+  # rearrange() %>%     # rearrange by correlations
+  # shave() # Shave off the upper triangle for a clean result %>% 
+  # map(~replace_na(.x,1)) %>% 
+  # as_tibble() %>%
+  # column_to_rownames(var = "car") %>%  ### var: Name of column to use for rownames.
+  # as_matrix(diagonal = 1)
+  network_plot(min_cor = .2)
+
+dfcorrr ### 直接展示图片
+
+### ③计算相关性矩阵
+library(corrr)
+dfcorrr <- df %>% 
+  correlate() %>% 
+  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'VEP' and 'SnpEff'
+  rearrange() %>%     # rearrange by correlations
+  # shave() # Shave off the upper triangle for a clean result %>% 
+  # map(~replace_na(.x,1)) %>% 
+  # as_tibble() %>%
+  # column_to_rownames(var = "car") %>%  ### var: Name of column to use for rownames.
   as_matrix(diagonal = 1)
+  # map(~replace_na(.x,1)) %>% ### 替换数据框所有的NA 为1
+  # as_tibble() ### 转换成tibble
 
+p <- heatmap(dfcorrr,main = "")
+p
+```
+## proxy jaccard 相似性
+```{r}
+# ### 该数据框用于本chunck 的 code
+# df <- df_AllMethod %>% 
+#   filter(!Method=="GERP+PPH2") %>% 
+#   filter(LoadGroup=="Deleterious") %>% 
+#   mutate(IfDel = 1) %>% 
+#   dplyr::select(ID,Method,IfDel) %>% 
+#   pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
+#   select(-ID)
+# 
+# ### 方案二：使用 proxy 包进行 jaccard 相似性指数矩阵分析
+# #### 先做一个小的测试，验证相似性指数
+# # library(jaccard)       
+# # jaccard(df$SIFT,df$GERP) ### 0.37481
+# ### 再做矩阵的分析
+# library(proxy)
+# #### 参数解释：convert_similarities=F，表示不转换成距离，直接表示相似性的高低。 距离和相似性之和是1
+# #### diag
+# dfjaccard <- proxy::dist(df, by_rows = F, method = "Jaccard",convert_similarities = F,diag = 0,upper = T) %>% as.matrix() 
+# 
+# ### 可视化
+# # library(corrplot)
+# # corrplot(dfjaccard, type = "upper", order = "hclust", 
+# #          tl.col = "black", tl.srt = 45)
+# 
+# ### 热图
+# library(pheatmap)
+# p <- pheatmap(dfjaccard, 
+#               display_numbers = T,
+#               cluster_rows = T,
+#               cluster_cols = T,
+#               angle_col=45, ### 设置列名的倾斜度
+#               color= colorRampPalette(brewer.pal(n = 4, name = "OrRd"))(25),
+#          )
+# 
+# p
+# 
+# 
+# ### 建立注释信息数据框，并添加行名
+# ###"SIFT"    "GERP"    "SnpEff"  "VEP"     "LIST-S2" "PhyloP"  "PPH2"   
+# ### 建立注释数据框
+# Methods <- c("SIFT","GERP","SnpEff","VEP","LIST-S2","PhyloP","PPH2")
+# Region <- c("Protein-coding sequqence","Whole-genome","Protein-coding sequqence","Protein-coding sequqence","Protein-coding sequqence","Whole-genome","Protein-coding sequqence")
+# MethodsGroup <- c("Homologous sequences similarity-based","Phylogenetic approach-based","Functional units-based","Functional units-based","Local sequence identity and taconomy-based","Phylogenetic approach-based","Protein structure-based")
+# 
+# dfanno <- tibble(Methods,Region,MethodsGroup) %>% column_to_rownames(var = "Methods")
+# 
+# ### 自定注释信息的颜色列表
+# colB <- brewer.pal(9,"Paired")[c(1:2)]
+# colC <- brewer.pal(9,"Set2")[c(8,1:4)]
+# 
+# ann_colors <-  list(
+#                     Region=c("Protein-coding sequqence" = colB[1],
+#                                       "Whole-genome" = colB[2]),
+#                     MethodsGroup=c("Functional units-based"=colC[1],
+#                                    "Homologous sequences similarity-based"=colC[2],
+#                                    "Local sequence identity and taconomy-based"=colC[3],
+#                                    "Protein structure-based"=colC[4],
+#                                    "Phylogenetic approach-based"=colC[5])
+#                                    )
+# 
+# library(pheatmap)
+# p <- pheatmap(dfjaccard, 
+#               display_numbers = T,
+#               cluster_rows = T,
+#               cluster_cols = T,
+#               treeheight_row = 0,treeheight_col = 0, ## 聚类但是不展示树的结构
+#               angle_col=45, ### 设置列名的倾斜度
+#               color= colorRampPalette(brewer.pal(n = 4, name = "OrRd"))(25),
+#               annotation_row = dfanno, ## 注释数据框
+#               annotation_col = dfanno,
+#               annotation_names_row = F,
+#               annotation_names_col = F,
+#               annotation_legend = F,
+#               annotation_colors = ann_colors ## 对应注释数据框的因子颜色
+#          )
+# 
+# p
+#                     
+# 
+# 
+# ggsave(p,filename = "~/Documents/test.pdf",height = 4, width = 5)
+```
 
-heatmap(as.matrix(df),main = "pheatmap default")
+## proxy jaccard 相似性，简化代码
+```{r}
+library(proxy)
 
+df <- df_AllMethod %>% 
+  filter(!Method=="GERP+PPH2") %>% 
+  filter(LoadGroup=="Deleterious") %>% 
+  mutate(IfDel = 1) %>% 
+  dplyr::select(ID,Method,IfDel) %>% 
+  pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
+  dplyr::select(-ID)
 
-distmat <- dist(as.matrix(df))
+#### 参数解释：convert_similarities=F，表示不转换成距离，直接表示相似性的高低。 距离和相似性之和是1
+#### diag
+dfjaccard <- proxy::dist(df, by_rows = F, method = "Jaccard",convert_similarities = F,diag = 0,upper = T) %>% as.matrix() 
 
-cutoff.distance <- 0.00001  
-cols <- colorRampPalette(c("white", "red",    # distances 0 to 3 colored from white to red
-                               "green", "black"), # distances 3 to max(distmat) colored from green to black
-                             cutoff.distance / max(distmat),
-                             100)
+### 建立注释信息数据框，并添加行名
+###"SIFT"    "GERP"    "SnpEff"  "VEP"     "LIST-S2" "PhyloP"  "PPH2"   
+### 建立注释数据框
+regionSet <- c("Protein-coding sequqence","Whole-genome")
+Set2 <- c("Homologous sequences similarity-based","Phylogenetic approach-based",
+          "Functional units-based","Local sequence identity and taconomy-based",
+          "Protein structure-based")
+
+Methods <- c("SIFT","GERP","SnpEff","VEP","LIST-S2","PhyloP","PPH2")
+Region <- c(regionSet[1],regionSet[2],regionSet[1],regionSet[1],
+            regionSet[1],regionSet[2],regionSet[1])
+MethodsGroup <- c(Set2[1],Set2[2],Set2[3],Set2[3],Set2[4],Set2[2],Set2[5])
+
+dfanno <- tibble(Methods,Region,MethodsGroup) %>% column_to_rownames(var = "Methods")
+
+### 自定注释信息的颜色列表
+colB <- brewer.pal(9,"Paired")[c(1:2)]
+colC <- brewer.pal(9,"Set2")[c(8,1:4)]
+
+ann_colors <-  list(
+                    Region=c("Protein-coding sequqence" = colB[1],
+                                      "Whole-genome" = colB[2]),
+                    MethodsGroup=c("Functional units-based"=colC[1],
+                                   "Homologous sequences similarity-based"=colC[2],
+                                   "Local sequence identity and taconomy-based"=colC[3],
+                                   "Protein structure-based"=colC[4],
+                                   "Phylogenetic approach-based"=colC[5])
+                                   )
 
 library(pheatmap)
-pheatmap(as.matrix(df), display_numbers = T,
-         # breaks = c(-1, 0, 1),
-         color= colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(10),
-         # color=cols
+p <- pheatmap(dfjaccard, 
+              display_numbers = T,
+              cluster_rows = T,
+              cluster_cols = T,
+              treeheight_row = 0,treeheight_col = 0, ## 聚类但是不展示树的结构
+              angle_col=45, ### 设置列名的倾斜度
+              color= colorRampPalette(brewer.pal(n = 4, name = "OrRd"))(25),
+              annotation_row = dfanno, ## 注释数据框
+              annotation_col = dfanno,
+              annotation_names_row = F,
+              annotation_names_col = F,
+              annotation_legend = F,
+              annotation_colors = ann_colors ## 对应注释数据框的因子颜色
          )
-# matrix <- cor(df)
 
-rplot(df) 
+p
+                    
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3.5*4/5, width = 3.5)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.4*4/5, width = 2.4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 7.2, width = 7.2)
+
+```
 
 
- df_AllMethod %>% 
+
+## Venn upsetR
+```{r}
+library(ComplexUpset)
+library(ggupset)
+
+p <- df_AllMethod %>% 
+  filter(!Method %in% "GERP+PPH2") %>% 
   filter(LoadGroup=="Deleterious") %>% 
-  mutate(ID=str_c(Chr,Pos,sep = "_"), IfDel = 1) %>% 
-  select(ID,Sub,Method,IfDel) %>% 
-  pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
-  select(-Sub,-ID) %>% 
-  correlate() %>% 
-  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
-  rearrange() %>%    # rearrange by correlations
-  # shave() # Shave off the upper triangle for a clean result
-  map(~replace_na(.x,1)) %>% 
-  network_plot(min_cor = .1)
+  dplyr::select(Chr,Pos,Method) %>% 
+  mutate(MethodMember=1) %>% 
+  pivot_wider(.,names_from = Method,values_from = MethodMember,values_fill = 0) %>% 
+  filter(!(GERP==1 & VEP==1)) %>% 
+  as.data.frame() %>% 
+  UpSetR::upset(sets = c("PPH2","GERP","VEP","SnpEff"), keep.order = TRUE)
 
-# matrix <- cor(df)
 
-rplot(df) 
+p
+pdf(file="~/Documents/test.pdf",width = 4,height = 3) # or other device
+p
+dev.off()
 
 ```
 
+## upsetR all methds
 ```{r}
-x <- datasets::mtcars %>%
-       correlate() %>%  # Create correlation data frame (cor_df)
-       focus(-cyl, -vs, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
-       rearrange() %>%   # rearrange by correlations
-       shave() # Shave off the upper triangle for a clean result
+library(ComplexUpset)
+library(ggupset)
 
-rplot(x) 
+p <- df_AllMethod %>% 
+  filter(!Method %in% "GERP+PPH2") %>% 
+  filter(LoadGroup=="Deleterious") %>% 
+  dplyr::select(Chr,Pos,Method) %>% 
+  mutate(MethodMember=1) %>% 
+  pivot_wider(.,names_from = Method,values_from = MethodMember,values_fill = 0) %>% 
+  filter(!(GERP==1 & VEP==1)) %>% 
+  as.data.frame() %>% 
+  UpSetR::upset( keep.order = TRUE,)
+
+
+p
+pdf(file="~/Documents/test.pdf",width = 7.2,height = 3) # or other device
+p
+dev.off()
 ```
 
 
-```{r}
-aolevels(df_AllMethod,"LoadGroup")
-```
 
-
-
-## 3.DAF
+## DAF
 ```{r}
 df <- df_AllMethod %>% 
   mutate(bin=cut_width(DAF,width = 0.1,boundary = 0)) %>%
   group_by(Method,Sub,LoadGroup) %>% 
   count(bin) %>% 
   mutate(fre=n/sum(n))
- 
-#### facet by sub
+
+#### Case1: facet by Method
 colB <- rep(c("#d5311c","#e69f00","#004680"),2)
 q <- df %>% 
   ggplot(aes(x=bin,y=fre,group=LoadGroup,fill=LoadGroup))+
   geom_bar(stat = 'identity',position = "dodge")+
-  # geom_hline(yintercept = 0.68)+
-  # geom_hline(yintercept = 0.82)+
   labs(y="Proportion",x="Derived allele frequency")+
-  # scale_color_brewer(palette = "Set2")+
   scale_fill_manual(values = colB)+
-  # scale_fill_brewer(palette = "Set2")+
-  # scale_fill_brewer(palette = "Blues")+
   scale_y_continuous(limits = c(0,1))+
   scale_x_discrete(label=c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
   facet_grid(Sub~Method)+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
   theme(
-    # plot.margin=unit(rep(1,4),'lines'),
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
     legend.position = 'none',
     text = element_text(size = 12))
 
 q
-ggsave(q,filename = "~/Documents/temp.png",height = 6,width = 8)
+ggsave(q,filename = "~/Documents/test.pdf",height = 3,width = 8)
 
 
-#### facet by sub
-methodColordf <-  tibble(Method=c("SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff"),Color=RColorBrewer::brewer.pal(6,"Set2"))
-
+#### Case2: facet by Sub
+methodColordf <-  tibble(Method=c("GERP+PPH2","GERP","PPH2","SIFT","PhyloP","LIST-S2","VEP","SnpEff"),
+                         Color= c(brewer.pal(12,"Paired")[c(2,6,10)],brewer.pal(8,"Set2")[c(1,2,3,6,7)]))
 
 df_su <- df %>%
   filter(Sub=="A", LoadGroup=="Deleterious", bin=="[0,0.1]") %>% 
@@ -326,32 +524,71 @@ q <- df %>%
   mutate(Method=factor(Method, levels = df_su$Method)) %>% 
   ggplot(aes(x=bin,y=fre,group=Method,fill=Method))+
   geom_bar(stat = 'identity',position = "dodge")+
-  # geom_hline(yintercept = 0.68)+
-  # geom_hline(yintercept = 0.82)+
   labs(y="Proportion",x="Derived allele frequency")+
-  # scale_color_brewer(palette = "Set2")+
   scale_fill_manual(values = df_su$Color)+
-  # scale_fill_brewer(palette = "Set2")+
-  # scale_fill_brewer(palette = "Blues")+
   scale_y_continuous(limits = c(0,1))+
   scale_x_discrete(label=c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
   facet_grid(Sub~LoadGroup)+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
   theme(
-    # plot.margin=unit(rep(1,4),'lines'),
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    legend.position = 'none',
+    # legend.position = 'none',
     text = element_text(size = 12))
 
 q
-ggsave(q,filename = "~/Documents/temp2.pdf",height = 3.6,width = 7.2)
+ggsave(q,filename = "~/Documents/test2.pdf",height = 3.6,width = 7.2)
 
+
+
+#### Case3: facet only by LoadGroup 采用此方法
+#### Case3: facet only by LoadGroup
+#### Case3: facet only by LoadGroup
+
+df <- df_AllMethod %>% 
+  mutate(bin=cut_width(DAF,width = 0.1,boundary = 0)) %>%
+  group_by(Method,LoadGroup) %>% 
+  count(bin) %>% 
+  mutate(fre=n/sum(n))
+
+methodColordf <-  tibble(Method=c("GERP+PPH2","GERP","PPH2","SIFT","PhyloP","LIST-S2","VEP","SnpEff"),
+                         Color= c(brewer.pal(12,"Paired")[c(2,6,10)],brewer.pal(8,"Set2")[c(1,2,3,6,7)]))
+
+df_su <- df %>%
+  filter(LoadGroup=="Deleterious", bin=="[0,0.1]") %>% 
+  arrange(desc(fre)) %>% 
+  left_join(y = methodColordf, by = c("Method"))
+
+q <- df %>% 
+  mutate(Method=factor(Method, levels = df_su$Method)) %>% 
+  ggplot(aes(x=bin,y=fre,group=Method,fill=Method))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  labs(y="Proportion",x="Derived allele frequency")+
+  scale_fill_manual(values = df_su$Color)+
+  scale_y_continuous(limits = c(0,1))+
+  scale_x_discrete(label=c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
+  facet_grid(.~LoadGroup)+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 9))
+
+q
+ggsave(q,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/DAF.pdf",height = 2,width = 7.2)
+
+ggsave(q,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/DAF.pdf",height = 4.8*9/16,width = 4.8)
 ```
 
-## 4.Reference bias evalution
+## Reference bias evalution
 
 ```{r}
+
+# factorA <- c("SIFT","LIST-S2","PPH2","GERP","GERP+PPH2","PhyloP","VEP","SnpEff")
+
 df <- df_AllMethod %>% 
+  # filter(Method %in% factorA) %>% 
   group_by(Method) %>% 
   mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
   mutate(bin=cut_interval(DAF,n = 10)) %>%
@@ -371,7 +608,7 @@ df_color <- df %>%
 colB <- c("#d5311c","#e69f00","#004680","#ea7161","#ffcc99","#4daeff")
 
 p <- df %>% 
-  mutate(Method = factor(Method, levels = df_color$Method)) %>% 
+  mutate(Method=factor(Method,levels = c("SIFT","LIST-S2","PPH2","GERP","GERP+PPH2","PhyloP","VEP","SnpEff"))) %>% 
   ggplot(aes(x=bin,y=fre))+
   geom_line(aes(group=group,linetype=group,color=group))+
   # geom_text(data = df_summary, aes(group=IfRefisAnc,x=bin,y=0, label=snpNum))+
@@ -379,7 +616,8 @@ p <- df %>%
   labs(y="Fraction in each category",x="Derived allele frequency bins")+
   scale_x_discrete(label = c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
   scale_color_manual(values = colB)+
-  facet_grid(.~Method,scales = "free")+
+  # facet_grid(.~Method,scales = "free")+
+  facet_wrap(~Method,scales = "free",ncol = 3)+
   # facet_wrap(~Method,scales = "free",ncol = 6)+
   scale_y_continuous(limits = c(0,1))+
   theme(strip.background = element_blank())+
@@ -388,7 +626,8 @@ p <- df %>%
     # plot.margin=unit(rep(1,4),'lines'),
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    # legend.position = 'none',
+    legend.position = 'none',
+    # legend.key = element_blank(),
     text = element_text(size = 12))
 
   # facet_wrap(~LoadGroup,ncol = 2,scales = "free_y")+
@@ -404,26 +643,91 @@ p <- df %>%
 p
 # ggsave(p, filename = "~/Documents/temp.png", height = 7.2*9/16,width = 7.2)
 
-ggsave(p,filename = "~/Documents/temp2.pdf",height = 3.6,width = 7.2)
+ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/RefBias_evalution.pdf",height = 7.2*3/4,width = 7.2)
 
 ```
-## 5.delRatio
+
+## Reference bias evalution ancstral DAF
+
+```{r}
+df <- df_AllMethod %>% 
+  # filter(Method %in% factorA) %>% 
+  group_by(Method) %>% 
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(bin=cut_interval(DAF,n = 10)) %>%
+  group_by(Method,IfRefisAnc,bin) %>% 
+  count(LoadGroup) %>% 
+  mutate(fre=n/sum(n)) %>% 
+  arrange(desc(bin)) %>% 
+  mutate(group = paste(IfRefisAnc,"-",str_sub(LoadGroup,1,3),sep = ""))
+
+### 求gap
+df_color <- df %>% 
+  filter(bin=="[0.001,0.101]", group %in% c("Anc-Del","Der-Del")) %>% 
+  pivot_wider(names_from = "IfRefisAnc", values_from = "fre", 
+              id_cols = c(Method)) %>% 
+  mutate(gap=abs(Anc-Der)) %>% 
+  arrange(desc(gap))
+
+colB <- c("#d5311c","#e69f00","#004680","#ea7161","#ffcc99","#4daeff")
+
+p <- df %>% 
+  mutate(Method=factor(Method,levels = c("SIFT","LIST-S2","PPH2","GERP","GERP+PPH2","PhyloP","VEP","SnpEff"))) %>% 
+  ggplot(aes(x=bin,y= n,fill=group))+
+  geom_bar(stat = 'identity',position = "stack")+
+  labs(x="Derived allele frequency bins", y="SNP count")+
+  scale_x_discrete(label = c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
+  scale_fill_manual(values = colB)+
+  # facet_grid(.~Method,scales = "free")+
+  facet_wrap(~Method,scales = "free",ncol = 3)+
+  # scale_y_continuous(limits = c(0,1))+
+  theme(strip.background = element_blank())+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(
+    # plot.margin=unit(rep(1,4),'lines'),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 12))
+
+  # facet_wrap(~LoadGroup,ncol = 2,scales = "free_y")+
+  # theme_classic()+
+  # theme(legend.position = "none")+
+  # theme(plot.margin=unit(rep(1,4),'lines'),
+  #       # axis.text.x= element_text(angle=45, vjust=1,hjust = 1),
+  #       strip.background = element_blank(),
+  #       legend.title = element_blank(),
+  #       axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10),
+  #       axis.text.x = element_text(size = 6))
+
+p
+# ggsave(p, filename = "~/Documents/temp.png", height = 7.2*9/16,width = 7.2)
+
+ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/RefBias_evalution_DAF.pdf",height = 3.6,width = 7.2)
+
+```
+
+## delRatio
 ```{r}
 
-dfdelRatio <- read.delim("data/004_delCount/delRatio.txt.gz")
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz")
 
-dftaxaDB <- read.delim("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GenomeType,GroupbyContinent)
+dftaxaDB <- read.delim("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% dplyr::select(Taxa=VcfID,GenomeType,GroupbyContinent)
 
 factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray90")
+
 
 # factorB <- c("Ratio_002_nonsynonymous","Ratio_004_nonsynDerivedSIFT","Ratio_007_VEP","Ratio_008_snpEff", "Ratio_014_GERP16way_2.14_max","Ratio_015_LIST_S2","Ratio_016_PhyloP")
 # labelsB <- c("Nonsynonymous","SIFT","VEP","SnpEff", "GERP","LIST-S2","PhyloP")
 
-factorB <- c("Ratio_002_nonsynonymous","Ratio_004_nonsynDerivedSIFT","Ratio_015_LIST_S2","Ratio_016_PhyloP","Ratio_014_GERP16way_2.14_max","Ratio_007_VEP","Ratio_008_snpEff")
-labelsB <- c("Nonsynonymous","SIFT","LIST-S2","PhyloP","GERP","VEP","SnpEff")
+factorB <- c("Ratio_002_nonsynonymous","Ratio_004_nonsynDerivedSIFT","Ratio_015_LIST_S2",
+             "Ratio_033_Derived_PolyPhen2_0.5","Ratio_032_GERP16way_1.5","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_017_PhyloP1.5_RefMask","Ratio_007_VEP","Ratio_008_snpEff")
+             
+labelsB <- c("Nonsynonymous","SIFT","LIST-S2","PPH2","GERP","GERP+PPH2","PhyloP","VEP","SnpEff") 
 
-df <- dfdelRatio %>% left_join(.,dftaxaDB,by="Taxa") %>% 
-  select(-c("IfSelected","Group_refobj")) %>% 
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  dplyr::select(-c("IfSelected","Group_refobj")) %>% 
   filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
   filter(GroupbyContinent %in% factorA) %>% 
   filter(Stand_LoadGroup %in% factorB) %>% 
@@ -431,7 +735,6 @@ df <- dfdelRatio %>% left_join(.,dftaxaDB,by="Taxa") %>%
   mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
   mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB))
 
-colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray90")
 
 ```
 - 接上
@@ -451,7 +754,7 @@ p <- df %>%
   # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
   # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
   # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
-  
+
   ### pointrange
   # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
   
@@ -467,995 +770,376 @@ p <- df %>%
   theme(
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7)
-    ,legend.position = 'none'
+    # ,legend.position = 'none'
     ,text = element_text(size = 12))
 p
 
 # ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
 ```
-## 6.delCount
+### legend without plot
 ```{r}
+# ### 方法一：
+# library("grid")
+# library("gridExtra")
+# library("cowplot")  
+# ggp_legend <- get_legend(p)   
+# # grid.newpage()                                     # Draw empty plot window
+# # grid.draw(ggp_legend)
+# cowplot::ggdraw(ggp_legend)
+# cowplot::save_plot(filename = "legend.pdf",plot= ggp_legend,base_height = 3, base_width = 2)
+# 
+# ### 方法二：
+# library("ggpubr")
+# ggp_legend <- get_legend(p)   
+# ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 2)
 
 ```
 
-#### ===========
-## 加PolyPhen-2 alt and derived
-#### ===========
-## Tidy BIG DATA
+
+## delCount
 ```{r}
-dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>% 
-  mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
-  mutate(HaveAncestralState=ifelse(is.na(Ancestral), "0", 
-                                   ifelse(Ancestral==Ref | Ancestral==Alt, "1", "0"))) %>% 
-  mutate(Impact_VEP=factor(Impact_VEP, levels = c("HIGH","MODERATE","LOW","MODIFIER")))
+dfdel <- read_tsv("data/004_delCount/delCount.txt.gz")
 
-```
-
-```{r}
-df_SIFT <- dftotal %>%
-  filter(HaveAncestralState==1) %>%
-  filter(!is.na(DAF)) %>%
-  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Derived_SIFT < 0.05,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>%
-  filter(!is.na(LoadGroup)) %>%
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="SIFT")
-
-df_GERP <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="GERP")
-
-df_snpEff <- dftotal %>%
-  filter(HaveAncestralState==1) %>%
-  # filter(!is.na(Impact_VEP)) %>%
-  filter(!is.na(DAF)) %>%
-  mutate(LoadGroup=ifelse(Impact_snpEff=="HIGH","Deleterious", ifelse(Effect_snpEff=="missense_variant", "Nonsynonymous",ifelse(Effect_snpEff=="synonymous_variant", "Synonymous", NA)))) %>%
-  filter(!is.na(LoadGroup)) %>%
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="SnpEff")
-
-df_vep <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Impact_VEP=="HIGH","Deleterious", ifelse(Effect_VEP=="missense_variant", "Nonsynonymous", ifelse(Effect_VEP=="synonymous_variant", "Synonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="VEP")
-
-df_LIST2 <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(LIST_S2>=0.85 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="LIST_S2")
-
-df_PhyloP <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(PhyloP_RefMask>=1.5 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="PhyloP_RefMask")
-
-df_polyphen2_alt <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Alt_PolyPhen2_prob>=0.452 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="Alt_PPH2")
-
-df_polyphen2_derived <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.452 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="Derived_PPH2")
-
-
-
-df_AllMethod <- bind_rows(df_vep,df_SIFT,df_GERP,
-                          df_snpEff,df_LIST2,df_PhyloP,df_polyphen2_alt,
-                          df_polyphen2_derived) %>%
-  mutate(Method=factor(Method, 
-                       levels = c("Alt_PPH2","Derived_PPH2","SIFT","GERP","PhyloP_RefMask","LIST_S2","VEP","SnpEff"), 
-                       labels = c("Alt_PPH2","Derived_PPH2","SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff")))
-```
-
-## 1.Distribution in nonsyn and syn
-```{r}
-factorA <- c("Derived_SIFT","LIST_S2","PhyloP_RefMask","Gerp_16way","Alt_PolyPhen2_prob","Derived_PolyPhen2_prob")
-labelsA <- c("SIFT","LIST-S2","PhyloP","GERP","Alt_PPH2","Derived_PPH2")
-thresholdA <- c(0.05,0.85,1.5,2.14,0.453,0.453)
-
-factorB <- c("NONSYNONYMOUS","SYNONYMOUS")
-labelsB <- c("Nonsynonymous","Synonymous")
-df <- dftotal %>% 
-  select(Variant_type,Derived_SIFT,Gerp_16way,LIST_S2,PhyloP_RefMask,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>% 
-  filter(Variant_type %in% c("SYNONYMOUS","NONSYNONYMOUS")) %>% 
-  pivot_longer(col=c(Derived_SIFT:Derived_PolyPhen2_prob), names_to = "Method",values_to = "Score") %>% 
-  filter(!is.na(Score)) %>% 
-  mutate(Method=factor(Method,levels = factorA,labels = labelsA)) %>% 
-  mutate(Variant_type=factor(Variant_type,levels = factorB,labels = labelsB ))
-
-dfthreshold <- tibble(Method= rep(labelsA,2),
-                 Variant_type=rep(labelsB,each=6),
-                 Line=rep(thresholdA,2))
-```
-### plot
-```{r}
-
-p <- df %>% 
-  ggplot(aes(x=Score, color=Variant_type,fill=Variant_type)) +
-  geom_histogram(aes(y=..ndensity..),alpha=0.5,position="identity",bins = 30)+
-  geom_vline(data = dfthreshold,aes(xintercept = Line),color="blue",linetype="dashed")+
-  scale_color_manual(values = c("#e69f00","#004680"))+
-  scale_fill_manual(values = c("#e69f00","#004680"))+
-  facet_grid(Variant_type~as.factor(Method),scales = "free")+
-  scale_y_continuous(limits = c(0,1))+
-  labs(y="Proportion")+
-  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
-  theme(
-    # plot.margin=unit(rep(1,4),'lines'),
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    legend.position = 'none',
-    text = element_text(size = 12))
-
-p
-# ggsave(p,filename = "~/Documents/test.pdf",height = 3.6,width = 4.5)
-ggsave(p,filename = "~/Documents/test.pdf",height = 3.6,width = 7.2)
-
-```
-
-## 1.Distribution in anc and der
-```{r}
-factorA <- c("Derived_SIFT","LIST_S2","PhyloP_RefMask","Gerp_16way","Alt_PolyPhen2_prob","Derived_PolyPhen2_prob")
-labelsA <- c("SIFT","LIST-S2","PhyloP","GERP","Alt_PPH2","Derived_PPH2")
-thresholdA <- c(0.05,0.85,1.5,2.14,0.453,0.453)
-
-factorB <- c("NONSYNONYMOUS","SYNONYMOUS")
-labelsB <- c("Nonsynonymous","Synonymous")
-
-df <- dftotal %>% 
-  filter(HaveAncestralState==1) %>%
-  filter(!is.na(DAF)) %>%
-  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
-  select(Variant_type,IfRefisAnc,Derived_SIFT,Gerp_16way,LIST_S2,PhyloP_RefMask,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>% 
-  filter(Variant_type %in% c("SYNONYMOUS","NONSYNONYMOUS")) %>% 
-  pivot_longer(col=c(Derived_SIFT:Derived_PolyPhen2_prob), names_to = "Method",values_to = "Score") %>% 
-  filter(!is.na(Score)) %>% 
-  mutate(Method=factor(Method,levels = factorA,labels = labelsA)) %>% 
-  mutate(Variant_type=factor(Variant_type,levels = factorB,labels = labelsB ))
-
-dfthreshold <- tibble(Method= rep(labelsA,2),
-                 Variant_type=rep(labelsB,each=6),
-                 Line=rep(thresholdA,2))
-```
-### plot
-```{r}
-
-p <- df %>% 
-  ggplot(aes(x=Score, color=IfRefisAnc,fill=IfRefisAnc)) +
-  geom_histogram(aes(y=..ndensity..),alpha=0.5,position="identity",bins = 30)+
-  geom_vline(data = dfthreshold,aes(xintercept = Line),color="blue",linetype="dashed")+
-  scale_color_manual(values = c("#00AFBB", "#E7B800"))+
-  scale_fill_manual(values = c("#00AFBB", "#E7B800"))+
-  facet_grid(IfRefisAnc~as.factor(Method),scales = "free")+
-  scale_y_continuous(limits = c(0,1))+
-  labs(y="Proportion")+
-  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
-  theme(
-    # plot.margin=unit(rep(1,4),'lines'),
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    legend.position = 'none',
-    text = element_text(size = 12))
-
-p
-# ggsave(p,filename = "~/Documents/test.pdf",height = 3.6,width = 4.5)
-ggsave(p,filename = "~/Documents/test.pdf",height = 3.6,width = 7.2)
-
-```
-
-## 2.Deleterious count
-
-```{r}
-
-df_delCount <- df_AllMethod %>% 
-  filter(LoadGroup %in% c("Deleterious")) %>% 
-  group_by(Method,Sub) %>% 
-  count()
-
-methodColordf <-  tibble(Method=c("SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff","Alt_PPH2","Derived_PPH2"),Color=RColorBrewer::brewer.pal(8,"Set2"))
-
-df_delCount_color <- df_delCount %>% 
-  filter(Sub=="A") %>% 
-  arrange(desc(n)) %>% 
-  left_join(y=methodColordf,by = "Method")
-
-q <- df_delCount %>% 
-  mutate(Method=factor(Method,levels = df_delCount_color$Method)) %>% 
-  ggplot(aes(x=Sub, fill=Method, y=n))+
-  geom_col(position = position_dodge())+
-  # facet_grid(Variant_type~.)+
-  scale_fill_manual(values = df_delCount_color$Color)+
-  # scale_fill_brewer(palette = "Set2")+
-  # scale_color_brewer(palette = "Set2")+
-  labs(y="Total deleterious count")+
-  theme(
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    # legend.position = 'none',
-    text = element_text(size = 12))
-q
-# ggsave(plot = q, "~/Documents/temp.png", width = 4, height = 3, dpi = 300)
-
-# ggsave(q,filename = "~/Documents/temp.pdf",height = 3.6,width = 2.7)
-ggsave(q,filename = "~/Documents/test.pdf",height = 3.6,width = 6)
-
-```
-
-## 2. Correlation
-```{r}
-library(corrr)
-df <- df_AllMethod %>% 
-  filter(LoadGroup=="Deleterious") %>% 
-  mutate(ID=str_c(Chr,Pos,sep = "_"), IfDel = 1) %>% 
-  select(ID,Sub,Method,IfDel) %>% 
-  pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
-  select(-Sub,-ID) %>% 
-  correlate() %>% 
-  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
-  rearrange() %>%    # rearrange by correlations
-  # shave() # Shave off the upper triangle for a clean result %>% 
-  # map(~replace_na(.x,1)) %>% 
-  # as_tibble() %>%
-  # column_to_rownames(var = "term") %>% 
-  as_matrix(diagonal = 1)
-
-
-heatmap(as.matrix(df),main = "pheatmap default")
-
-
-library(pheatmap)
-p <- pheatmap(as.matrix(df), display_numbers = T,
-         # breaks = c(-1, 0, 1),
-         color= colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(10),
-         # color=cols
-         )
-
-p
-
-ggsave(p,filename = "~/Documents/test.pdf",height = 4, width = 5)
-# matrix <- cor(df)
-
-rplot(df) 
-
-
- df_AllMethod %>% 
-  filter(LoadGroup=="Deleterious") %>% 
-  mutate(ID=str_c(Chr,Pos,sep = "_"), IfDel = 1) %>% 
-  select(ID,Sub,Method,IfDel) %>% 
-  pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
-  select(-Sub,-ID) %>% 
-  correlate() %>% 
-  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
-  rearrange() %>%    # rearrange by correlations
-  # shave() # Shave off the upper triangle for a clean result
-  map(~replace_na(.x,1)) %>% 
-  network_plot(min_cor = .1)
-
-# matrix <- cor(df)
-
-rplot(df) 
-
-```
-
-```{r}
-x <- datasets::mtcars %>%
-       correlate() %>%  # Create correlation data frame (cor_df)
-       focus(-cyl, -vs, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
-       rearrange() %>%   # rearrange by correlations
-       shave() # Shave off the upper triangle for a clean result
-
-rplot(x) 
-```
-
-
-```{r}
-aolevels(df_AllMethod,"LoadGroup")
-```
-
-
-
-## 3.DAF
-```{r}
-df <- df_AllMethod %>% 
-  mutate(bin=cut_width(DAF,width = 0.1,boundary = 0)) %>%
-  group_by(Method,Sub,LoadGroup) %>% 
-  count(bin) %>% 
-  mutate(fre=n/sum(n))
- 
-#### facet by sub
-colB <- rep(c("#d5311c","#e69f00","#004680"),2)
-q <- df %>% 
-  ggplot(aes(x=bin,y=fre,group=LoadGroup,fill=LoadGroup))+
-  geom_bar(stat = 'identity',position = "dodge")+
-  # geom_hline(yintercept = 0.68)+
-  # geom_hline(yintercept = 0.82)+
-  labs(y="Proportion",x="Derived allele frequency")+
-  # scale_color_brewer(palette = "Set2")+
-  scale_fill_manual(values = colB)+
-  # scale_fill_brewer(palette = "Set2")+
-  # scale_fill_brewer(palette = "Blues")+
-  scale_y_continuous(limits = c(0,1))+
-  scale_x_discrete(label=c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
-  facet_grid(Sub~Method)+
-  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
-  theme(
-    # plot.margin=unit(rep(1,4),'lines'),
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    legend.position = 'none',
-    text = element_text(size = 12))
-
-q
-# ggsave(q,filename = "~/Documents/temp.png",height = 6,width = 8)
-ggsave(q,filename = "~/Documents/test1.pdf",height = 3.6,width = 7.2)
-
-
-#### facet by sub
-methodColordf <-  tibble(Method=c("SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff","Alt_PPH2","Derived_PPH2"),Color=RColorBrewer::brewer.pal(8,"Set2"))
-
-
-df_su <- df %>%
-  filter(Sub=="A", LoadGroup=="Deleterious", bin=="[0,0.1]") %>% 
-  arrange(desc(fre)) %>% 
-  left_join(y = methodColordf, by = c("Method"))
-
-q <- df %>% 
-  mutate(Method=factor(Method, levels = df_su$Method)) %>% 
-  ggplot(aes(x=bin,y=fre,group=Method,fill=Method))+
-  geom_bar(stat = 'identity',position = "dodge")+
-  # geom_hline(yintercept = 0.68)+
-  # geom_hline(yintercept = 0.82)+
-  labs(y="Proportion",x="Derived allele frequency")+
-  # scale_color_brewer(palette = "Set2")+
-  scale_fill_manual(values = df_su$Color)+
-  # scale_fill_brewer(palette = "Set2")+
-  # scale_fill_brewer(palette = "Blues")+
-  scale_y_continuous(limits = c(0,1))+
-  scale_x_discrete(label=c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
-  facet_grid(Sub~LoadGroup)+
-  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
-  theme(
-    # plot.margin=unit(rep(1,4),'lines'),
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    legend.position = 'none',
-    text = element_text(size = 12))
-
-q
-ggsave(q,filename = "~/Documents/test2.pdf",height = 3.6,width = 7.2)
-
-```
-
-## 4.Reference bias evalution
-
-```{r}
-df <- df_AllMethod %>% 
-  group_by(Method) %>% 
-  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
-  mutate(bin=cut_interval(DAF,n = 10)) %>%
-  group_by(Method,IfRefisAnc,bin) %>% 
-  count(LoadGroup) %>% 
-  mutate(fre=n/sum(n)) %>% 
-  arrange(desc(bin)) %>% 
-  mutate(group = paste(IfRefisAnc,"-",str_sub(LoadGroup,1,3),sep = ""))
-
-df_color <- df %>% 
-  filter(bin=="[0.001,0.101]", group %in% c("Anc-Del","Der-Del")) %>% 
-  pivot_wider(names_from = "IfRefisAnc", values_from = "fre", 
-              id_cols = c(Method)) %>% 
-  mutate(gap=abs(Anc-Der)) %>% 
-  arrange(desc(gap))
-
-colB <- c("#d5311c","#e69f00","#004680","#ea7161","#ffcc99","#4daeff")
-
-p <- df %>% 
-  mutate(Method = factor(Method, levels = df_color$Method)) %>% 
-  ggplot(aes(x=bin,y=fre))+
-  geom_line(aes(group=group,linetype=group,color=group))+
-  # geom_text(data = df_summary, aes(group=IfRefisAnc,x=bin,y=0, label=snpNum))+
-  scale_linetype_manual(values=c("solid","solid","solid","dotdash","dotdash","dotdash"))+
-  labs(y="Fraction in each category",x="Derived allele frequency bins")+
-  scale_x_discrete(label = c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
-  scale_color_manual(values = colB)+
-  # facet_grid(.~Method,scales = "free")+
-  facet_wrap(~Method,scales = "free",ncol = 4)+
-  # facet_wrap(~Method,scales = "free",ncol = 6)+
-  scale_y_continuous(limits = c(0,1))+
-  theme(strip.background = element_blank())+
-  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
-  theme(
-    # plot.margin=unit(rep(1,4),'lines'),
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    legend.position = 'none',
-    text = element_text(size = 12))
-
-  # facet_wrap(~LoadGroup,ncol = 2,scales = "free_y")+
-  # theme_classic()+
-  # theme(legend.position = "none")+
-  # theme(plot.margin=unit(rep(1,4),'lines'),
-  #       # axis.text.x= element_text(angle=45, vjust=1,hjust = 1),
-  #       strip.background = element_blank(),
-  #       legend.title = element_blank(),
-  #       axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10),
-  #       axis.text.x = element_text(size = 6))
-
-p
-# ggsave(p, filename = "~/Documents/temp.png", height = 7.2*9/16,width = 7.2)
-
-ggsave(p,filename = "~/Documents/temp2.pdf",height = 3.6,width = 7.2)
-
-```
-## 5.delRatio
-```{r}
-
-dfdelRatio <- read.delim("data/004_delCount/delRatio.txt.gz")
-
-dftaxaDB <- read.delim("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GenomeType,GroupbyContinent)
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  dplyr::select(Taxa=VcfID,GenomeType,GroupbyContinent)
 
 factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
-colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray90")
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray80")
 
+factorB <- c("002_nonsynonymous","004_nonsynDerivedSIFT","015_LIST_S2",
+             "033_Derived_PolyPhen2_0.5","032_GERP16way_1.5","031_GERP16way_1.5andDerived_PolyPhen2_0.5","017_PhyloP1.5_RefMask","007_VEP","008_snpEff")
+             
+labelsB <- c("Nonsynonymous","SIFT","LIST-S2","PPH2","GERP","GERP+PPH2","PhyloP","VEP","SnpEff") 
 
-# factorB <- c("Ratio_002_nonsynonymous","Ratio_004_nonsynDerivedSIFT","Ratio_007_VEP","Ratio_008_snpEff", "Ratio_014_GERP16way_2.14_max","Ratio_015_LIST_S2","Ratio_016_PhyloP")
-# labelsB <- c("Nonsynonymous","SIFT","VEP","SnpEff", "GERP","LIST-S2","PhyloP")
-
-factorB <- c("Ratio_002_nonsynonymous","Ratio_004_nonsynDerivedSIFT","Ratio_015_LIST_S2","Ratio_016_PhyloP","Ratio_014_GERP16way_2.14_max","Ratio_007_VEP","Ratio_008_snpEff","Ratio_019_Alt_PolyPhen2","Ratio_020_Derived_PolyPhen2","Ratio_021_GERP16wayandPolyPhen2")
-labelsB <- c("Nonsynonymous","SIFT","LIST-S2","PhyloP","GERP","VEP","SnpEff","AltPPH2","DerivedPPH2","GERP+derivedPPH2")
-
-df <- dfdelRatio %>% left_join(.,dftaxaDB,by="Taxa") %>% 
-  select(-c("IfSelected","Group_refobj")) %>% 
-  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  dplyr::select(-c("IfSelected","Group_refobj")) %>% 
   filter(GroupbyContinent %in% factorA) %>% 
-  filter(Stand_LoadGroup %in% factorB) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
   droplevels() %>% 
   mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
-  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB))
-
-
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB))
 ```
-- 接上
+
 ```{r}
-dfCS <- df %>% filter(Taxa=="ABD_1142")
-
-p <- df %>%
-  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
-  ylab("Mutation burden")+xlab("")+
-  ### volin
-  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
-  # geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
-  # # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
-  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
-
-  ### boxplot
-  geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
-  geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
-  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
-
-  ### pointrange
-  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
-  
-  ### 打上中国春的位置
-  # geom_hline(data = dfCS, aes( yintercept = Stand_delCount))+
-  geom_point(data = dfCS,aes(x=Subgenome,y=Stand_delCount),color="black")+
-
-  scale_color_manual(values = colB,name='')+
-  scale_fill_manual(values = colB,name='')+
-  facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 2)+
-  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+p <-ggplot(df, aes(x=Subgenome,y=TotalDerivedSNPCount,fill = GroupbyContinent))+
+  stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position=position_dodge(0.8),geom="pointrange")+
+  stat_summary(fun=mean, geom="point", color="white",position = position_dodge(0.8))+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+  labs(y="Number of deleterious alleles",x="")+
+  coord_cartesian(ylim = c())+
+  facet_wrap(~VariantsGroup,ncol = 3,scales = "free")+
+  # facet_grid(VariantsGroup~.,scales = "free")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
   theme(strip.background = element_blank())+
   theme(
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7)
     ,legend.position = 'none'
     ,text = element_text(size = 12))
-p
-
-# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
-ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
-```
-
-#### ===========
-## gerp+pph2
-#### ===========
-## Tidy BIG DATA
-```{r}
-dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>% 
-  mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
-  mutate(HaveAncestralState=ifelse(is.na(Ancestral), "0", 
-                                   ifelse(Ancestral==Ref | Ancestral==Alt, "1", "0"))) %>% 
-  mutate(Impact_VEP=factor(Impact_VEP, levels = c("HIGH","MODERATE","LOW","MODIFIER")))
-
-```
-
-```{r}
-df_SIFT <- dftotal %>%
-  filter(HaveAncestralState==1) %>%
-  filter(!is.na(DAF)) %>%
-  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Derived_SIFT < 0.05,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>%
-  filter(!is.na(LoadGroup)) %>%
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="SIFT")
-
-df_GERP <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=2.14,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="GERP")
-
-df_snpEff <- dftotal %>%
-  filter(HaveAncestralState==1) %>%
-  # filter(!is.na(Impact_VEP)) %>%
-  filter(!is.na(DAF)) %>%
-  mutate(LoadGroup=ifelse(Impact_snpEff=="HIGH","Deleterious", ifelse(Effect_snpEff=="missense_variant", "Nonsynonymous",ifelse(Effect_snpEff=="synonymous_variant", "Synonymous", NA)))) %>%
-  filter(!is.na(LoadGroup)) %>%
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="SnpEff")
-
-df_vep <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Impact_VEP=="HIGH","Deleterious", ifelse(Effect_VEP=="missense_variant", "Nonsynonymous", ifelse(Effect_VEP=="synonymous_variant", "Synonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="VEP")
-
-df_LIST2 <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(LIST_S2>=0.85 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="LIST_S2")
-
-df_PhyloP <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(PhyloP_RefMask>=1.5 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="PhyloP_RefMask")
-
-df_polyphen2_alt <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Alt_PolyPhen2_prob>=0.452 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="Alt_PPH2")
-
-df_polyphen2_derived <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.452 & Variant_type %in% c("NONSYNONYMOUS"), "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="Derived_PPH2")
-
-df_GERPandPPH2 <- dftotal %>% 
-  filter(HaveAncestralState==1) %>% 
-  filter(!is.na(DAF)) %>% 
-  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.452 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  select(Chr:Minor,Ancestral,DAF,Gerp_16way,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,LIST_S2,PhyloP_RefMask,Sub,HaveAncestralState,LoadGroup,Alt_PolyPhen2_prob,Derived_PolyPhen2_prob) %>%
-  mutate(Method="GERP+PPH2")
-
-
-df_AllMethod <- bind_rows(df_vep,df_SIFT,df_GERP,
-                          df_snpEff,df_LIST2,df_PhyloP,df_polyphen2_alt,
-                          df_polyphen2_derived,df_GERPandPPH2) %>%
-  mutate(Method=factor(Method, 
-                       levels = c("Alt_PPH2","Derived_PPH2","GERP+PPH2","SIFT","GERP","PhyloP_RefMask","LIST_S2","VEP","SnpEff"), 
-                       labels = c("Alt_PPH2","Derived_PPH2","GERP+PPH2","SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff")))
-```
-
-## 2.Deleterious count
-
-```{r}
-
-df_delCount <- df_AllMethod %>% 
-  filter(LoadGroup %in% c("Deleterious")) %>% 
-  group_by(Method,Sub) %>% 
-  count()
-
-methodColordf <-  tibble(Method=c("SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff","Alt_PPH2","Derived_PPH2","GERP+PPH2"),Color=RColorBrewer::brewer.pal(9,"Set3"))
-
-df_delCount_color <- df_delCount %>% 
-  filter(Sub=="A") %>% 
-  arrange(desc(n)) %>% 
-  left_join(y=methodColordf,by = "Method")
-
-q <- df_delCount %>% 
-  mutate(Method=factor(Method,levels = df_delCount_color$Method)) %>% 
-  ggplot(aes(x=Sub, fill=Method, y=n))+
-  geom_col(position = position_dodge())+
-  # facet_grid(Variant_type~.)+
-  scale_fill_manual(values = df_delCount_color$Color)+
-  # scale_fill_brewer(palette = "Set2")+
-  # scale_color_brewer(palette = "Set2")+
-  labs(y="Total deleterious count")+
-  theme(
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    # legend.position = 'none',
-    text = element_text(size = 12))
-q
-# ggsave(plot = q, "~/Documents/temp.png", width = 4, height = 3, dpi = 300)
-
-# ggsave(q,filename = "~/Documents/temp.pdf",height = 3.6,width = 2.7)
-ggsave(q,filename = "~/Documents/test.pdf",height = 3.6,width = 6)
-
-### 求总数
-dftest <- df_delCount %>% 
-  group_by(Method) %>% 
-  summarise(sum=sum(n))
-
-p <- dftest %>% 
-  ggplot(aes(x=Method,y=sum,fill=Method))+
-  geom_bar(stat = 'identity',position = "dodge")+
-  geom_text(aes(label=sum),size=3,
-            position = position_dodge(0.9))+
-  labs(x="", y="Del SNP count")+
-  scale_fill_brewer(palette = "Set3")+
-  theme_classic()+
-  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
-  theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
-          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
-p
-
-ggsave(p,filename = "~/Documents/test2.pdf",height = 3.6,width = 6)
-
-```
-
-## 2. Correlation
-```{r}
-library(corrr)
-df <- df_AllMethod %>% 
-  filter(LoadGroup=="Deleterious") %>% 
-  mutate(ID=str_c(Chr,Pos,sep = "_"), IfDel = 1) %>% 
-  select(ID,Sub,Method,IfDel) %>% 
-  pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
-  select(-Sub,-ID) %>% 
-  correlate() %>% 
-  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
-  rearrange() %>%    # rearrange by correlations
-  # shave() # Shave off the upper triangle for a clean result %>% 
-  # map(~replace_na(.x,1)) %>% 
-  # as_tibble() %>%
-  # column_to_rownames(var = "term") %>% 
-  as_matrix(diagonal = 1)
-
-
-heatmap(as.matrix(df),main = "pheatmap default")
-
-
-library(pheatmap)
-p <- pheatmap(as.matrix(df), display_numbers = T,
-         # breaks = c(-1, 0, 1),
-         color= colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(10),
-         # color=cols
-         )
 
 p
 
-ggsave(p,filename = "~/Documents/test.pdf",height = 4, width = 5)
-# matrix <- cor(df)
-
-rplot(df) 
-
-
- df_AllMethod %>% 
-  filter(LoadGroup=="Deleterious") %>% 
-  mutate(ID=str_c(Chr,Pos,sep = "_"), IfDel = 1) %>% 
-  select(ID,Sub,Method,IfDel) %>% 
-  pivot_wider(.,names_from = "Method",values_from = "IfDel",values_fill = 0) %>% 
-  select(-Sub,-ID) %>% 
-  correlate() %>% 
-  # focus(-VEP, -SnpEff, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
-  rearrange() %>%    # rearrange by correlations
-  # shave() # Shave off the upper triangle for a clean result
-  map(~replace_na(.x,1)) %>% 
-  network_plot(min_cor = .1)
-
-# matrix <- cor(df)
-
-rplot(df) 
-
+ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/mutatioBurden/delCount.pdf",height = 7.2,width = 7.2)
 ```
-
+### legend without plot
 ```{r}
-x <- datasets::mtcars %>%
-       correlate() %>%  # Create correlation data frame (cor_df)
-       focus(-cyl, -vs, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
-       rearrange() %>%   # rearrange by correlations
-       shave() # Shave off the upper triangle for a clean result
-
-rplot(x) 
-```
-
-
-```{r}
-aolevels(df_AllMethod,"LoadGroup")
-```
-
-
-
-## 3.DAF
-```{r}
-df <- df_AllMethod %>% 
-  mutate(bin=cut_width(DAF,width = 0.1,boundary = 0)) %>%
-  group_by(Method,Sub,LoadGroup) %>% 
-  count(bin) %>% 
-  mutate(fre=n/sum(n))
- 
-#### facet by sub
-colB <- rep(c("#d5311c","#e69f00","#004680"),2)
-q <- df %>% 
-  ggplot(aes(x=bin,y=fre,group=LoadGroup,fill=LoadGroup))+
-  geom_bar(stat = 'identity',position = "dodge")+
-  # geom_hline(yintercept = 0.68)+
-  # geom_hline(yintercept = 0.82)+
-  labs(y="Proportion",x="Derived allele frequency")+
-  # scale_color_brewer(palette = "Set2")+
-  scale_fill_manual(values = colB)+
-  # scale_fill_brewer(palette = "Set2")+
-  # scale_fill_brewer(palette = "Blues")+
-  scale_y_continuous(limits = c(0,1))+
-  scale_x_discrete(label=c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
-  facet_grid(Sub~Method)+
-  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
-  theme(
-    # plot.margin=unit(rep(1,4),'lines'),
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    legend.position = 'none',
-    text = element_text(size = 12))
-
-q
-# ggsave(q,filename = "~/Documents/temp.png",height = 6,width = 8)
-ggsave(q,filename = "~/Documents/test1.pdf",height = 3,width = 8)
-
-
-#### facet by sub
-methodColordf <-  tibble(Method=c("SIFT","GERP","PhyloP","LIST-S2","VEP","SnpEff","Alt_PPH2","Derived_PPH2","GERP+PPH2"),Color=RColorBrewer::brewer.pal(9,"Set3"))
-
-
-df_su <- df %>%
-  filter(Sub=="A", LoadGroup=="Deleterious", bin=="[0,0.1]") %>% 
-  arrange(desc(fre)) %>% 
-  left_join(y = methodColordf, by = c("Method"))
-
-q <- df %>% 
-  mutate(Method=factor(Method, levels = df_su$Method)) %>% 
-  ggplot(aes(x=bin,y=fre,group=Method,fill=Method))+
-  geom_bar(stat = 'identity',position = "dodge")+
-  # geom_hline(yintercept = 0.68)+
-  # geom_hline(yintercept = 0.82)+
-  labs(y="Proportion",x="Derived allele frequency")+
-  # scale_color_brewer(palette = "Set2")+
-  scale_fill_manual(values = df_su$Color)+
-  # scale_fill_brewer(palette = "Set2")+
-  # scale_fill_brewer(palette = "Blues")+
-  scale_y_continuous(limits = c(0,1))+
-  scale_x_discrete(label=c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
-  facet_grid(Sub~LoadGroup)+
-  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
-  theme(
-    # plot.margin=unit(rep(1,4),'lines'),
-    panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    # legend.position = 'none',
-    text = element_text(size = 12))
-
-q
-ggsave(q,filename = "~/Documents/test2.pdf",height = 3.6,width = 7.2)
-
-```
-
-## 4.Reference bias evalution
-
-```{r}
-df <- df_AllMethod %>% 
-  group_by(Method) %>% 
-  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
-  mutate(bin=cut_interval(DAF,n = 10)) %>%
-  group_by(Method,IfRefisAnc,bin) %>% 
-  count(LoadGroup) %>% 
-  mutate(fre=n/sum(n)) %>% 
-  arrange(desc(bin)) %>% 
-  mutate(group = paste(IfRefisAnc,"-",str_sub(LoadGroup,1,3),sep = ""))
-
-df_color <- df %>% 
-  filter(bin=="[0.001,0.101]", group %in% c("Anc-Del","Der-Del")) %>% 
-  pivot_wider(names_from = "IfRefisAnc", values_from = "fre", 
-              id_cols = c(Method)) %>% 
-  mutate(gap=abs(Anc-Der)) %>% 
-  arrange(desc(gap))
-
-colB <- c("#d5311c","#e69f00","#004680","#ea7161","#ffcc99","#4daeff")
-
-p <- df %>% 
-  mutate(Method = factor(Method, levels = df_color$Method)) %>% 
-  ggplot(aes(x=bin,y=fre))+
-  geom_line(aes(group=group,linetype=group,color=group))+
-  # geom_text(data = df_summary, aes(group=IfRefisAnc,x=bin,y=0, label=snpNum))+
-  scale_linetype_manual(values=c("solid","solid","solid","dotdash","dotdash","dotdash"))+
-  labs(y="Fraction in each category",x="Derived allele frequency bins")+
-  scale_x_discrete(label = c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
-  scale_color_manual(values = colB)+
-  # facet_grid(.~Method,scales = "free")+
-  facet_wrap(~Method,scales = "free",ncol = 3)+
-  # facet_wrap(~Method,scales = "free",ncol = 6)+
-  scale_y_continuous(limits = c(0,1))+
+p <-ggplot(df, aes(x=Subgenome,y=TotalDerivedSNPCount,fill = GroupbyContinent))+
+  stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position=position_dodge(0.8),geom="pointrange")+
+  stat_summary(fun=mean, geom="point", color="white",position = position_dodge(0.8))+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+  labs(y="Number of deleterious alleles",x="")+
+  coord_cartesian(ylim = c())+
+  facet_wrap(~VariantsGroup,ncol = 3,scales = "free")+
+  # facet_grid(VariantsGroup~.,scales = "free")+
+  scale_fill_manual(values = colB,name='Polyploid')+
+  scale_color_manual(values = colB,name='Polyploid')+
   theme(strip.background = element_blank())+
-  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
   theme(
-    # plot.margin=unit(rep(1,4),'lines'),
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
-    legend.position = 'none',
+    # ,legend.position = 'none'
+    legend.key = element_blank(),
     text = element_text(size = 12))
 
-  # facet_wrap(~LoadGroup,ncol = 2,scales = "free_y")+
-  # theme_classic()+
-  # theme(legend.position = "none")+
-  # theme(plot.margin=unit(rep(1,4),'lines'),
-  #       # axis.text.x= element_text(angle=45, vjust=1,hjust = 1),
-  #       strip.background = element_blank(),
-  #       legend.title = element_blank(),
-  #       axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10),
-  #       axis.text.x = element_text(size = 6))
+### legend without plot
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 2)
 
+
+```
+
+## polyDFE on different methods
+### plot DFE
+```{r}
+outfile <- c("data/008_polyDFE/001_differentMethods_gerp_pph2/polyDFE.txt")
+source("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2_S1000Figs/data/polyDFE/postprocessing.R")
+# parse polyDFE output
+est = parseOutput(outfile)
+# est has 4 different runs of polyDFE
+length(est)
+# names(est[[1]])
+# est[[1]]$input
+# est[[1]]$model
+# est[[1]][c("lk", "criteria")]
+# est[[1]]$values
+# est[[1]]$estimated
+# est[[1]]$expec
+# est[[1]]$alpha
+# grad = sapply(est, function(e) e$criteria)
+# print(grad)
+# # names(grad) = sapply(est, getModelName)
+# grad
+# # which gradients are larger than 0.001?
+# grad[which(grad > 0.001)]
+# 
+# # on what input files was polyDFE ran?
+# print(sapply(est, function(e) e$input))
+
+
+### ******** choice
+choice <- "choiceA"
+
+if(choice=="choiceA"){
+  # we can easily calculate the discretized DFE for different models
+  ### case1: range 是不连续的
+  ######### 第一步：设置离散的值
+  # range <- c(-100,-50,-10,-1, 0, 1,10,20,50)
+  # range <- c(-10,-1, 0, 1)
+  range <- c(-100,-10, -5,-1, 0, 1,5,10)
+  # range <- c(-100,-10, -5,-1, 0)
+
+  ######### 第二步：设置横坐标的标签 xlabelsFinal
+  ### 5 个值有 6 个 bin
+  xlabels <- range %>% tibble(Bin=.)
+  xlabels1 <- xlabels %>% rbind(-1000,.) %>% rename(Bin1=Bin) ##在第一行加一行
+  xlabels2 <- xlabels %>% rbind(.,1000) %>% rename(Bin2=Bin) ##在最后一行加一行
+  lineTotal <- nrow(xlabels1)
+  dfxlabel <- cbind(xlabels1,xlabels2) %>% 
+  mutate(Bin=str_c("(",Bin1,",",Bin2,")")) %>% 
+  mutate(Bin = ifelse(row_number()==1, str_c("< ",range[1]), Bin)) %>% 
+  mutate(Bin = ifelse(row_number()== lineTotal, str_c(range[length(range)]," <"), Bin))
+  xlabelsFinal <- dfxlabel$Bin
+  
+}else if(choice=="choiceB"){
+  ### case2: range 是连续的
+  ######### 第一步：设置连续的值
+  range <- c(seq(-20,10,1))
+  ######### 第二步：设置横坐标的标签 xlabelsFinal
+  ### 首先：构建函数，画出坐标轴，将显示指定的坐标，其他默认不显示
+  selectPos <- c(-25,0,25)
+  xlabelsFinalContinuous <- function(range,selectPos){
+   dffun <- range %>% tibble(Range=.) %>% 
+      mutate(Range2=ifelse(Range %in% selectPos,Range,""))
+    out <-as.character(dffun$Range2)  
+    return(out)
+  }
+  ### 其次，调用函数，标签要比实际的 range 多一个，比如5个值有6个 range 区间
+  xlabelsFinal <-c(xlabelsFinalContinuous(range,selectPos),"")  
+}
+
+### 标签会随之发生改变
+### 找到 0 所处的位置索引,以及 x 轴 的 labels
+cutvalue0 <- which(range == 0)+0.5  ### 为后续添加竖直线做准备
+
+
+### ************************************************************************************ 
+
+####################### 正式画图 ####################
+####################### 正式画图 ####################
+####################### 正式画图 ####################
+### 第一步：求DFE的值
+dfe = t(sapply(est, getDiscretizedDFE, range))
+# dfe = t(sapply(est, getDiscretizedDFE))
+
+### 第二步：先制造新列（分组），再将矩阵转换成数据框
+#### give names to the rows in dfe to use in the barplot legend
+### 注意可以通过程序提取制作，也可以自己手动建立.
+### 程序提取分组
+infiles <- sapply(est, function(e)e$input) %>% 
+  tibble(GroupFile=.) %>% 
+  ### 文件名字提取出来 Group = LR_EA_D_09_A_
+  mutate(Group=str_replace(str_split_fixed(GroupFile,"002_polyDFE_input/",2)[,2],".txt","")) %>% dplyr::select(Group) %>%
+  ### 先提取 bootstrap 次数, 再提取 sub, 再提取亚群
+  mutate(REP=str_sub(Group,str_length(Group)-1)) %>% 
+  mutate(Sub=str_split_fixed(Group,pattern = "_",n = 4)[,2]) %>% 
+  mutate(GroupPop=str_split_fixed(Group,pattern = "_",n = 4)[,1]) %>% 
+  mutate(Type=str_split_fixed(Group,pattern = "_",n = 4)[,3]) %>% 
+  mutate(Group2=str_c(GroupPop,"_",Type)) %>% 
+  dplyr::select(Group=Group2,Sub,REP) 
+  
+
+#### 将dfe矩阵转化为table,并且进行转置，方便画图
+### 该数据框为长表，供画图
+df <- as_tibble(dfe) %>%
+  mutate(Sub=infiles$Sub,Group=infiles$Group,REP=infiles$REP) %>% 
+  pivot_longer(.,cols= V1: str_c("V",dim(dfe)[2]),names_to ="Bin" ,values_to = "Proportion") %>%  
+  mutate(Proportion=round(as.numeric(format(Proportion, scientific = FALSE)),4)) 
+  # mutate(Proportion= na_if(Proportion, 0)) ### 将0设置为NAs
+
+### 该数据框为宽表，仅供自己看
+df_matrix <- as_tibble(dfe) %>%
+  mutate(Sub=infiles$Sub,Group=infiles$Group,REP=infiles$REP)
+  
+  
+
+### 计算平均值，标准差，标准误
+df2 <- df %>% 
+  group_by(Sub,Group,Bin) %>% 
+  summarise(ave = mean(Proportion), sd = sd(Proportion), N = n(), se = sd/sqrt(N))
+
+### 修改因子
+factorA <- c("GERP+PPH2_Deleterious","GERP_Deleterious","PPH2_Deleterious",
+             "GERP+PPH2_Nonsynonymous","GERP_Nonsynonymous","PPH2_Nonsynonymous")
+labelsA <- c("GERP+PPH2_Del","GERP_Del","PPH2_Del",
+             "GERP+PPH2_Nonsyn","GERP_Nonsyn","PPH2_Nonsyn")
+
+colB <- brewer.pal(12,"Paired")[c(2,6,10,1,5,9)]
+
+df2$Group <- factor(df2$Group,levels = factorA,labels = labelsA)
+
+# colB <- brewer.pal(12,"Paired")
+
+p <- df2 %>%
+  filter(ave!=0) %>% 
+  # filter(Sub=="D") %>%
+  ggplot(aes(x=Bin,y=ave,fill=Group))+
+  geom_bar(stat = "identity",position=position_dodge(),alpha=0.90)+
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,color="gray50",
+                 position=position_dodge(.9))+
+  ### scale 坐标轴
+  # scale_y_log10()+
+  # scale_y_sqrt(limits = c(0, 0.64),breaks=c(0.2,0.4,0.6,0.8,1)^2) +
+  # scale_y_sqrt(limits = c(0, 1),breaks=c(0.2,0.4,0.6,0.8,1)^2) +
+  geom_vline(xintercept = cutvalue0, linetype="dashed", color = "gray", size=0.5)+
+  scale_fill_manual(values = colB)+
+  ### 离散型的DFE
+  scale_x_discrete(labels=xlabelsFinal)+
+  ### 连续型的DFE
+  # scale_x_discrete(labels=xlabelsFinal_continuous)+
+  # theme(axis.ticks.x = element_blank())+
+  ### new choice
+  # scale_x_continuous(limits = c(-20,10,5))+
+  labs(x=expression(italic(S)==4~italic(N[e]~italic(s))), y="Proportion")+
+  facet_grid(Sub~.)+
+  theme(strip.background = element_blank(),strip.text = element_text(size=12))+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  # theme(axis.text.x = element_text(vjust = 0, hjust = 1, angle = 90))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    # ,legend.position = 'none'
+    ,text = element_text(size = 12))
 p
-# ggsave(p, filename = "~/Documents/temp.png", height = 7.2*9/16,width = 7.2)
 
-ggsave(p,filename = "~/Documents/temp2.pdf",height = 5,width = 7.2)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 4, width = 7.2)
+ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/polyDFE_method/polyDFE_differentMethods.pdf",height = 4, width = 7.2)
 
-```
-## 5.delRatio
-```{r}
-
-dfdelRatio <- read.delim("data/004_delCount/delRatio.txt.gz")
-
-dftaxaDB <- read.delim("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GenomeType,GroupbyContinent)
-
-factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
-colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray90")
-
-
-# factorB <- c("Ratio_002_nonsynonymous","Ratio_004_nonsynDerivedSIFT","Ratio_007_VEP","Ratio_008_snpEff", "Ratio_014_GERP16way_2.14_max","Ratio_015_LIST_S2","Ratio_016_PhyloP")
-# labelsB <- c("Nonsynonymous","SIFT","VEP","SnpEff", "GERP","LIST-S2","PhyloP")
-
-factorB <- c("Ratio_002_nonsynonymous","Ratio_004_nonsynDerivedSIFT","Ratio_015_LIST_S2","Ratio_016_PhyloP","Ratio_014_GERP16way_2.14_max","Ratio_007_VEP","Ratio_008_snpEff","Ratio_019_Alt_PolyPhen2","Ratio_020_Derived_PolyPhen2","Ratio_021_GERP16wayandPolyPhen2")
-labelsB <- c("Nonsynonymous","SIFT","LIST-S2","PhyloP","GERP","VEP","SnpEff","AltPPH2","DerivedPPH2","GERP+derivedPPH2")
-
-df <- dfdelRatio %>% left_join(.,dftaxaDB,by="Taxa") %>% 
-  select(-c("IfSelected","Group_refobj")) %>% 
-  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
-  filter(GroupbyContinent %in% factorA) %>% 
-  filter(Stand_LoadGroup %in% factorB) %>% 
-  droplevels() %>% 
-  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
-  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB))
 
 
 ```
-- 接上
+
+
+### plot alpha
 ```{r}
-dfCS <- df %>% filter(Taxa=="ABD_1142")
+###########################
+## estimate alpha
+###########################
+## alpha_dfe alpha_div  
+## use the S_adv limit like in Galtier 2016：supLimit 参数值越大alpha越小
+## turn off correction for misattributed polymorphism：poly
+# alpha_dfe, but use the S_adv limit like in Galtier 2016
+### case1: alpha dfe with/without para: supLimit
+# print(estimateAlpha(est[[1]], supLimit = 2))
+### case2: alpha div with/without para1: supLimit para2:poly
+# div = parseDivergenceData('/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/012_DFE/005_polyDFE_input/FTT_A.txt')
+# print(estimateAlpha(est[[1]], supLimit = 2,poly = FALSE,div = div))
+### case3: compare with the values returned from polyDFE and R script
+### 技巧： unlist(est[[1]]$alpha)["alpha_dfe"]  est[[1]]$alpha 是个 list
+# alpha = sapply(est, function(e) c("polyDFE alpha_dfe" = unname(unlist(e$alpha)["alpha_dfe"]),
+#                                   "R alpha_dfe" = estimateAlpha(e),
+#                                   "polyDFE alpha_div" = unname(unlist(e$alpha)["alpha_div"]),
+#                                   "R alpha_div" = estimateAlpha(e, div = div)))
+# colnames(alpha) = basename(polyDFEfiles)
+# print(alpha)
+
+### 注意可以通过程序提取制作，也可以自己手动建立.
+### 程序提取分组
+infiles <- sapply(est, function(e)e$input) %>% 
+  tibble(GroupFile=.) %>% 
+  ### 文件名字提取出来 Group = LR_EA_D_09_A_
+  mutate(Group=str_replace(str_split_fixed(GroupFile,"002_polyDFE_input/",2)[,2],".txt","")) %>% dplyr::select(Group) %>%
+  ### 先提取 bootstrap 次数, 再提取 sub, 再提取亚群
+  mutate(REP=str_sub(Group,str_length(Group)-1)) %>% 
+  mutate(Sub=str_split_fixed(Group,pattern = "_",n = 4)[,2]) %>% 
+  mutate(GroupPop=str_split_fixed(Group,pattern = "_",n = 4)[,1]) %>% 
+  mutate(Type=str_split_fixed(Group,pattern = "_",n = 4)[,3]) %>% 
+  mutate(Group2=str_c(GroupPop,"_",Type)) %>% 
+  dplyr::select(Group=Group2,Sub,REP) 
+
+
+# df <- sapply(est, function(e) e$alpha[[1]]["alpha_dfe"]) %>%
+#   tibble(alpha_dfe=.) %>%
+#   mutate(Sub=infiles$Sub,Group=infiles$Group,REP=infiles$REP) %>%
+#   arrange(Sub,alpha_dfe)
+
+df <- sapply(est, function(e)estimateAlpha(e,supLimit = 0,poly = FALSE)) %>%
+  tibble(alpha_dfe=.) %>%
+  mutate(Sub=infiles$Sub,Group=infiles$Group,REP=infiles$REP) %>%
+  arrange(Sub,alpha_dfe)
+
+### 总结：e$alpha[[1]]["alpha_dfe"] 和 estimateAlpha(e) 得出的结果是一样的
+
+### 计算平均值，标准差，标准误
+df <- df %>% 
+  group_by(Sub,Group) %>% 
+  summarise(ave = mean(alpha_dfe), sd = sd(alpha_dfe), N = n(), se = sd/sqrt(N)) %>% 
+  arrange(Sub,ave)
+
+
+### 修改因子
+factorA <- c("GERP+PPH2_Deleterious","GERP_Deleterious","PPH2_Deleterious",
+             "GERP+PPH2_Nonsynonymous","GERP_Nonsynonymous","PPH2_Nonsynonymous")
+labelsA <- c("GERP+PPH2_Del","GERP_Del","PPH2_Del",
+             "GERP+PPH2_Nonsyn","GERP_Nonsyn","PPH2_Nonsyn")
+
+colB <- brewer.pal(12,"Paired")[c(2,6,10,1,5,9)]
+
+
+df$Group <- factor(df$Group,levels = factorA,labels = labelsA)
 
 p <- df %>%
-  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
-  ylab("Mutation burden")+xlab("")+
-  ### volin
-  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
-  # geom_boxplot(position = position_dodge(0.8), width=0.02, color="white", alpha=0.2) +
-  # # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
-  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
-
-  ### boxplot
-  geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
-  geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
-  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
-
-  ### pointrange
-  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
-  
-  ### 打上中国春的位置
-  # geom_hline(data = dfCS, aes( yintercept = Stand_delCount))+
-  geom_point(data = dfCS,aes(x=Subgenome,y=Stand_delCount),color="black")+
-
-  scale_color_manual(values = colB,name='')+
-  scale_fill_manual(values = colB,name='')+
-  facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 2)+
-  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+ggplot(aes(x=Group,y=ave,fill=Group))+
+  geom_bar(stat = "identity",position=position_dodge(),alpha=0.95)+
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,color="gray50",
+                 position=position_dodge(.9))+
+  geom_text(aes(label= round(ave,digits = 3)),size=2,nudge_y = -0.1)+
+  scale_fill_manual(values = colB)+
+  labs(x="Benificial mutation",y="Proportion")+
+  facet_grid(Sub~.)+
   theme(strip.background = element_blank())+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
   theme(
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7)
     ,legend.position = 'none'
-    ,text = element_text(size = 12))
+    ,text = element_text(size = 10))
 p
 
-# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
-ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
-```
-
-## 6. scatter plot
-```{r}
-df2 <- dftotal %>% filter(Variant_type %in% c("SYNONYMOUS","NONSYNONYMOUS"))%>% 
-  mutate(LoadGroup = ifelse(Variant_type=="NONSYNONYMOUS" & Gerp_16way > 2.14 & Derived_PolyPhen2_prob >= 0.453, "Deleterious",
-                            ifelse(Variant_type=="NONSYNONYMOUS","Nonsynonymous",
-                                   ifelse(Variant_type=="SYNONYMOUS","Synonymous",NA)))) %>% 
-  # filter(!is.na(Gerp_16way),!is.na(Derived_PolyPhen2_prob)) %>%
-  filter(!is.na(Ancestral))
-  
-df <- sample_n(df2,5000)
+ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/polyDFE_method/estimateAlpha_.pdf",height = 3, width = 4)
 
 ```
+
 
 ```{r}
-df$LoadGroup <- factor(df$LoadGroup, levels = c("Synonymous","Nonsynonymous","Deleterious"))
-colB <- c("#004680","#e69f00","#d5311c")
-
-p <- df %>%
-  ggplot(aes(x=Gerp_16way,y=Derived_PolyPhen2_prob,fill=LoadGroup))+
-  geom_point(size=2, shape=21,color="white",alpha=0.8)+
-  # scale_color_manual(values = colB)+
-  scale_fill_manual(values = colB)+
-  labs(x="GERP score",y="PolyPhen-2 score")+
-  theme(
-    panel.background = element_blank(),
-    # legend.position = 'none',
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7))
-   
-p
-
-# ggsave(p,filename = "~/Documents/test.pdf",height = 3.6*3/4,width = 3.6)
-ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 
 ```
-
-```{r}
-df <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("possibly damaging","probably damaging") ) %>% 
-  filter(Derived_PolyPhen2_class %in% c("deleterious"))
-
-df1 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("benign"))
-
-df2 <- dftotal %>% filter(Derived_PolyPhen2_prediction %in% c("possibly damaging")) %>%
-  filter(Derived_PolyPhen2_class %in% c("neutral"))
-```
-
-2. Fig2 
-1. 1B1R 
-3. Introgression and selection
-4. GERP 1.5 PolyPhen2 0.5
-
-
-
 
 
 

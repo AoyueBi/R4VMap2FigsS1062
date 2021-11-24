@@ -432,6 +432,7 @@ df_stage1 <- dftotal %>%
 
 ```
 接上，
+#### 基因含有多少突变 
 ```{r}
 ### 计算多少个基因含有突变 47615
 genenum <- length(unique(df_stage1$Transcript))
@@ -469,6 +470,10 @@ dftest <- dfgenenum %>%
 
 print(str_c("gene num with only rare snp ",dftest[2,2]))
 print(str_c("gene num with only common snp ",dftest[1,2]))
+
+### 计算每个基因含有稀有变异的数量
+
+
 
 #############################################################################
 ### 有害变异在基因中的分布：分类三类基因1.common 2.rare 3.common and rare
@@ -657,7 +662,7 @@ df_filter <- df_stage1 %>%
   filter(n == 3) %>% 
   select(Transcript) %>% 
   left_join(.,df_common_rare,by="Transcript") %>% 
-  rename(RareVariantsCount = n) %>% 
+  dplyr::rename(RareVariantsCount = n) %>% 
   filter(!is.na(RareVariantsCount)) %>% 
   ungroup()
   ### nuique 一下计数
@@ -678,17 +683,17 @@ df_filter %>%
 ```{r}
 df <- df_sample %>% 
   left_join(.,df_stage1,by="Transcript") %>% 
-  rename(Gene = Transcript)
+  dplyr::rename(Gene = Transcript)
 
 ## 处理抽样基因的CDS长度
 df_geneInfo <- read.delim("data/006_Fig2/wheat_v1.1_nonoverlap_addPos.txt")
 
 df_geneInfo <- df_geneInfo %>% select(Longest_transcript,CDSLength) %>% 
-  rename(Transcript=Longest_transcript)
+  dplyr::rename(Transcript=Longest_transcript)
 
 df_geneCDSlength <- df_sample %>% 
   left_join(.,df_geneInfo,by="Transcript") %>% 
-  rename(Gene = Transcript)
+  dplyr::rename(Gene = Transcript)
 
 ### 接下来看每个基因的长度，也画到图上，表示基因长度和变异数的关系
 ```
@@ -713,7 +718,7 @@ p <- ggplot()+
                    )+
   # theme(axis.text.x = element_blank(),axis.ticks.x = element_blank(),axis.line.x = element_blank())+
   theme(panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),text = element_text(size = 12))
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),text = element_text(size = 14))
 p
 ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 6)
 
@@ -777,11 +782,202 @@ df <- dftotal %>% filter(Region=="CDS",Variant_type == "SYNONYMOUS"|Variant_type
 ```
 
 
+#### ===========
+## Allele age
+### A:SNP count with allele age 
+```{r}
+col <- c("#004680","#e69f00","#d5311c")
+## probably damaging [0.957,1]
+## possibly damaging [0.453,0.956]
+dfAlleleAge <- dftotal %>% 
+  filter(Variant_type %in% c("SYNONYMOUS","NONSYNONYMOUS")) %>%
+  filter(HaveAncestralState==1, !is.na(Gerp_16way)) %>% 
+  # & Gerp_16way >=2.14 & Derived_PolyPhen2_prob > 0.453
+  mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Derived_PolyPhen2_prob >= 0.5 & Gerp_16way >= 1.5 ,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>%
+  filter(!is.na(AlleleAge_J), !is.na(AlleleAge_M), !is.na(AlleleAge_R)) %>%
+  mutate(LoadGroup=factor(LoadGroup, levels = c("Synonymous","Nonsynonymous","Deleterious")))
+
+df_db_summary <- dfAlleleAge %>% 
+  group_by(LoadGroup,Sub) %>% 
+  summarise(n=n())
+
+q <- dfAlleleAge %>% 
+  ggplot(aes(x=Sub, fill=LoadGroup))+
+  geom_bar(position = position_dodge(width = 0.9))+
+  geom_text(data = df_db_summary, aes(label=n, y=n), 
+            position = position_dodge(width = 0.9), size=2.5)+
+  scale_fill_manual(values = col)+
+  labs(y="The num of SNP having allele age")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.line = element_blank(),
+        # text = element_text(size = 14),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+```
+
+
+### B: allele age distribution
+```{r}
+q <- dfAlleleAge %>% 
+  mutate(Region=factor(Region, levels = c("UTR_5","Intron","CDS","UTR_3"))) %>% 
+  ggplot(aes(x=AlleleAge_J, fill=LoadGroup))+
+  geom_histogram(aes(y=..count..), color="white")+
+  facet_grid(Sub~LoadGroup, scales = "free")+
+  # scale_color_brewer(palette = "Set2")+
+  # scale_fill_brewer(palette = "Set2")+
+  scale_fill_manual(values = col)+
+  scale_color_manual(values = col)+
+  scale_x_continuous(trans = "log10",
+                     breaks = scales::trans_breaks("log10", function(x) 10^x),
+                     labels = scales::trans_format("log10",   scales::math_format(10^.x)))+
+  labs(x="Mutation age (Years)")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        # axis.title.x = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 16),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+```
+
+
+
+### C: allele age vs DAF
+```{r}
+q <- dfAlleleAge %>% 
+  group_by(Sub,LoadGroup) %>% 
+  slice_sample(prop = 0.2) %>%
+  ggplot(aes(x=AlleleAge_J, y=DAF,color=LoadGroup, fill=LoadGroup))+
+  geom_point(alpha=0.2)+
+  facet_grid(Sub~LoadGroup)+
+  scale_color_manual(values = col)+
+  scale_fill_manual(values = col)+
+  scale_x_continuous(trans = "log10",
+                     # breaks = scales::trans_breaks("log10", function(x) 10^x),
+                     labels = scales::trans_format("log10",   scales::math_format(10^.x)))+
+  labs(x="Mutation age (Years)",y="Derived allele frequency")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        # axis.title.x = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 16),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+ggsave(plot = q, "~/Documents/temp.pdf", width = 6, height = 4)
+
+```
+
+```{r}
+q <- dfAlleleAge %>% 
+  group_by(Sub,LoadGroup) %>% 
+  slice_sample(prop = 0.2) %>%
+  ggplot(aes(x=DAF, y=AlleleAge_J,color=LoadGroup, fill=LoadGroup))+
+  geom_point(alpha=0.2)+
+  facet_grid(Sub~LoadGroup)+
+  scale_color_manual(values = col)+
+  scale_fill_manual(values = col)+
+  scale_y_continuous(trans = "log10",
+                     # breaks = scales::trans_breaks("log10", function(x) 10^x),
+                     labels = scales::trans_format("log10",   scales::math_format(10^.y)))+
+  # labs(x="Mutation age (Years)",y="Derived allele frequency")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        # axis.title.x = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 16),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+ggsave(plot = q, "~/Documents/temp.pdf", width = 6, height = 4)
+```
+
+
+### allele age vs DAF (2D plot)
+```{r}
+p <- dfAlleleAge %>% 
+  group_by(Sub,LoadGroup) %>% 
+  slice_sample(prop = 0.5) %>%
+  ggplot(aes(x=AlleleAge_J, y=DAF))+
+  # stat_density_2d(aes(x = AlleleAge_J, y = DAF, fill = stat(nlevel)),
+  #                 geom = "polygon", n = 500, bins = 10, contour = TRUE) +
+  geom_bin2d(aes(x = AlleleAge_J, y = DAF),bins = 10) +
+  # geom_point(alpha=0.5)+
+  facet_grid(Sub~LoadGroup)+
+  # scale_color_manual(values = col)+
+  # scale_fill_manual(values = col)+
+  # scale_fill_viridis_c(option = "A")+
+  scale_fill_continuous(type="viridis")+
+  scale_x_continuous(trans = "log10",
+                     # breaks = scales::trans_breaks("log10", function(x) 10^x),
+                     labels = scales::trans_format("log10",   scales::math_format(10^.x)))+
+  labs(x="Derived allele age (Years)",y="Derived allele frequency")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 16),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+p
+
+```
+
+
+```{r}
+dabins <- c(0,1,2,4,8,16,32, 64, 128)
+
+df <- dfAlleleAge %>% 
+  mutate(bin=cut(AlleleAge_J/1000,breaks=dabins)) %>%
+  filter(!is.na(LoadGroup), !is.na(bin)) %>% 
+  group_by(Sub,bin) %>% 
+  count(LoadGroup) %>% 
+  mutate(fre=n/sum(n)) 
+
+
+q <- df %>% 
+  # filter(Sub=="A") %>% 
+  ggplot(aes(x=bin, y=fre, color=LoadGroup,group=LoadGroup))+
+  geom_point()+
+  geom_line()+
+  facet_grid(.~Sub)+
+  scale_color_manual(values = col)+
+  scale_x_discrete(label=dabins)+
+  labs(x="Derived allele age (Ka)",y="Deleterious SNPs (%)") +
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+
+ggsave(plot = q, "~/Documents/temp.pdf", width = 5, height = 3)
+
+```
 
 
 
 
 
+
+
+## ************************
 ## ********* 以下是上一版本文件
 ## ********* 以下是上一版本文件
 ## ********* 以下是上一版本文件
