@@ -1,0 +1,733 @@
+---
+title: "Gene expression by tissue vs load"
+author: "Aoyue Bi, Daxing Xu"
+date: "`r Sys.Date()`"
+output: 
+  html_document: # html_notebook, html_document
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
+    # bibliography: bibliography.json
+---
+
+
+# FigS2
+
+```{r setup, echo = T, message = T, warning = F}
+library(tidyverse)
+# library(RColorBrewer)
+# library(ggpubr)
+# library(egg)
+## eval 代码要不要运行
+## echo 代码要不要输出
+## include 图要不要输出
+## warning 警告要不要输出
+## message 默认Bin等信息要不要输出
+```
+
+## 两种不同load计算方法和expression tissue的影响
+## ①Gene Expression and tissue ① 全基因组统计法
+- caption: Deleterious mutation of genes expressed across tissues.
+conclusion: Deleterious mutations are depleted in genes expressed in grain and anther.
+```{r}
+### Step1: 将29万个基因在35个组织中的表达量过滤，只保留高置信度的最长转录本;将Load的结果也合并到HC数据库中
+
+df_expression <- read_tsv("data/011_geneExpression/expressionByTissue.txt.gz")
+
+```
+接上
+```{r}
+dataFile <- c("data/geneExpression/001_geneSummary_hexaploid.txt.gz")
+df_load <- read_tsv(dataFile) %>% 
+  mutate(FreSyn = NumberOfSyn/CDSLength, FreNonsyn = NumberOfNon/CDSLength, FreDel = NumberOfDeleterious/CDSLength, FreHGDel = NumberOfHGDeleterious/CDSLength, RatioNonsynVSSyn = NumberOfNon/NumberOfSyn, RatioDelVSSyn = NumberOfDeleterious/NumberOfSyn, RatioHGDelVSSyn = NumberOfHGDeleterious/NumberOfSyn) %>% 
+  select(Transcripts=Transcript,FreSyn,FreNonsyn,FreDel,FreHGDel, RatioNonsynVSSyn, RatioDelVSSyn, RatioHGDelVSSyn, MeanGerpScore)
+
+
+dataFile <- c("data/geneExpression/geneHC.txt.gz")
+df_geneHC <- read_tsv(dataFile) %>% 
+  rename(Transcripts = Longest_transcript) %>% 
+  left_join(df_expression,by="Transcripts") %>% 
+  left_join(df_load,by="Transcripts") 
+
+# write.table(df_geneHC,file="~/Documents/test.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+```
+接上
+```{r}
+### Step2： 转换表格，将组织表达 -> 长表
+# df_geneHC$`third leaf sheath`
+df_geneHC_long <- df_geneHC %>% 
+  pivot_longer(cols = `Internode #2`:`third leaf sheath`, names_to = "Tissue",values_to = "TPM") %>% 
+  filter(TPM < 0.5)
+```
+接上
+```{r}
+### 计算FreSyn和组织的关系
+dfstatistic <- df_geneHC_long %>%
+  pivot_longer(cols = FreSyn:RatioHGDelVSSyn,names_to = "LoadType",values_to = "LoadValue") %>% 
+  filter(!is.na(LoadValue), is.finite(LoadValue)) %>% 
+  group_by(LoadType,Tissue) %>% 
+  summarise(ave = mean(LoadValue), sd = sd(LoadValue), N = n(), se = sd/sqrt(N))
+
+# write.table(df,file="~/Documents/barplot.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+```
+
+接上- 开始画图
+### fre del
+```{r}
+### 将多个组织的命名方式都添加进去，便于排序画图使用
+dataFile <- c("data/geneExpression/TissueHashMap.txt")
+dfTissueHashMap <- read.delim(dataFile) %>% 
+  rename(Tissue = Tissue_inRHeader)
+
+AoCase <- "FreHGDel"
+
+df <- dfstatistic %>% 
+  left_join(.,dfTissueHashMap,by="Tissue") %>% 
+  filter(LoadType == AoCase) %>% 
+  mutate(High_level_tissue=factor(High_level_tissue,levels = c("roots","leaves/shoots","spike","grain"))) %>% 
+  arrange(High_level_tissue,-ave) ## 注意排序！！！
+
+### 画图的时候根据数据框的顺序画出来
+### 35 个组织的顺序定义
+df$Tissue_inOri <- factor(df$Tissue_inOri,levels = df$Tissue_inOri)
+
+colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
+
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=ave,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+                 position=position_dodge(.9))+
+  labs(x="",y= "Frequency of del SNPs in CDS")+
+  geom_hline(yintercept = 0.00016, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+ 
+ggsave(p,filename = "~/Documents/freDel.pdf",height = 5,width = 7)
+
+```
+### fre syn
+```{r}
+### 将多个组织的命名方式都添加进去，便于排序画图使用
+dataFile <- c("data/geneExpression/TissueHashMap.txt")
+dfTissueHashMap <- read.delim(dataFile) %>% 
+  rename(Tissue = Tissue_inRHeader)
+
+AoCase <- "FreSyn"
+
+df <- dfstatistic %>% 
+  left_join(.,dfTissueHashMap,by="Tissue") %>% 
+  filter(LoadType == AoCase) %>% 
+  mutate(High_level_tissue=factor(High_level_tissue,levels = c("roots","leaves/shoots","spike","grain"))) %>% 
+  arrange(High_level_tissue,-ave) ## 注意排序！！！
+
+### 画图的时候根据数据框的顺序画出来
+### 35 个组织的顺序定义
+df$Tissue_inOri <- factor(df$Tissue_inOri,levels = df$Tissue_inOri)
+colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
+
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=ave,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+                 position=position_dodge(.9))+
+  labs(x="",y= "Frequency of syn SNPs in CDS")+
+  # geom_hline(yintercept = 0.00016, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+ 
+ggsave(p,filename = "~/Documents/freSyn.pdf",height = 5,width = 7)
+
+```
+### fre nonsyn
+```{r}
+### 将多个组织的命名方式都添加进去，便于排序画图使用
+dataFile <- c("data/geneExpression/TissueHashMap.txt")
+dfTissueHashMap <- read.delim(dataFile) %>% 
+  rename(Tissue = Tissue_inRHeader)
+
+AoCase <- "FreNonsyn"
+
+df <- dfstatistic %>% 
+  left_join(.,dfTissueHashMap,by="Tissue") %>% 
+  filter(LoadType == AoCase) %>% 
+  mutate(High_level_tissue=factor(High_level_tissue,levels = c("roots","leaves/shoots","spike","grain"))) %>% 
+  arrange(High_level_tissue,-ave) ## 注意排序！！！
+
+### 画图的时候根据数据框的顺序画出来
+### 35 个组织的顺序定义
+df$Tissue_inOri <- factor(df$Tissue_inOri,levels = df$Tissue_inOri)
+colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
+
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=ave,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+                 position=position_dodge(.9))+
+  labs(x="",y= "Frequency of nonsyn SNPs in CDS")+
+  # geom_hline(yintercept = 0.00016, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+ 
+ggsave(p,filename = "~/Documents/freNonsyn.pdf",height = 5,width = 7)
+
+```
+### ratio del/syn
+```{r}
+### 将多个组织的命名方式都添加进去，便于排序画图使用
+dataFile <- c("data/geneExpression/TissueHashMap.txt")
+dfTissueHashMap <- read.delim(dataFile) %>% 
+  rename(Tissue = Tissue_inRHeader)
+
+AoCase <- "RatioHGDelVSSyn"
+
+df <- dfstatistic %>% 
+  left_join(.,dfTissueHashMap,by="Tissue") %>% 
+  filter(LoadType == AoCase) %>% 
+  mutate(High_level_tissue=factor(High_level_tissue,levels = c("roots","leaves/shoots","spike","grain"))) %>% 
+  arrange(High_level_tissue,-ave) ## 注意排序！！！
+
+### 画图的时候根据数据框的顺序画出来
+### 35 个组织的顺序定义
+df$Tissue_inOri <- factor(df$Tissue_inOri,levels = df$Tissue_inOri)
+colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
+
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=ave,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+                 position=position_dodge(.9))+
+  labs(x="",y= "Del/syn SNPs in CDS")+
+  geom_hline(yintercept = 0.1348, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+ 
+ggsave(p,filename = "~/Documents/RatioHGDelVSSyn.pdf",height = 5,width = 7)
+
+### 查看每个组织有多少个基因含有burden值
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=N,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  labs(x="",y= "Gene number with strongly burden")+
+  geom_hline(yintercept = 0.0318, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+
+```
+
+### ratio nonsyn/syn
+```{r}
+### 将多个组织的命名方式都添加进去，便于排序画图使用
+dataFile <- c("data/geneExpression/TissueHashMap.txt")
+dfTissueHashMap <- read.delim(dataFile) %>% 
+  rename(Tissue = Tissue_inRHeader)
+
+AoCase <- "RatioNonsynVSSyn"
+
+df <- dfstatistic %>% 
+  left_join(.,dfTissueHashMap,by="Tissue") %>% 
+  filter(LoadType == AoCase) %>% 
+  mutate(High_level_tissue=factor(High_level_tissue,levels = c("roots","leaves/shoots","spike","grain"))) %>% 
+  arrange(High_level_tissue,-ave) ## 注意排序！！！
+
+### 画图的时候根据数据框的顺序画出来
+### 35 个组织的顺序定义
+df$Tissue_inOri <- factor(df$Tissue_inOri,levels = df$Tissue_inOri)
+colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
+
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=ave,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+                 position=position_dodge(.9))+
+  labs(x="",y= "Nonsyn/syn SNPs in CDS")+
+  # geom_hline(yintercept = 0.00016, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+ 
+ggsave(p,filename = "~/Documents/RatioNonsynVSSyn.pdf",height = 5,width = 7)
+
+```
+
+## 查看不同列变量的分布趋势
+```{r}
+ggplot(df_geneHC_long,aes(x=FreSyn))+
+  geom_histogram()
+
+ggplot(df_geneHC_long,aes(x=FreHGDel))+
+  geom_histogram()
+
+ggplot(df_geneHC_long,aes(x=RatioHGDelVSSyn))+
+  geom_histogram()
+
+ggplot(df_geneHC_long,aes(x= RatioNonsynVSSyn))+
+  geom_histogram()
+
+ggplot(df_geneHC_long,aes(x= RatioHGDelVSSyn))+
+  geom_histogram()
+
+```
+
+
+
+
+## ②Gene Expression and tissue ② mutation burden
+- caption: Deleterious mutation of genes expressed across tissues.
+conclusion: Deleterious mutations are depleted in genes expressed in grain and anther.
+```{r}
+### Step1: 将29万个基因在35个组织中的表达量过滤，只保留高置信度的最长转录本;将Load的结果也合并到HC数据库中
+### 第一个数据框
+dataFile <- c("data/geneExpression/expressionByTissue.txt.gz")
+df_expression <- read.delim(dataFile)
+```
+接上
+```{r}
+### 第二个数据框
+dataFile <- c("data/geneExpression/geneBurdenByIndi/GeneBurden.txt.gz")
+df_load <- read.delim(dataFile) %>%
+  rename(Gene = geneName)
+
+
+dataFile <- c("data/geneExpression/geneHC.txt.gz")
+df_geneHC <- read.delim(dataFile) %>%
+  rename(Transcripts = Longest_transcript) %>%
+  left_join(.,df_expression,by="Transcripts")  ###合并第1个数据框
+
+## expression 文件与load文件合并
+  df_expression_load <- df_load %>%
+    left_join(.,df_geneHC,by="Gene")  ###合并第2个数据框
+
+# write.table(df_geneHC,file="~/Documents/test.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+```
+接上
+```{r}
+### Step2： 转换表格，将组织表达 -> 长表
+df_expression_load_long <- df_expression_load %>%
+  pivot_longer(.,cols = Internode..2:third.leaf.sheath, names_to = "Tissue",values_to = "TPM") %>%
+  filter(TPM < 0.5)
+```
+接上
+```{r}
+### 计算load和组织的关系
+dfstatistic <- df_expression_load_long %>%
+  # pivot_longer(.,cols = FreSyn:RatioHGDelVSSyn,names_to = "LoadType",values_to = "LoadValue") %>%
+  filter(!is.na(mean_burden), is.finite(mean_burden)) %>%
+  group_by(SlightlyOrStrongly,Tissue) %>% ### 计算不同分类下，不同组织load的平均值 标准差
+  summarise(ave = mean(mean_burden), sd = sd(mean_burden), n= n(), se = sd/sqrt(n))
+
+write.table(dfstatistic,file="~/Documents/barplot.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+```
+
+接上- 开始画图
+### strongly burden by individual
+```{r}
+### 将多个组织的命名方式都添加进去，便于排序画图使用
+dataFile <- c("data/geneExpression/TissueHashMap.txt")
+dfTissueHashMap <- read.delim(dataFile) %>%
+  rename(Tissue = Tissue_inRHeader)
+
+AoCase <- "StronglyBurden"
+
+df <- dfstatistic %>%
+  left_join(.,dfTissueHashMap,by="Tissue") %>%
+  filter(SlightlyOrStrongly == AoCase) %>%
+  mutate(High_level_tissue=factor(High_level_tissue,levels = c("roots","leaves/shoots","spike","grain"))) %>%
+  arrange(High_level_tissue,-ave) ## 注意排序！！！
+
+### 画图的时候根据数据框的顺序画出来
+### 35 个组织的顺序定义
+df$Tissue_inOri <- factor(df$Tissue_inOri,levels = df$Tissue_inOri)
+
+colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
+
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=ave,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+                 position=position_dodge(.9))+
+  labs(x="",y= "Strongly burden in CDS")+
+  geom_hline(yintercept = 0.0318, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+ggsave(p,filename = "~/Documents/stronglyBurden_in_Tissue.pdf",height = 5,width = 7)
+
+### 查看每个组织有多少个基因含有burden值
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=n,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  labs(x="",y= "Gene number with strongly burden")+
+  geom_hline(yintercept = 0.0318, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+```
+
+### slightly burden by individual
+```{r}
+### 将多个组织的命名方式都添加进去，便于排序画图使用
+dataFile <- c("data/geneExpression/TissueHashMap.txt")
+dfTissueHashMap <- read.delim(dataFile) %>%
+  rename(Tissue = Tissue_inRHeader)
+
+AoCase <- "SlightlyBurden"
+
+df <- dfstatistic %>%
+  left_join(.,dfTissueHashMap,by="Tissue") %>%
+  filter(SlightlyOrStrongly == AoCase) %>%
+  mutate(High_level_tissue=factor(High_level_tissue,levels = c("roots","leaves/shoots","spike","grain"))) %>%
+  arrange(High_level_tissue,-ave) ## 注意排序！！！
+
+### 画图的时候根据数据框的顺序画出来
+### 35 个组织的顺序定义
+df$Tissue_inOri <- factor(df$Tissue_inOri,levels = df$Tissue_inOri)
+
+colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
+
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=ave,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+                 position=position_dodge(.9))+
+  labs(x="",y= "Slightly burden in CDS")+
+  geom_hline(yintercept = 0.6534, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+ggsave(p,filename = "~/Documents/slightlyBurden_in_Tissue.pdf",height = 5,width = 7)
+
+### 查看每个组织有多少个基因含有burden值
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=n,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  labs(x="",y= "Gene number with strongly burden")+
+  geom_hline(yintercept = 0.0318, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+
+```
+### 提取数据，得到indivi burden的基因突变负荷表格
+```{r}
+
+dataFile <- c("data/geneExpression/geneBurdenByIndi/GeneBurden.txt.gz")
+df_load <- read.delim(dataFile) %>%
+  rename(Gene = geneName)
+
+dataFile <- c("data/geneExpression/geneHC.txt.gz")
+df_geneHC <- read.delim(dataFile)
+
+df_load_strong <- df_load %>%
+  left_join(.,df_geneHC,by="Gene") %>%  ###合并第2个数据框
+  select(Gene,Chr,TranStart,TranEnd,CDSLength,SlightlyOrStrongly,mean_burden,sd_burden,rsd) %>%
+  filter(SlightlyOrStrongly == "StronglyBurden", !is.na(mean_burden))
+
+write.table(df_load_strong,file="~/Documents/001_geneExpression_StronglyLoad.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+
+df_load_slight <- df_load %>%
+  left_join(.,df_geneHC,by="Gene") %>%  ###合并第2个数据框
+  select(Gene,Chr,TranStart,TranEnd,CDSLength,SlightlyOrStrongly,mean_burden,sd_burden,rsd) %>%
+  filter(SlightlyOrStrongly == "SlightlyBurden", !is.na(mean_burden))
+
+write.table(df_load_slight,file="~/Documents/001_geneExpression_SlightlyLoad.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+```
+
+
+
+## ③Gene Expression and tissue ②③mutation burden
+- caption: Deleterious mutation of genes expressed across tissues.
+conclusion: Deleterious mutations are depleted in genes expressed in grain and anther.
+```{r}
+### Step1: 将29万个基因在35个组织中的表达量过滤，只保留高置信度的最长转录本;将Load的结果也合并到HC数据库中
+### 第一个数据框
+dataFile <- c("data/geneExpression/expressionByTissue.txt.gz")
+df_expression <- read.delim(dataFile)
+```
+接上
+```{r}
+### 第二个数据框
+dataFile <- c("data/geneExpression/geneBurdenByIndi/geneBurden_byIndiviSum.txt.gz")
+df_load <- read.delim(dataFile) %>%
+  rename(Gene = geneName)
+
+
+dataFile <- c("data/geneExpression/geneHC.txt.gz")
+df_geneHC <- read.delim(dataFile) %>%
+  rename(Transcripts = Longest_transcript) %>%
+  left_join(.,df_expression,by="Transcripts")  ###合并第1个数据框
+
+## expression 文件与load文件合并
+  df_expression_load <- df_load %>%
+    left_join(.,df_geneHC,by="Gene")  ###合并第2个数据框
+
+# write.table(df_geneHC,file="~/Documents/test.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+```
+接上
+```{r}
+### Step2： 转换表格，将组织表达 -> 长表
+df_expression_load_long <- df_expression_load %>%
+  pivot_longer(.,cols = Internode..2:third.leaf.sheath, names_to = "Tissue",values_to = "TPM") %>%
+  filter(TPM < 0.5) %>%
+  pivot_longer(.,cols = c(StronglyBurden,SlightlyBurden),names_to = "SlightlyOrStrongly",values_to = "BurdenbyIndiSum")
+```
+接上
+```{r}
+### 计算load和组织的关系
+dfstatistic <- df_expression_load_long %>%
+  # pivot_longer(.,cols = FreSyn:RatioHGDelVSSyn,names_to = "LoadType",values_to = "LoadValue") %>%
+  filter(!is.na(BurdenbyIndiSum), is.finite(BurdenbyIndiSum)) %>%
+  group_by(SlightlyOrStrongly,Tissue) %>% ### 计算不同分类下，不同组织load的平均值 标准差
+  summarise(ave = mean(BurdenbyIndiSum), sd = sd(BurdenbyIndiSum), n= n(), se = sd/sqrt(n))
+
+write.table(dfstatistic,file="~/Documents/barplot.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+```
+
+接上- 开始画图
+### strongly burden by individual
+```{r}
+### 将多个组织的命名方式都添加进去，便于排序画图使用
+dataFile <- c("data/geneExpression/TissueHashMap.txt")
+dfTissueHashMap <- read.delim(dataFile) %>%
+  rename(Tissue = Tissue_inRHeader)
+
+AoCase <- "StronglyBurden"
+
+df <- dfstatistic %>%
+  left_join(.,dfTissueHashMap,by="Tissue") %>%
+  filter(SlightlyOrStrongly == AoCase) %>%
+  mutate(High_level_tissue=factor(High_level_tissue,levels = c("roots","leaves/shoots","spike","grain"))) %>%
+  arrange(High_level_tissue,-ave) ## 注意排序！！！
+
+### 画图的时候根据数据框的顺序画出来
+### 35 个组织的顺序定义
+df$Tissue_inOri <- factor(df$Tissue_inOri,levels = df$Tissue_inOri)
+
+colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
+
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=ave,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+                 position=position_dodge(.9))+
+  labs(x="",y= "Strongly burden in CDS")+
+  geom_hline(yintercept = 1.3076, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+ggsave(p,filename = "~/Documents/stronglyBurden_in_Tissue.pdf",height = 5,width = 7)
+
+### 查看每个组织有多少个基因含有burden值
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=n,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  labs(x="",y= "Gene number with strongly burden")+
+  geom_hline(yintercept = 1.3076, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+```
+
+### slightly burden by individual
+```{r}
+### 将多个组织的命名方式都添加进去，便于排序画图使用
+dataFile <- c("data/geneExpression/TissueHashMap.txt")
+dfTissueHashMap <- read.delim(dataFile) %>%
+  rename(Tissue = Tissue_inRHeader)
+
+AoCase <- "SlightlyBurden"
+
+df <- dfstatistic %>%
+  left_join(.,dfTissueHashMap,by="Tissue") %>%
+  filter(SlightlyOrStrongly == AoCase) %>%
+  mutate(High_level_tissue=factor(High_level_tissue,levels = c("roots","leaves/shoots","spike","grain"))) %>%
+  arrange(High_level_tissue,-ave) ## 注意排序！！！
+
+### 画图的时候根据数据框的顺序画出来
+### 35 个组织的顺序定义
+df$Tissue_inOri <- factor(df$Tissue_inOri,levels = df$Tissue_inOri)
+
+colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
+
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=ave,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+                 position=position_dodge(.9))+
+  labs(x="",y= "Slightly burden in CDS")+
+  geom_hline(yintercept = 0.6534, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+ggsave(p,filename = "~/Documents/slightlyBurden_in_Tissue.pdf",height = 5,width = 7)
+
+### 查看每个组织有多少个基因含有burden值
+p <- df %>%
+  ggplot(aes(x= Tissue_inOri, y=n,fill = High_level_tissue)) +
+   geom_bar(stat="identity", position=position_dodge()) +
+  labs(x="",y= "Gene number with strongly burden")+
+  geom_hline(yintercept = 0.0318, color = "gray",linetype="dashed")+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  scale_fill_manual(values = colB)+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 12))
+
+p
+
+
+```
+### 提取数据，得到indivi burden的基因突变负荷表格
+```{r}
+
+dataFile <- c("data/geneExpression/geneBurdenByIndi/GeneBurden.txt.gz")
+df_load <- read.delim(dataFile) %>%
+  rename(Gene = geneName)
+
+dataFile <- c("data/geneExpression/geneHC.txt.gz")
+df_geneHC <- read.delim(dataFile)
+
+df_load_strong <- df_load %>%
+  left_join(.,df_geneHC,by="Gene") %>%  ###合并第2个数据框
+  select(Gene,Chr,TranStart,TranEnd,CDSLength,SlightlyOrStrongly,mean_burden,sd_burden,rsd) %>%
+  filter(SlightlyOrStrongly == "StronglyBurden", !is.na(mean_burden))
+
+write.table(df_load_strong,file="~/Documents/001_geneExpression_StronglyLoad.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+
+df_load_slight <- df_load %>%
+  left_join(.,df_geneHC,by="Gene") %>%  ###合并第2个数据框
+  select(Gene,Chr,TranStart,TranEnd,CDSLength,SlightlyOrStrongly,mean_burden,sd_burden,rsd) %>%
+  filter(SlightlyOrStrongly == "SlightlyBurden", !is.na(mean_burden))
+
+write.table(df_load_slight,file="~/Documents/001_geneExpression_SlightlyLoad.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+```
+
+
+
+
+
+ 
+
+
+

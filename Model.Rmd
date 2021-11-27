@@ -17,7 +17,7 @@ output:
 
 # FigS
 
-```{r setup, echo =F, message = T, warning = F}
+```{r setup, echo =T, message = T, warning = F}
 library(tidyverse)
 # library(RColorBrewer)
 library(ggpubr)
