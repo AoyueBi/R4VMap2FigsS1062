@@ -622,9 +622,10 @@ p <- ggplot()+
   theme(panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
     legend.position = 'none',
-    text = element_text(size = 14))
+    text = element_text(size = 9))
 p
-ggsave(p,filename = "figs/Fig2/misc/Gene_MAF_LoadGroup.pdf",height = 3,width = 6)
+# ggsave(p,filename = "figs/Fig2/misc/Gene_MAF_LoadGroup.pdf",height = 3,width = 6)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
 
 ```
 
@@ -735,11 +736,11 @@ p <- df %>%
       panel.background = element_blank(),
       axis.line = element_line(size=0.4, colour = "black"),
       legend.position = 'none',
-      text = element_text(size = 16))
+      text = element_text(size = 9))
 
 
 p
-ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_CDF_scale_x.pdf")),height = 3,width = 4)
+ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_CDF_scale_x.pdf")),height = 2.22,width = 1.8)
 }
 
 ```
@@ -1600,12 +1601,14 @@ p <- dfAlleleAge %>%
         legend.background = element_rect(fill="transparent"),
         strip.background = element_blank(),
         axis.line = element_blank(),
-        text = element_text(size = 16),
+        text = element_text(size = 9),
         panel.border = element_rect(colour = "black",fill = "transparent"))
 p
 
-```
+ggsave(p, filename = "~/Documents/test.pdf", height = 2.22, width = 3.6)
 
+```
+### D: Del proportion on diff allele age 
 ```{r}
 dabins <- c(0,1,2,4,8,16,32, 64, 128)
 # ### 分亚基因组
@@ -1645,44 +1648,41 @@ df <- dfAlleleAge %>%
   count(LoadGroup) %>% 
   mutate(fre=n/sum(n)) 
 
-q <- df %>% 
+p <- df %>% 
   ggplot(aes(x=bin, y=fre, color=LoadGroup,group=LoadGroup))+
   geom_point()+
   geom_line()+
   scale_color_manual(values = col)+
   scale_x_discrete(label=dabins)+
   labs(x="Derived allele age (Ka)",y="Deleterious SNPs (%)") +
-  theme_classic()+
-  theme(legend.title = element_blank(),
-        legend.position = "none",
-        legend.background = element_rect(fill="transparent"),
-        strip.background = element_blank(),
-        axis.line = element_blank(),
-        panel.border = element_rect(colour = "black",fill = "transparent"))
-q
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 9))
 
-ggsave(plot = q, "~/Documents/temp.pdf", width = 2.22, height = 3.6)
+p
+
+ggsave(plot = p, "~/Documents/test.pdf", height = 2.22,width = 1.8)
 
 ```
 
 #### =======================
 ## Gene expression
-```{r message=FALSE, warning=FALSE}
+```{r}
 df_burden1 <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneBurden.averageIndividualBurden.txt.gz")
 df_expression <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneExpression.averageTPM.txt.gz")
 
 df_burden1_expression <- df_burden1 %>% 
   left_join(y = df_expression,by = c("geneName"="Gene")) %>% 
   filter(!is.na(Subgenome))
-```
 
-```{r}
 temp <- df_burden1_expression %>% 
   # filter(SlightlyOrStrongly=="StronglyBurden") %>%
   mutate(TPM_mean_log = log2(TPM_mean)) %>% 
   mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0)) %>% 
   group_by(SlightlyOrStrongly, Subgenome,bin) %>% 
-  count() %>% 
+  count() %>%   
   filter(n > 20, !is.na(bin))
 
 colN1 <- brewer.pal(9,"Reds")[c(7)]
@@ -1693,6 +1693,7 @@ colN2 <- brewer.pal(9,"Reds")[c(9)]
 colB <- c(colN1,colA,colC,colN2)
 # colB <- colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(40)
 # xLabel <- expression(2^{-12},"",2^{-8},"",2^{-4},"",2^{0},"",2^{4},"",2^{8},"")
+# xLabel <- expression("",2^{-12},"","",2^{-9},"","",2^{-6},"","",2^{-3},"","",2^{0},"","",2^{3},"","",2^{6},"","",2^{9})
 xLabel <- expression("",2^{-12},"","",2^{-9},"","",2^{-6},"","",2^{-3},"","",2^{0},"","",2^{3},"","",2^{6},"","",2^{9})
 p <- df_burden1_expression %>% 
   filter(SlightlyOrStrongly=="StronglyBurden") %>%
@@ -1703,30 +1704,29 @@ p <- df_burden1_expression %>%
 # stat_boxplot(geom = "errorbar",width=0.05,position = position_dodge(1))+ # add error bar
 # geom_boxplot(aes(fill=bin),outlier.shape = NA) +
 # geom_point(position = position_jitter(width = 0.2), size=0.1)+
-stat_summary(fun=median, geom="point", color="blue",
-             position = position_dodge(1),
-             size=0.1)+
-  stat_summary(aes(color=bin),fun.data = mean_se)+
-scale_fill_manual(values = colB)+
+# stat_summary(fun=median, geom="point", color="blue",
+#              position = position_dodge(1),
+#              size=0.1)+
+  stat_summary(aes(color=bin),fun.data = mean_se,size=0.2)+
+  scale_fill_manual(values = colB)+
   # facet_grid(SlightlyOrStrongly~.,scales = "free")+
   labs(x="TPM", y= "Gene burden")+
   # scale_y_continuous(trans = "log2",
   #                    breaks = trans_breaks("log2",function(x) 2^x),
   #                    labels = trans_format("log2",math_format(2^.x)))+
-  scale_x_discrete(labels=xLabel)+
-scale_color_manual(values = colB)+
+  scale_x_discrete(breaks=c("(-12,-11]","(-9,-8]","(-6,-5]","(-3,-2]","(0,1]","(3,4]","(6,7]","(9,10]"),
+                   labels=expression(2^{-12},2^{-9},2^{-6},2^{-3},2^{0},2^{3},2^{6},2^{9}))+
+  # scale_x_discrete(labels=xLabel)+
+  scale_color_manual(values = colB)+
   coord_cartesian(ylim = c(0,0.04))+
-theme_classic()+
-  theme(legend.title = element_blank(),
-        # legend.position = c(0.2,0.8),
-        legend.background = element_rect(fill="transparent"),
-        strip.background = element_blank(),
-        axis.line = element_blank(),
-        legend.position = 'none',
-        panel.border = element_rect(colour = "black",fill = "transparent"))
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 9))
 
 p
-ggsave(plot = p, "~/Documents//Burden1_vs_TPM.pdf",width = 4, height = 3)
+ggsave(plot = p, "~/Documents//Burden1_vs_TPM.pdf",height = 2,width = 2)
 
 ```
 
@@ -1735,7 +1735,7 @@ ggsave(plot = p, "~/Documents//Burden1_vs_TPM.pdf",width = 4, height = 3)
 - caption: Deleterious mutation of genes expressed across tissues.
 conclusion: Deleterious mutations are depleted in genes expressed in grain and anther.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 ### Step1: 将29万个基因在35个组织中的表达量过滤，只保留高置信度的最长转录本;将Load的结果也合并到HC数据库中
 ### 第一个数据框
 df_expression <- read_tsv("data/011_geneExpression/expressionByTissue.txt.gz")
@@ -1756,11 +1756,9 @@ df_geneHC <- read_tsv(dataFile) %>%
     left_join(.,df_geneHC,by="Gene")  ###合并第2个数据框
 
 # write.table(df_geneHC,file="~/Documents/test.txt",quote=F,col.name=T,row.names=F,sep = "\t")
-
-```
-接上
-```{r}
-### Step2： 转换表格，将组织表达 -> 长表
+  
+  
+  ### Step2： 转换表格，将组织表达 -> 长表
 df_expression_load_long <- df_expression_load %>%
   pivot_longer(.,cols = "Internode #2":"third leaf sheath", names_to = "Tissue",values_to = "TPM") %>%
   filter(TPM < 0.5)
@@ -1772,9 +1770,9 @@ dfstatistic <- df_expression_load_long %>%
   group_by(SlightlyOrStrongly,Tissue) %>% ### 计算不同分类下，不同组织load的平均值 标准差
   summarise(ave = mean(mean_burden), sd = sd(mean_burden), n= n(), se = sd/sqrt(n))
 
-write.table(dfstatistic,file="~/Documents/barplot.txt",quote=F,col.name=T,row.names=F,sep = "\t")
-```
+# write.table(dfstatistic,file="~/Documents/barplot.txt",quote=F,col.name=T,row.names=F,sep = "\t")
 
+```
 
 接上- 开始画图
 ### strongly burden by individual
@@ -1800,10 +1798,12 @@ colB <- c("#9a784c","#749b64","#e6b700","#b3b563") ## 4个组织的颜色
 
 p <- df %>%
   ggplot(aes(x= Tissue, y=ave,fill = High_level_tissue)) +
-   geom_bar(stat="identity", position=position_dodge()) +
-  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.2,
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=ave-se, ymax=ave+se), width=.1,
+                # color="gray",
                  position=position_dodge(.9))+
-  labs(x="",y= "Strongly burden in CDS")+
+  # labs(x="",y= "Strongly burden in CDS")+
+  labs(x="",y= "Mutation burden")+
   geom_hline(yintercept = 0.0095, color = "gray",linetype="dashed")+
   theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
   scale_fill_manual(values = colB)+
@@ -1812,14 +1812,14 @@ p <- df %>%
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7)
     ,legend.position = 'none'
-    ,text = element_text(size = 12))
+    ,text = element_text(size = 8))
 
 p
 
-ggsave(p,filename = "~/Documents/stronglyBurden_in_Tissue.pdf",height = 5,width = 7)
+ggsave(p,filename = "~/Documents/stronglyBurden_in_Tissue.pdf",height = 3,width = 4.2)
 
 ### 查看每个组织有多少个基因含有burden值
-p <- df %>%
+q <- df %>%
   ggplot(aes(x= Tissue, y=n,fill = High_level_tissue)) +
    geom_bar(stat="identity", position=position_dodge()) +
   labs(x="",y= "Gene number with strongly burden")+
@@ -1833,7 +1833,7 @@ p <- df %>%
     ,legend.position = 'none'
     ,text = element_text(size = 12))
 
-p
+q
 
 ```
 
@@ -1899,35 +1899,93 @@ p
 ```
 
 #### ========================
+## whole genome scan
 ```{r}
-library(ggplot2)
-library(windowscanr)
-library(stringr)
-df <- read_tsv("data/006_Fig2/genomeScan/002_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt")
+### step1:根据原来数据框，求出 2方面值，1：单位CDS的结果，2：有害突变和同义突变的比
+# library(tidyverse)
+# df <- read_tsv("data/006_Fig2/genomeScan/002_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt")
+# 
+# df1 <- df %>% 
+#   mutate(SynFre=.$a001_synonymous/.$CDSLength,
+#          NonsynFre=.$a002_nonsynonymous/.$CDSLength,
+#          DelFre=.$a003_nonsynGERPandDerivedPPH2/.$CDSLength,
+#          PPH2Fre=.$a004_nonsynDerivedPPH2/.$CDSLength,
+#          GERPFre=.$a005_GERP_16way/.$CDSLength,
+#          StopGainFre=.$a006_StopGain/.$CDSLength,
+#          ### ratio
+#          NonsynSynRatio=.$a002_nonsynonymous/.$a001_synonymous,
+#          DelSynRatio=.$a003_nonsynGERPandDerivedPPH2/.$a001_synonymous,
+#          PPH2SynRatio=.$a004_nonsynDerivedPPH2/.$a001_synonymous,
+#          GERPSynRatio=.$a005_GERP_16way/.$a001_synonymous,
+#          StopGainSynRatio=.$a006_StopGain/.$a001_synonymous
+#          )
+# write_tsv(df1,"data/006_Fig2/genomeScan/003_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt")
 
-### 去除DelSynRatio为NA的行
-df <- subset(df,!is.na(df$DelSynRatio))
-df <- subset(df,!is.na(df$RecombinationRate))
-### check del/syn 最大值和最小值
-max(df$DelSynRatio)
-min(df$DelSynRatio)
-max(df$RecombinationRate)
-min(df$RecombinationRate)
-colB <- c("#fffcd4","#1e3c84","#3ab4c4","#3ab4c4","#1e3c84")
-rec <- data.frame(x1=c(0,9,28,50,80), x2=c(9,28,50,80,100), y1=c(-Inf,-Inf,-Inf,-Inf,-Inf), y2=c(Inf,Inf,Inf,Inf,Inf), region=c('R1','R2a','C','R2b','R3'))
-
-pos_win <- winScan(x = df, 
-                   groups = "CHROM", 
-                   position = "BIN_START_scale" , 
-                   values = c("DelSynRatio", "RecombinationRate"), 
-                   win_size = 5,
-                   win_step = 2,
-                   funs = c("mean", "sd"))
-
-head(pos_win)
-df <- pos_win
-df <- mutate(df,Sub=substring(df$CHROM,2,2))
+### step2:根据step1的结果，求出 windowScan 滑窗后的数据框
+# library(tidyverse)
+# library(windowscanr)
+# df1 <- read_tsv("data/006_Fig2/genomeScan/003_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt") 
+# 
+# df <- df1 %>% 
+#   filter(!is.na(.$DelSynRatio),!is.na(.$RecombinationRate)) 
+# 
+# ### check del/syn 最大值和最小值
+# max(df$DelSynRatio)
+# min(df$DelSynRatio)
+# max(df$RecombinationRate)
+# min(df$RecombinationRate)
+# 
+# pos_win <- winScan(x = df, 
+#                    groups = "CHROM", 
+#                    position = "BIN_START_scale" , 
+#                    values = c("NonsynSynRatio", 
+#                               "DelSynRatio",
+#                               "PPH2SynRatio",
+#                               "GERPSynRatio",
+#                               "StopGainSynRatio",
+#                               "RecombinationRate"), 
+#                    win_size = 5,
+#                    win_step = 2,
+#                    funs = c("mean", "sd"))
+# 
+# head(pos_win)
+# df <- pos_win
+# df3 <- mutate(df,Sub=substring(df$CHROM,2,2))
+# df <- df3
+# 
+# write_tsv(df,"data/006_Fig2/genomeScan/004_delVSsynOnChr_windowScanbyRpackage.txt")
 ```
+## plot
+```{r}
+df <- read_tsv("data/006_Fig2/genomeScan/004_delVSsynOnChr_windowScanbyRpackage.txt")
+
+# rec <- data.frame(x1=c(0,9,28,50,80), x2=c(9,28,50,80,100), y1=c(-Inf,-Inf,-Inf,-Inf,-Inf), y2=c(Inf,Inf,Inf,Inf,Inf), region=c('R1','R2a','C','R2b','R3'))
+colB <- c("#fffcd4","#1e3c84","#3ab4c4","#3ab4c4","#1e3c84")
+p <- df %>% 
+  ggplot()+
+  # geom_rect(data=rec, mapping=aes(xmin=x1, xmax=x2, ymin=y1, ymax=y2,fill=region))+
+  annotate(geom = "rect", xmin = 28.14,xmax = 53.08, ymin = -Inf, ymax = Inf, fill = "#fffcd4",alpha = 1)+
+  geom_line(mapping=aes(x=df$win_start,y=df$DelSynRatio_mean,group=CHROM),col='#F4A460')+
+  stat_smooth(mapping=aes(x=df$win_start,y=df$DelSynRatio_mean),col = "#d5311c",method = "loess",formula = y~x,span = 0.04,se=F,size=1) +
+  # geom_point()+
+  geom_line(mapping=aes(x=df$win_start,y=df$RecombinationRate_mean/2,group=CHROM),col='#56B4E9')+
+  stat_smooth(df, mapping=aes(x=df$win_start,y=df$RecombinationRate_mean/2),col = "blue",method = "loess",formula = y~x,span = 0.04,se=F,size=1) +
+    # geom_point(df_centromere,mapping = aes(x=x,y=y),color='black',size=0.5)+
+  xlab("Scale position")+ylab("Del SNPs/syn SNPs") +
+  theme(legend.position = 'none')+
+  scale_fill_manual(values = colB)+
+  scale_y_continuous(expand = c(0, 0),sec.axis = sec_axis(~.*2, name="Recombination rate"))+
+  scale_x_continuous(expand = c(0, 0))+
+  theme(
+    # plot.margin=unit(rep(1,4),'lines'),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 9))
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
+```
+
 
 
 
