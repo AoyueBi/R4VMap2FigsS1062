@@ -273,7 +273,7 @@ ggsave(plot = p, "~/Documents/test.pdf", width = 3, height = 5)
 
 ## Deleterious count
 
-### 区分亚基因组
+### 1.区分亚基因组
 
 ```{r}
 ### GERP & PPH2 方法定义有害突变
@@ -303,8 +303,8 @@ df2 <- dftotal %>%
   mutate(fre=n/sum(n)) %>% 
   arrange(Sub,desc(LoadGroup))
 
-df2
 
+### *****************************plot***********************************************
 colB <- c("#d5311c","#e69f00","#004680")
 df$LoadGroup <- factor(df$LoadGroup,levels = c("Deleterious","Nonsynonymous","Synonymous"))
 
@@ -325,7 +325,6 @@ ggplot(aes(x=Sub,y=n,fill=LoadGroup))+
 p
 
 ### 只画柱状图 stack
-
 p <- df %>% 
   ggplot(aes(x=Sub, y=n,fill=LoadGroup)) +
   geom_bar(stat="identity",alpha = 1)+  #,position=position_dodge()
@@ -355,7 +354,7 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 
 ```
 
-### 不区分亚基因组
+### 2.不区分亚基因组
 
 ```{r}
 ### 不区分亚基因组
@@ -387,8 +386,8 @@ df2 <- dftotal %>%
   mutate(fre=n/sum(n)) %>% 
   arrange(desc(LoadGroup))
 
-df2
 
+### *****************************plot***********************************************
 colB <- c("#d5311c","#e69f00","#004680")
 df$LoadGroup <- factor(df$LoadGroup,levels = c("Deleterious","Nonsynonymous","Synonymous"))
 
@@ -408,6 +407,8 @@ ggplot(aes(x=LoadGroup,y=n,fill=LoadGroup))+
 
 p
 ```
+
+
 
 #### ===== Gene level ================
 
@@ -1730,6 +1731,14 @@ ggsave(plot = p, "~/Documents//Burden1_vs_TPM.pdf",height = 2,width = 2)
 
 ```
 
+```{r}
+dff <- df_burden1_expression %>% 
+  filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  mutate(TPM_mean_log = log2(TPM_mean)) %>% 
+  filter(!is.na(mean_burden), is.finite(mean_burden),mean_burden!=0)
+```
+
+
 
 ## Tissue expression VS mutation burden
 - caption: Deleterious mutation of genes expressed across tissues.
@@ -1902,10 +1911,11 @@ p
 ## whole genome scan
 ```{r}
 ### step1:根据原来数据框，求出 2方面值，1：单位CDS的结果，2：有害突变和同义突变的比
-# library(tidyverse)
 # df <- read_tsv("data/006_Fig2/genomeScan/002_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt")
-# 
-# df1 <- df %>% 
+
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/009_genomeScan_delvcSyn/002/001_delVSsynOnChr_20000000window5000000step_addEffectiveCDSLength.txt")
+
+# df1 <- df %>%
 #   mutate(SynFre=.$a001_synonymous/.$CDSLength,
 #          NonsynFre=.$a002_nonsynonymous/.$CDSLength,
 #          DelFre=.$a003_nonsynGERPandDerivedPPH2/.$CDSLength,
@@ -1919,7 +1929,10 @@ p
 #          GERPSynRatio=.$a005_GERP_16way/.$a001_synonymous,
 #          StopGainSynRatio=.$a006_StopGain/.$a001_synonymous
 #          )
+
 # write_tsv(df1,"data/006_Fig2/genomeScan/003_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt")
+
+# write_tsv(df1,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/009_genomeScan_delvcSyn/002/001_delVSsynOnChr_20000000window5000000step_addEffectiveCDSLength.txt")
 
 ### step2:根据step1的结果，求出 windowScan 滑窗后的数据框
 # library(tidyverse)

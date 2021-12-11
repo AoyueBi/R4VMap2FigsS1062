@@ -1,0 +1,602 @@
+---
+title: "Population parameters"
+author: "Aoyue Bi, Daxing Xu"
+date: "`r Sys.Date()`"
+output: 
+  html_document: # html_notebook, html_document
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
+    # bibliography: bibliography.json
+---
+
+
+# FigS
+
+```{r setup, echo =T, message = T, warning = F}
+library(tidyverse)
+# library(RColorBrewer)
+library(ggpubr)
+# library(egg)
+## eval 代码要不要运行
+## echo 代码要不要输出
+## include 图要不要输出
+## warning 警告要不要输出
+## message 默认Bin等信息要不要输出
+```
+
+## Pi TajimaD数据合并
+```{r}
+### 数据合并
+# inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/002_pi_based100kWindow_50kStep")
+# df1 <- dir(inputDir,full.names = T) %>% 
+#   map(~{read_tsv(.x) %>%
+#       mutate(Group=str_split_fixed(basename(.x),"_chr",2)[,1])
+#   }) %>% 
+#   bind_rows()
+# 
+# write_tsv(df1,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/002_pi_merge/001_pi.txt.gz")
+# 
+# inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/004_pi_based100kWindow_50kStep")
+# df2 <- dir(inputDir,full.names = T) %>% 
+#   map(~{read_tsv(.x) %>%
+#       mutate(Group=str_split_fixed(basename(.x),"_chr",2)[,1])
+#   }) %>% 
+#   bind_rows()
+# write_tsv(df2,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/004_pi_merge/001_pi.txt.gz")
+# 
+# inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/006_pi_based100kWindow_50kStep")
+# df3 <- dir(inputDir,full.names = T) %>% 
+#   map(~{read_tsv(.x) %>%
+#       mutate(Group=str_split_fixed(basename(.x),"_chr",2)[,1])
+#   }) %>% 
+#   bind_rows()
+# write_tsv(df3,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/006_pi_merge/001_pi.txt.gz")
+
+### ============================================================================
+### TajimaD
+# inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/002_TajimaD_based50000window")
+# df1 <- dir(inputDir,full.names = T) %>%
+#   map(~{read_tsv(.x) %>%
+#       mutate(Group=str_split_fixed(basename(.x),"_chr",2)[,1])
+#   }) %>%
+#   bind_rows()
+# 
+# write_tsv(df1,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/002_TajimaD_merge/001_TajimaD.txt.gz")
+# 
+# 
+# inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/004_TajimaD_based50000window")
+# df2 <- dir(inputDir,full.names = T) %>%
+#   map(~{read_tsv(.x) %>%
+#       mutate(Group=str_split_fixed(basename(.x),"_chr",2)[,1])
+#   }) %>%
+#   bind_rows()
+# write_tsv(df2,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/004_TajimaD_merge/001_TajimaD.txt.gz")
+# 
+# 
+# inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/006_TajimaD_based50000window")
+# df3 <- dir(inputDir,full.names = T) %>%
+#   map(~{read_tsv(.x) %>%
+#       mutate(Group=str_split_fixed(basename(.x),"_chr",2)[,1])
+#   }) %>%
+#   bind_rows()
+# write_tsv(df3,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/006_TajimaD_merge/001_TajimaD.txt.gz")
+
+```
+
+## Pi TajimaD data import
+```{r}
+df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/002_pi_merge/001_pi.txt.gz")
+df2 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/004_pi_merge/001_pi.txt.gz")
+unique(df1$Group)
+unique(df2$Group)
+
+df3 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/002_TajimaD_merge/001_TajimaD.txt.gz")
+df4 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/004_TajimaD_merge/001_TajimaD.txt.gz")
+unique(df3$Group)
+unique(df4$Group)
+
+# [1] "AT"    "CL"    "DE"    "FTT"   "LR_EA" "LR_EU" "WE"   
+# [1] "CL"     "LR_AF"  "LR_AM"  "LR_CSA" "LR_EA"  "LR_EU"  "LR_WA" 
+```
+
+### *p不同倍性
+```{r}
+df <- df1 %>% 
+  mutate(Group2=ifelse(Group %in% c("LR_EA","LR_EU"),"LR",Group)) %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  mutate(MergedSub=ifelse(Sub=="D","D","AB")) %>% 
+  group_by(Group2,MergedSub) %>% 
+  summarise(N=n(),PI_mean=mean(PI),PI_median=median(PI),PI_sd=sd(PI),PI_se=PI_sd/sqrt(N))
+
+factorA <- c("AT","WE","DE","FTT","LR","CL")
+df$Group2 <- factor(df$Group2,levels =rev(factorA))
+
+p <- df %>% 
+  ggplot()+
+  # ggplot(aes(x=Group2,y=PI_mean,ymin=PI_mean-PI_se,ymax=PI_mean+PI_se))+
+  # geom_hline(yintercept = 0,linetype="dashed")+
+  # geom_pointrange(aes(color=Sub,fatten = 2))+
+  geom_segment(aes(x=Group2, xend=Group2, y=0, yend=PI_mean*1000,color=Group2),size=0.3)+
+  geom_point(aes(x=Group2,y= PI_mean*1000,color=Group2), size=2, alpha=0.95) +
+  scale_color_manual(values = rev(c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")))+
+  labs(y = expression(italic(theta)[pi]~"("~10^-3~")"),x="")+
+  coord_flip()+
+  facet_grid(MergedSub~.,scales = "free")+
+theme_classic()+
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 9))+
+  theme(strip.background = element_blank(),strip.text = element_blank())
+
+  p
+
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 2.8,width = 1.5)
+
+### 不同亚基因组
+df <- df1 %>% 
+  mutate(Group2=ifelse(Group %in% c("LR_EA","LR_EU"),"LR",Group)) %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  group_by(Group2,Sub) %>% 
+  summarise(N=n(),PI_mean=mean(PI),PI_median=median(PI),PI_sd=sd(PI),PI_se=PI_sd/sqrt(N))
+
+factorA <- c("AT","WE","DE","FTT","LR","CL")
+df$Group2 <- factor(df$Group2,levels =rev(factorA))
+
+p <- df %>% 
+  ggplot()+
+  # ggplot(aes(x=Group2,y=PI_mean,ymin=PI_mean-PI_se,ymax=PI_mean+PI_se))+
+  # geom_hline(yintercept = 0,linetype="dashed")+
+  # geom_pointrange(aes(color=Sub,fatten = 2))+
+  geom_segment(aes(x=Group2, xend=Group2, y=0, yend=PI_mean*1000,color=Group2),size=0.3)+
+  geom_point(aes(x=Group2,y= PI_mean*1000,color=Group2), size=2, alpha=0.95) +
+  scale_color_manual(values = rev(c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")))+
+  labs(y = expression(italic(theta)[pi]~"("~10^-3~")"),x="")+
+  coord_flip()+
+  facet_grid(Sub~.,scales = "free")+
+theme_classic()+
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 9))+
+  theme(strip.background = element_blank(),strip.text = element_blank())
+
+  p
+
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 2.8,width = 1.5)
+
+
+```
+
+### *p LR不同亚洲
+```{r}
+### 求每个亚基因组的平均值、标准差
+df_pi <- df2 %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  group_by(Group,Sub) %>% 
+  summarise(N=n(),Pop_mean=mean(PI),Pop_median=median(PI),Pop_sd=sd(PI),Pop_se=Pop_sd/sqrt(N)) %>%
+  arrange(Sub,desc(Pop_mean)) %>% 
+  ungroup() %>%
+  mutate(PopPara="PI")
+### 排序
+df_order <- df2 %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  group_by(Group,Sub) %>% 
+  summarise(N=n(),Pop_mean=mean(PI),Pop_median=median(PI),Pop_sd=sd(PI),Pop_se=Pop_sd/sqrt(N)) %>%
+  filter(Sub=="B") %>% 
+  arrange(Sub,desc(Pop_mean))
+### 因子设置
+factorA <- df_order$Group
+df_pi$Group <- factor(df_pi$Group,levels =rev(factorA))
+df_pi$Sub <- factor(df_pi$Sub,levels = c("B","A","D"))
+colB <- c("#967bce","#fd8582","#4bcdc6")
+### plot
+p1 <- df_pi %>% 
+  ggplot(aes(x=Group,y=Pop_mean*10000,fill=Sub))+
+  geom_bar(stat = "identity",position=position_identity(),alpha=0.5)+
+  geom_errorbar(aes(ymin=Pop_mean*10000-Pop_se*10000, ymax=Pop_mean*10000+Pop_se*10000), width=.2,
+                 position="identity")+
+  scale_fill_manual(values = colB)+
+  labs(y = expression(italic(theta)[pi]~"("~10^-4~")"),x="")+
+  # facet_wrap(.~PopPara,scales = "free_y")+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 8))+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme(strip.background = element_blank(),strip.text = element_blank())
+
+p1
+# ggsave(p,filename = "/Users/Aoyue/Documents/test1.pdf",height = 1.3,width = 3.6)
+
+#### TajimaD
+### 求每个亚基因组的平均值、标准差
+df_tajima <- df4 %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  filter(!is.na(TajimaD)) %>% 
+  group_by(Group,Sub) %>% 
+  summarise(N=n(),Pop_mean=mean(TajimaD),Pop_median=median(TajimaD),
+            Pop_sd=sd(TajimaD),Pop_se=Pop_sd/sqrt(N)) %>%
+  arrange(Sub,desc(Pop_mean)) %>% 
+  ungroup() %>% 
+  mutate(PopPara="TajimaD")
+### 排序
+df_order <- df4 %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  filter(!is.na(TajimaD)) %>% 
+  group_by(Group,Sub) %>% 
+  summarise(N=n(),Pop_mean=mean(TajimaD),Pop_median=median(TajimaD),Pop_sd=sd(TajimaD),Pop_se=Pop_sd/sqrt(N)) %>%
+  filter(Sub=="B") %>% 
+  arrange(Sub,desc(Pop_mean))
+### 因子设置
+factorA <- df_order$Group
+df_tajima$Group <- factor(df_tajima$Group,levels =rev(factorA))
+df_tajima$Sub <- factor(df_tajima$Sub,levels =c("D","B","A"))
+colB <- c("#4bcdc6","#967bce","#fd8582")
+### plot
+p2 <- df_tajima %>% 
+  ggplot(aes(x=Group,y=Pop_mean,fill=Sub))+
+  geom_bar(stat = "identity",position=position_identity(),alpha=0.5)+
+  geom_errorbar(aes(ymin=Pop_mean-Pop_se, ymax=Pop_mean+Pop_se), width=.2,
+                 position="identity")+
+  scale_fill_manual(values = colB)+
+  labs(y = expression(paste("Tajima's ",italic(D))),x="")+
+  # facet_wrap(.~PopPara,scales = "free_y")+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 8))+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme(strip.background = element_blank(),strip.text = element_blank())
+
+p2
+  
+library(ggpubr)
+library(cowplot)
+q <- ggarrange(p1,p2,ncol = 2)
+q
+
+cowplot::save_plot(q,filename = "/Users/Aoyue/Documents/test.pdf",base_height = 1.4,base_width = 3.6)
+```
+
+
+#### ==============
+## Fst 数据合并
+```{r}
+# inputDir <- ("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/002_fst_based100000window_50000step")
+
+# df1 <- dir(inputDir,full.names = T) %>%
+#   map(~{read_tsv(.x) %>%
+#       mutate(Group=str_split_fixed(basename(.x),"_chr",2)[,1])
+#   }) %>%
+#   bind_rows()
+# 
+# write_tsv(df1,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/001_fst.txt.gz")
+
+```
+
+### Fst 求均值
+```{r}
+# dfall <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/001_fst.txt.gz")
+
+# df1 <- dfall %>% 
+#   mutate(Sub=str_sub(CHROM,2,2)) %>% 
+#   # mutate(MergedSub=ifelse(Sub=="D","D","AB")) %>% 
+#   group_by(Group,Sub) %>% 
+#   summarise(N=n(),Pop_mean=mean(WEIGHTED_FST),Pop_median=median(WEIGHTED_FST),Pop_sd=sd(WEIGHTED_FST),Pop_se=Pop_sd/sqrt(N)) %>% 
+#   ungroup() %>% 
+#   arrange(Sub,Pop_mean)
+# 
+# write_tsv(df1,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/002_fst_Subsummary.txt.gz")
+# 
+# df1_1 <- dfall %>% 
+#   mutate(Sub=str_sub(CHROM,2,2)) %>% 
+#   # mutate(MergedSub=ifelse(Sub=="D","D","AB")) %>% 
+#   group_by(Group,CHROM) %>% 
+#   summarise(N=n(),Pop_mean=mean(WEIGHTED_FST),Pop_median=median(WEIGHTED_FST),Pop_sd=sd(WEIGHTED_FST),Pop_se=Pop_sd/sqrt(N)) %>% 
+#   ungroup() %>% 
+#   arrange(CHROM,Pop_mean)
+# 
+# write_tsv(df1_1,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/003_fst_CHROMsummary.txt.gz")
+```
+
+## step1:矩阵生成 测试
+```{r}
+
+df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/002_fst_Subsummary.txt.gz")
+
+### 建立2个一模一样的表格，为创建矩阵做准备
+df2 <- df1 %>% 
+  mutate(Group1=str_split_fixed(Group,"_VS_",2)[,1],Group2=str_split_fixed(Group,"_VS_",2)[,2]) 
+
+df3 <- df1 %>% 
+  mutate(Group2=str_split_fixed(Group,"_VS_",2)[,1],Group1=str_split_fixed(Group,"_VS_",2)[,2]) 
+
+### AB sub
+df4 <- rbind(df2,df3) %>% 
+  select(Group1,Group2,Sub,Pop_mean) %>% 
+  filter(!Sub=="D") %>% 
+  group_by(Sub) %>% 
+  pivot_wider(names_from =Group2,values_from = Pop_mean,values_fill = 0) %>% ### 注意，相等的要补充为0
+  arrange(Sub) %>% 
+  rename(Group=Group1)
+
+### D sub
+df5 <- rbind(df2,df3) %>% 
+  select(Group1,Group2,Sub,Pop_mean) %>% 
+  filter(Sub=="D") %>% 
+  group_by(Sub) %>% 
+  pivot_wider(names_from =Group2,values_from = Pop_mean,values_fill = 0) %>% 
+  arrange(Sub) %>% 
+  rename(Group=Group1)
+
+```
+
+
+## step2:*p heatmap 测试
+```{r}
+df <- df4 %>% filter(Sub =="A")
+df_matrix <- as.matrix(df[,-1:-2])
+rownames(df_matrix) <- df$Group
+
+library(pheatmap)
+library(RColorBrewer)
+p <- pheatmap(df_matrix, 
+              keep.dendro=T,
+              display_numbers = T,
+              cluster_rows = T,
+              cluster_cols = T,
+              treeheight_row = 1,treeheight_col = 1, ## 聚类但是不展示树的结构
+              # angle_col=45, ### 设置列名的倾斜度
+              color= colorRampPalette(brewer.pal(n = 4, name = "OrRd"))(25),
+              # annotation_row = dfanno, ## 注释数据框
+              # annotation_col = dfanno,
+              # annotation_names_row = T,
+              # annotation_names_col = T,
+              # annotation_legend = T,
+              # annotation_colors = ann_colors ## 对应注释数据框的因子颜色
+         )
+
+p
+                    
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3.5*4/5, width = 3.5)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.4*4/5, width = 2.4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 7.2, width = 7.2)
+```
+## FST heatmap 相关性矩阵
+```{r}
+df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/002_fst_Subsummary.txt.gz")
+
+fun_plotHeatmap <- function(df,subfun){
+  p <- df %>% 
+  ggplot(aes(x=Group2,y=Group1,fill=Pop_mean))+
+    geom_tile()+
+    geom_text(aes(Group2, Group1, label = round(Pop_mean,2)), color = "black", size = 2) +
+    scale_fill_gradient2(low = "blue", high = "red", mid = "gray98", 
+      midpoint = 0.3, limit = c(0,0.7), space = "Lab", 
+      name=expression(F[ST])) +
+    labs(x="",y="")+
+    theme(
+      axis.text.x = element_text(angle = 45, vjust = 1,hjust = 1),
+      # legend.position = c(0.2, 0.7),
+      panel.background = element_blank(),
+      panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+      legend.position = 'none',
+      text = element_text(size = 8))
+
+p
+ggsave(p,filename = str_c("~/Documents/",subfun,"_fst_heatmap.pdf") ,height = 2.4,width = 2.4)
+
+return(p)
+}
+
+### 建立2个一模一样的表格，为创建矩阵做准备
+df2 <- df1 %>% 
+  mutate(Group1=str_split_fixed(Group,"_VS_",2)[,1],Group2=str_split_fixed(Group,"_VS_",2)[,2]) %>% 
+  group_by(Sub) %>% 
+  group_map(~fun_plotHeatmap(.x,.y))
+
+q <- ggpubr::ggarrange(plotlist=df2,ncol = 3)
+
+q
+
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 2.4,base_width = 7.2)
+
+```
+
+
+
+## PCA by FST
+```{r}
+df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/002_fst_Subsummary.txt.gz")
+
+### 建立2个一模一样的表格，为创建矩阵做准备
+df2 <- df1 %>% 
+  mutate(Group1=str_split_fixed(Group,"_VS_",2)[,1],Group2=str_split_fixed(Group,"_VS_",2)[,2]) 
+
+df3 <- df1 %>% 
+  mutate(Group2=str_split_fixed(Group,"_VS_",2)[,1],Group1=str_split_fixed(Group,"_VS_",2)[,2]) 
+
+### AB sub
+df4 <- rbind(df2,df3) %>% 
+  select(Group1,Group2,Sub,Pop_mean) %>% 
+  filter(!Sub=="D") %>% 
+  group_by(Sub) %>% 
+  pivot_wider(names_from =Group2,values_from = Pop_mean,values_fill = 0) %>% ### 注意，相等的要补充为0
+  arrange(Sub) %>% 
+  ungroup() %>% 
+  rename(Group=Group1)
+
+### D sub
+df5 <- rbind(df2,df3) %>% 
+  select(Group1,Group2,Sub,Pop_mean) %>% 
+  filter(Sub=="D") %>% 
+  group_by(Sub) %>% 
+  pivot_wider(names_from =Group2,values_from = Pop_mean,values_fill = 0) %>% 
+  arrange(Sub) %>% 
+  ungroup() %>% 
+  rename(Group=Group1)
+
+############################################ PCA 聚类 A sub
+library(factoextra)
+library(FactoMineR)
+
+### import matrix
+df <- df4 %>% 
+  filter(Sub=="A") %>% 
+  mutate(GroupSub=str_c(Group,"-",Sub))%>% column_to_rownames(var="GroupSub")
+### pca analysis
+c1 <- which(colnames(df) == 'Group')
+c2 <- which(colnames(df) == 'Sub')
+df.pca <- PCA(df[,-c(c1,c2)], graph = F)
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分 "64.2%"
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分 "16.77%"
+
+dfpca1 <- as_tibble(df.pca$ind$coord,rownames=NA) %>% 
+  rownames_to_column(var = "GroupSub") %>% 
+  mutate(variance1=variance1,variance2=variance2)
+  
+
+############################################ PCA 聚类 B sub
+library(factoextra)
+library(FactoMineR)
+
+### import matrix
+df <- df4 %>% 
+  filter(Sub=="B") %>% 
+  mutate(GroupSub=str_c(Group,"-",Sub))%>% column_to_rownames(var="GroupSub")
+### pca analysis
+c1 <- which(colnames(df) == 'Group')
+c2 <- which(colnames(df) == 'Sub')
+df.pca <- PCA(df[,-c(c1,c2)], graph = F)
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分 "70.29%"
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分  "12.55%"
+
+dfpca2 <- as_tibble(df.pca$ind$coord,rownames=NA) %>% 
+  rownames_to_column(var = "GroupSub") %>% 
+  mutate(variance1=variance1,variance2=variance2)
+
+############################################ PCA 聚类 D sub
+df <- df5 %>% 
+  mutate(GroupSub=str_c(Group,"-",Sub))%>% column_to_rownames(var="GroupSub")
+### pca analysis
+c1 <- which(colnames(df) == 'Group')
+c2 <- which(colnames(df) == 'Sub')
+df.pca <- PCA(df[,-c(c1,c2)], graph = F)
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分 "95.25%"
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分 "3.2%"
+
+dfpca3 <- as_tibble(df.pca$ind$coord,rownames=NA) %>%
+  rownames_to_column(var = "GroupSub") %>% 
+  mutate(variance1=variance1,variance2=variance2)
+
+dfpca <- rbind(dfpca1,dfpca2,dfpca3)
+```
+
+### *plot
+```{r}
+
+fun_plotPCA <- function(df,subfun){
+  library(ggrepel)
+  
+  variance1 = df$variance1[1]
+  variance2 = df$variance2[1]
+ 
+factorA <- c("WE","DE","FTT","CL","LR_AF","LR_AM","LR_CSA","LR_EA","LR_EU","LR_WA","AT")
+colB <- c("#ffd702","#7f5701","#016699","#9900ff","#800000","#dbb3ff","gray20","#fc6e6e","#D4AC0D","#76D7C4","#87cef9")
+dfhash <- tibble(Group=factorA,colB)
+
+dfcolor <-  tibble(Group=unique(df$Group)) %>% left_join(dfhash,by="Group")
+
+df$Group <- factor(df$Group,levels = dfcolor$Group)
+
+p <- df %>% 
+  ggplot(aes(x=Dim.1,y=Dim.2,color=Group))+
+  # geom_text(aes(label=Group))+
+  geom_label_repel(aes(label=Group),size = 3,vjust = 0, nudge_y = 0.2,hjust=0,nudge_x=0.5)+
+  # geom_label_repel(aes(label=Group))+
+  geom_point(aes(fill= Group), alpha=0.95,size=2.5,shape=21,color="gray50")+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_color_brewer(palette = "Set3")+
+  # scale_shape_manual(values=c(23, 21), name="Subgenome")+
+  scale_fill_manual(values = dfcolor$colB,name="Genetic group")+
+  scale_color_manual(values = dfcolor$colB,name="Genetic group")+
+  # scale_x_continuous(limits = c(-2.7,2.8),breaks = seq(-2,2.8,1))+
+  xlab(str_c("Dim.1 (",variance1,")"))+ ylab(str_c("Dim.2 (",variance2,")"))+
+  # facet_wrap(~Sub,scales = "free_y")+
+  scale_y_continuous(limits = c(-2.5,2.5),breaks = seq(-2,2,1))+
+  theme(
+  strip.background = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5)
+    ,legend.position = 'none'
+    ,text = element_text(size = 9))
+
+p
+ggsave(p,filename = str_c("~/Documents/",subfun$Sub,".PCA.pdf"),height = 2.4,width = 2.4)
+  
+return(p)
+}
+
+
+### 建立2个一模一样的表格，为创建矩阵做准备
+dfout <- dfpca %>% 
+  mutate(Group=str_split_fixed(GroupSub,"-",2)[,1]) %>% 
+  mutate(Sub=str_split_fixed(GroupSub,"-",2)[,2]) %>% 
+  group_by(Sub) %>% 
+  group_map(~ {fun_plotPCA(.x,.y)})
+
+q <- ggpubr::ggarrange(plotlist=dfout,ncol = 3)
+
+q
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 2.4,base_width = 7.2)
+
+```
+## Fst by point 两两相关性
+```{r}
+df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/002_fst_Subsummary.txt.gz")
+
+p <- df1 %>% 
+  filter(Sub=="A") %>% 
+  ggplot(aes(x=Group,y=Pop_mean))+
+  geom_point()+
+  theme_bw()+
+  theme(text = element_text(size = 9))+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))
+  
+p
+ggsave(p,filename = "/Users/Aoyue/Documents/fst.pdf",height = 3,width = 7.2)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
