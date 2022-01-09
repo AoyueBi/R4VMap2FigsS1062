@@ -33,10 +33,18 @@ library(egg)
 ```
 
 ## Fig1|World map
-```{r}
 ### 检查Taxa来自多少个国家
+```{r}
 df <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
-dfcountry <- df %>% group_by(orgCty) %>% count()
+dfcountry <- df %>% filter(!is.na(orgCty)) %>%  group_by(orgCty) %>% count()
+numCountry <- nrow(dfcountry)
+print(str_c("The sample in VMap2 project comes from ",numCountry," countries"))
+
+df <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dfcountry <- df %>% group_by(GenomeType,orgCty) %>% count() %>% 
+  filter(!is.na(orgCty)) %>% 
+  group_by(GenomeType) %>% count()
+
 numCountry <- nrow(dfcountry)
 print(str_c("The sample in VMap2 project comes from ",numCountry," countries"))
 

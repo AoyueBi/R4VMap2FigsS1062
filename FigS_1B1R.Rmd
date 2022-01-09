@@ -37,7 +37,7 @@ p <- chromoMap(chromFile,annoFile,
           chr_color = c("#bdbebe"),
           anno_col = c("#004680"),
           segment_annotation = T)
-
+          
 
 p
 

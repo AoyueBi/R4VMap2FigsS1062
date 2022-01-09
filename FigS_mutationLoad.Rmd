@@ -1,0 +1,1415 @@
+---
+title: "Deleterious mutation accumulation"
+author: "Aoyue Bi, Daxing Xu"
+date: "`r Sys.Date()`"
+output: 
+  html_document: # html_notebook, html_document
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
+    # bibliography: bibliography.json
+---
+
+# Fig3S
+```{r setup, echo =T, message = T, warning = F}
+library(tidyverse)
+# library(RColorBrewer)
+# library(ggpubr)
+# library(egg)
+## eval 代码要不要运行
+## echo 代码要不要输出
+## include 图要不要输出
+## warning 警告要不要输出
+## message 默认Bin等信息要不要输出
+```
+
+#### ===1=== Dataset one 1
+## dftotal 
+```{r}
+dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") 
+
+  # filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
+  # mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  # mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
+```
+
+## VMap2.1 - 1:1:1 Triads
+```{r}
+triadsGeneSet <- read_tsv("/Users/Aoyue/Documents/Data/wheat/gene/homoeologsGene111/triadGenes1.1_V3.txt") %>% 
+  filter(synteny=="syntenic") %>% 
+  select(TriadID,A,B,D) %>% 
+  pivot_longer(cols = c(A,B,D),names_to = "Sub",values_to = "Gene") %>% 
+  pull(Gene)
+
+## dftotal_triads 数据库
+dftotal_triads <- dftotal %>% 
+  mutate(Gene=str_split_fixed(Transcript,"\\.",2)[,1]) %>% 
+  filter(Gene %in% triadsGeneSet) %>% 
+  select(-Sub,-Gene)
+
+# write_tsv(dftotal_triads,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_triads/001_geneSNPAnno_triads.txt.gz")
+```
+
+## Hexaploid/Pseudohexaploid - whole-genome/1:1:1 Triads annotation
+```{r eval=FALSE, include=FALSE}
+### 将上述结果重新读入，加到数据库
+dfAAF <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/012_DFE/018_run_AAF/004_merge003/002_AAF_byPloidy.txt.gz") %>%
+  mutate(ID=str_c(Chr,"-",Pos))
+
+### ************************* hexaploid ***********************
+df06 <- dfAAF %>%
+  filter(AAF_AABBDD>0,AAF_AABBDD<1) %>%
+  pull(ID)
+
+### dftotal_hexaploid 数据库
+dftotal_hexaploid <- dftotal %>%
+  filter(ID %in% df06)
+
+write_tsv(dftotal_hexaploid,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_hexaploid_pseudohexaploid/001_geneSNPAnno_hexaploid.txt.gz")
+
+### dftotal_hexaploid_triads 数据库
+triadsGeneSet <- read_tsv("/Users/Aoyue/Documents/Data/wheat/gene/homoeologsGene111/triadGenes1.1_V3.txt") %>%
+  filter(synteny=="syntenic") %>%
+  select(TriadID,A,B,D) %>%
+  pivot_longer(cols = c(A,B,D),names_to = "Sub",values_to = "Gene") %>%
+  pull(Gene)
+
+dftotal_hexaploid_triads <- dftotal %>%
+  mutate(Gene=str_split_fixed(Transcript,"\\.",2)[,1]) %>%
+  filter(Gene %in% triadsGeneSet) %>%
+  filter(ID %in% df06) %>%
+  select(-Gene)
+
+write_tsv(dftotal_hexaploid_triads,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_triads/002_geneSNPAnno_hexaploid_triads.txt.gz")
+
+### ************************* pseudohexaploid ***********************
+df42 <- dfAAF %>%
+  filter(AAF_AABB_DD>0,AAF_AABB_DD<1) %>%
+  pull(ID)
+
+### dftotal_hexaploid 数据库
+dftotal_pseudohexaploid <- dftotal %>%
+  filter(ID %in% df42)
+
+write_tsv(dftotal_pseudohexaploid,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_hexaploid_pseudohexaploid/002_geneSNPAnno_pseudohexaploid.txt.gz")
+
+### dftotal_hexaploid_triads 数据库
+triadsGeneSet <- read_tsv("/Users/Aoyue/Documents/Data/wheat/gene/homoeologsGene111/triadGenes1.1_V3.txt") %>%
+  filter(synteny=="syntenic") %>%
+  select(TriadID,A,B,D) %>%
+  pivot_longer(cols = c(A,B,D),names_to = "Sub",values_to = "Gene") %>%
+  pull(Gene)
+
+dftotal_pseudohexaploid_triads <- dftotal %>%
+  mutate(Gene=str_split_fixed(Transcript,"\\.",2)[,1]) %>%
+  filter(Gene %in% triadsGeneSet) %>%
+  filter(ID %in% df42) %>%
+  select(-Gene)
+
+write_tsv(dftotal_pseudohexaploid_triads,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_triads/003_geneSNPAnno_pseudohexaploid_triads.txt.gz")
+
+```
+
+#### ===2=== Dataset two 2
+## del Count and del Ratio
+### java Calculate the deleterious load
+```{r}
+### DeleteriousXPCLRS1000 java类
+```
+### data operate1 - bySub summary
+- 数据初处理，主要做2个工作：
+①过滤Sub:过滤四倍体中的D亚基因组数据和二倍体中的AB亚基因组数据；
+②相加Sub:将染色体1-42以亚基因组为单位进行合并相加，得到每个taxa每个亚基因组的del count。
+输入文件夹和输出文件夹的名字保持不变
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# ### 导入种质数据库,并选取特定的列
+dftaxaDB <- read.delim("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/021_WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GenomeType)
+#
+### 导入染色体-亚基因组数据库，并选取特定的列
+dfchrDB <- read.delim("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/000_chrDB/chrConvertionRule_byAoyue.txt") %>% select(Chr = ChrID,Subgenome)
+
+sumDerivedCountPerTaxon <- function(file){
+  df <- read_tsv(file,show_col_types = F) %>% 
+    left_join(.,dftaxaDB,by="Taxa") %>%
+    left_join(.,dfchrDB,by="Chr") %>%
+    # filter(Chr==3) %>%
+    mutate(MergedGenomeTypeSub = paste(GenomeType,"_",Subgenome,sep = "")) %>%
+    filter(!MergedGenomeTypeSub %in% c("AABB_D","DD_A","DD_B") ) %>%
+    select(-MergedGenomeTypeSub) %>%
+    ###************ group_by ***********需要根据实际修改!!!!!!!
+    group_by(Taxa,Subgenome,VariantsGroup,IfSelected,Group_refobj) %>%
+    # group_by(Taxa,Subgenome,VariantsGroup) %>%
+    ##求每个个体，每个亚基因组，每种类型的count之和
+    summarise(TotalDerivedSNPCount = sum(TotalDerivedSNPCount),
+              HomoDerivedSNPCount = sum(HomoDerivedSNPCount),
+              HeterDerivedSNPCount = sum(HeterDerivedSNPCount),
+              SiteCountWithMinDepth = sum(SiteCountWithMinDepth))  
+
+  df
+} 
+
+# inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_allIndivi")
+# df <- dir(inputDir, full.names = T, pattern = "") %>% 
+#   map(sumDerivedCountPerTaxon) %>% 
+#   bind_rows()
+# write_tsv(df,path = "~/Documents/delCount.txt.gz")
+
+### 一
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/006_indivi_triads")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_triads.txt.gz"))
+
+### 二
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/007_indivi_hexaploid")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_hexaploid.txt.gz"))
+
+### 三
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/008_indivi_hexaploid_triads")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_hexaploid_triads.txt.gz"))
+
+### 四
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/009_indivi_pseudohexaploid")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_pseudohexaploid.txt.gz"))
+
+### 五
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/010_indivi_pseudohexaploid_triads")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_pseudohexaploid_triads.txt.gz"))
+
+### 六
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_allIndivi")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount.txt.gz"))
+
+```
+
+### data operate2 - 长表宽表转换，并标准化数据
+- 合并数据，成为一个数据框，进行操作
+levels(factor(df$VariantsGroup))
+[1] "001_synonymous"                 "002_nonsynonymous"              "003_nonsynGERPandDerivedSIFT"   "004_nonsynDerivedSIFT"         
+ [5] "005_GERP"                       "006_SIFT_StopGain"              "007_VEP"                        "008_snpEff"                    
+ [9] "009_VEP_stopGained"             "010_GERP16way_1"                "011_GERP16way_1.2_max"          "012_GERP16way_1.2_2.5"         
+[13] "013_GERP16way_2.5_max"          "014_GERP16way_2.14_max"         "015_LIST_S2"                    "016_PhyloP1.5_RefNotMask"      
+[17] "017_PhyloP1.5_RefMask"          "018_GERP16way_2.14andSIFT"      "019_Alt_PolyPhen2"              "020_Derived_PolyPhen2"         
+[21] "021_GERP16way_2.14andPolyPhen2" "022_GERP16way_1.78"             "023_GERP16way_1.78andPolyPhen2" "024_GERP16way_1andPolyPhen2"   
+[25] "025_GERP16way_3.1"                               "026_Derived_PolyPhen2_probably"                 
+[27] "027_GERP16way_1andDerived_PolyPhen2_probably"    "028_GERP16way_1.78andDerived_PolyPhen2_probably"
+[29] "029_GERP16way_2.14andDerived_PolyPhen2_probably" "030_GERP16way_3.1andDerived_PolyPhen2_probably" 
+
+"031_GERP16way_1.5andDerived_PolyPhen2_0.5" "032_GERP16way_1.5"                              
+[33] "033_Derived_PolyPhen2_0.5"                      
+> 
+
+```{r}
+### 跑一次，将数据存储起来，不用再跑。
+### wide table -> long table 将 DelCountGroup (total, homo, heter)变成长表,后续可以filter;
+### long table -> wide table 将 VariantsGroup 变成宽表，为标准化求ratio做准备;
+### wide table -> long table 将 Stand_LoadGroup 变成长表， 为画图做准备。
+
+fun_getDelRatio <- function(filenamefun){
+  
+  dfdelRatio <- read_tsv(filenamefun,show_col_types = F) %>% 
+  ### wide -> long
+  pivot_longer(.,cols =c("TotalDerivedSNPCount","HomoDerivedSNPCount","HeterDerivedSNPCount","SiteCountWithMinDepth"),names_to ="DelCountGroup" ,values_to = "DelCount") %>%
+  ### long -> wide
+  pivot_wider(.,names_from = "VariantsGroup",values_from = "DelCount") %>% 
+  mutate(Ratio_002_nonsynonymous = `002_nonsynonymous`/`001_synonymous`,
+         # Ratio_003_nonsynGERPandDerivedSIFT = `003_nonsynGERPandDerivedSIFT`/`001_synonymous`,
+         Ratio_004_nonsynDerivedSIFT = `004_nonsynDerivedSIFT`/`001_synonymous`,
+         # Ratio_005_GERP = `005_GERP`/`001_synonymous`,
+         # Ratio_006_SIFT_StopGain = `006_SIFT_StopGain`/`001_synonymous`,
+         Ratio_007_VEP = `007_VEP`/`001_synonymous`,
+         Ratio_008_snpEff = `008_snpEff`/`001_synonymous`,
+         # Ratio_009_VEP_stopGained = `009_VEP_stopGained`/`001_synonymous`,
+         Ratio_010_GERP16way_1 = `010_GERP16way_1`/`001_synonymous`,
+         # Ratio_011_GERP16way_1.2_max = `011_GERP16way_1.2_max`/`001_synonymous`,
+         # Ratio_012_GERP16way_1.2_2.5 = `012_GERP16way_1.2_2.5`/`001_synonymous`,
+         # Ratio_013_GERP16way_2.5_max=
+         #   `013_GERP16way_2.5_max`/`001_synonymous`,
+         Ratio_014_GERP16way_2.14_max = `014_GERP16way_2.14_max`/`001_synonymous`,
+         Ratio_015_LIST_S2=`015_LIST_S2`/`001_synonymous`,
+         # Ratio_016_PhyloP1.5_RefNotMask=`016_PhyloP1.5_RefNotMask`/`001_synonymous`,
+         Ratio_017_PhyloP1.5_RefMask=`017_PhyloP1.5_RefMask`/`001_synonymous`,
+         # Ratio_018_GERP16way_2.14andSIFT=`018_GERP16way_2.14andSIFT`/`001_synonymous`,
+         # Ratio_019_Alt_PolyPhen2 = `019_Alt_PolyPhen2`/`001_synonymous`,
+         # Ratio_020_Derived_PolyPhen2=`020_Derived_PolyPhen2`/`001_synonymous`,
+         # Ratio_021_GERP16way_2.14andPolyPhen2=`021_GERP16way_2.14andPolyPhen2`/`001_synonymous`,
+         # Ratio_022_GERP16way_1.78=`022_GERP16way_1.78`/`001_synonymous`,
+         # Ratio_023_GERP16way_1.78andPolyPhen2=`023_GERP16way_1.78andPolyPhen2`/`001_synonymous`,
+         # Ratio_024_GERP16way_1andPolyPhen2 = `024_GERP16way_1andPolyPhen2`/`001_synonymous`,
+         Ratio_025_GERP16way_3.1=`025_GERP16way_3.1`/`001_synonymous`,
+         # Ratio_026_Derived_PolyPhen2_probably = `026_Derived_PolyPhen2_probably`/`001_synonymous`,
+         # Ratio_027_GERP16way_1andDerived_PolyPhen2_probably=`027_GERP16way_1andDerived_PolyPhen2_probably`/`001_synonymous`,
+         # Ratio_028_GERP16way_1.78andDerived_PolyPhen2_probably=`028_GERP16way_1.78andDerived_PolyPhen2_probably`/`001_synonymous`,
+         # Ratio_029_GERP16way_2.14andDerived_PolyPhen2_probably=`029_GERP16way_2.14andDerived_PolyPhen2_probably`/`001_synonymous`,
+         # Ratio_030_GERP16way_3.1andDerived_PolyPhen2_probably=`030_GERP16way_3.1andDerived_PolyPhen2_probably`/`001_synonymous`,
+         Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5=`031_GERP16way_1.5andDerived_PolyPhen2_0.5`/`001_synonymous`,
+         Ratio_032_GERP16way_1.5=`032_GERP16way_1.5`/`001_synonymous`,
+         Ratio_033_Derived_PolyPhen2_0.5=`033_Derived_PolyPhen2_0.5`/`001_synonymous`) %>% 
+  ### wide -> long
+  pivot_longer(.,cols =c("Ratio_002_nonsynonymous":"Ratio_033_Derived_PolyPhen2_0.5"),names_to ="Stand_LoadGroup" ,values_to = "Stand_delCount") %>% 
+  ### 去除不必要的列，方便画图和管理数据
+  select(- ("001_synonymous":"033_Derived_PolyPhen2_0.5")) %>%
+    write_tsv(file.path("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge",str_replace_all(basename(filenamefun),"delCount","delRatio")))
+  
+  return(dfdelRatio)
+}
+
+### 函数调用
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
+
+df <- dir(inputDir,pattern = "delCount",full.names = T) %>%
+  map(fun_getDelRatio)
+
+```
+
+#### -------- AB sub D sub
+### data operate1 - bySub summary
+- 数据初处理，主要做2个工作：
+①过滤Sub:过滤四倍体中的D亚基因组数据和二倍体中的AB亚基因组数据；
+②相加Sub:将染色体1-42以亚基因组为单位进行合并相加，得到每个taxa每个亚基因组的del count。
+输入文件夹和输出文件夹的名字保持不变
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# ### 导入种质数据库,并选取特定的列
+dftaxaDB <- read.delim("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/021_WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GenomeType)
+#
+### 导入染色体-亚基因组数据库，并选取特定的列
+dfchrDB <- read.delim("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/000_chrDB/chrConvertionRule_byAoyue.txt") %>% select(Chr = ChrID,Subgenome)
+
+sumDerivedCountPerTaxon <- function(file){
+  df <- read_tsv(file,show_col_types = F) %>% 
+    left_join(.,dftaxaDB,by="Taxa") %>%
+    left_join(.,dfchrDB,by="Chr") %>%
+    # filter(Chr==3) %>%
+    mutate(MergedGenomeTypeSub = paste(GenomeType,"_",Subgenome,sep = "")) %>%
+    filter(!MergedGenomeTypeSub %in% c("AABB_D","DD_A","DD_B") ) %>%
+    select(-MergedGenomeTypeSub) %>%
+    mutate(MergedSub=ifelse(Subgenome=="D","D","AB")) %>% 
+    mutate(Subgenome=MergedSub) %>% 
+    select(-MergedSub) %>% 
+    ###************ group_by ***********需要根据实际修改!!!!!!!
+    group_by(Taxa,Subgenome,VariantsGroup,IfSelected,Group_refobj) %>%
+    # group_by(Taxa,Subgenome,VariantsGroup) %>%
+    ##求每个个体，每个亚基因组，每种类型的count之和
+    summarise(TotalDerivedSNPCount = sum(TotalDerivedSNPCount),
+              HomoDerivedSNPCount = sum(HomoDerivedSNPCount),
+              HeterDerivedSNPCount = sum(HeterDerivedSNPCount),
+              SiteCountWithMinDepth = sum(SiteCountWithMinDepth))  
+
+  df
+} 
+
+# inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_allIndivi")
+# df <- dir(inputDir, full.names = T, pattern = "") %>% 
+#   map(sumDerivedCountPerTaxon) %>% 
+#   bind_rows()
+# write_tsv(df,path = "~/Documents/delCount.txt.gz")
+
+### 一
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/006_indivi_triads")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_triads.txt.gz"))
+
+### 二
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/007_indivi_hexaploid")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_hexaploid.txt.gz"))
+
+### 三
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/008_indivi_hexaploid_triads")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_hexaploid_triads.txt.gz"))
+
+### 四
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/009_indivi_pseudohexaploid")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_pseudohexaploid.txt.gz"))
+
+### 五
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/010_indivi_pseudohexaploid_triads")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount_pseudohexaploid_triads.txt.gz"))
+
+### 六
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_allIndivi")
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
+df <- dir(inputDir, full.names = T, pattern = "") %>% 
+  map(sumDerivedCountPerTaxon) %>% 
+  bind_rows() %>% 
+  write_tsv(file.path(outDir,"delCount.txt.gz"))
+
+```
+
+### data operate2 - 长表宽表转换，并标准化数据
+- 合并数据，成为一个数据框，进行操作
+levels(factor(df$VariantsGroup))
+[1] "001_synonymous"                 "002_nonsynonymous"              "003_nonsynGERPandDerivedSIFT"   "004_nonsynDerivedSIFT"         
+ [5] "005_GERP"                       "006_SIFT_StopGain"              "007_VEP"                        "008_snpEff"                    
+ [9] "009_VEP_stopGained"             "010_GERP16way_1"                "011_GERP16way_1.2_max"          "012_GERP16way_1.2_2.5"         
+[13] "013_GERP16way_2.5_max"          "014_GERP16way_2.14_max"         "015_LIST_S2"                    "016_PhyloP1.5_RefNotMask"      
+[17] "017_PhyloP1.5_RefMask"          "018_GERP16way_2.14andSIFT"      "019_Alt_PolyPhen2"              "020_Derived_PolyPhen2"         
+[21] "021_GERP16way_2.14andPolyPhen2" "022_GERP16way_1.78"             "023_GERP16way_1.78andPolyPhen2" "024_GERP16way_1andPolyPhen2"   
+[25] "025_GERP16way_3.1"                               "026_Derived_PolyPhen2_probably"                 
+[27] "027_GERP16way_1andDerived_PolyPhen2_probably"    "028_GERP16way_1.78andDerived_PolyPhen2_probably"
+[29] "029_GERP16way_2.14andDerived_PolyPhen2_probably" "030_GERP16way_3.1andDerived_PolyPhen2_probably" 
+
+"031_GERP16way_1.5andDerived_PolyPhen2_0.5" "032_GERP16way_1.5"                              
+[33] "033_Derived_PolyPhen2_0.5"                      
+> 
+
+```{r eval=FALSE, include=FALSE}
+### 跑一次，将数据存储起来，不用再跑。
+### wide table -> long table 将 DelCountGroup (total, homo, heter)变成长表,后续可以filter;
+### long table -> wide table 将 VariantsGroup 变成宽表，为标准化求ratio做准备;
+### wide table -> long table 将 Stand_LoadGroup 变成长表， 为画图做准备。
+
+fun_getDelRatio <- function(filenamefun){
+  
+  dfdelRatio <- read_tsv(filenamefun,show_col_types = F) %>% 
+  ### wide -> long
+  pivot_longer(.,cols =c("TotalDerivedSNPCount","HomoDerivedSNPCount","HeterDerivedSNPCount","SiteCountWithMinDepth"),names_to ="DelCountGroup" ,values_to = "DelCount") %>%
+  ### long -> wide
+  pivot_wider(.,names_from = "VariantsGroup",values_from = "DelCount") %>% 
+  mutate(Ratio_002_nonsynonymous = `002_nonsynonymous`/`001_synonymous`,
+         # Ratio_003_nonsynGERPandDerivedSIFT = `003_nonsynGERPandDerivedSIFT`/`001_synonymous`,
+         Ratio_004_nonsynDerivedSIFT = `004_nonsynDerivedSIFT`/`001_synonymous`,
+         # Ratio_005_GERP = `005_GERP`/`001_synonymous`,
+         # Ratio_006_SIFT_StopGain = `006_SIFT_StopGain`/`001_synonymous`,
+         Ratio_007_VEP = `007_VEP`/`001_synonymous`,
+         Ratio_008_snpEff = `008_snpEff`/`001_synonymous`,
+         # Ratio_009_VEP_stopGained = `009_VEP_stopGained`/`001_synonymous`,
+         Ratio_010_GERP16way_1 = `010_GERP16way_1`/`001_synonymous`,
+         # Ratio_011_GERP16way_1.2_max = `011_GERP16way_1.2_max`/`001_synonymous`,
+         # Ratio_012_GERP16way_1.2_2.5 = `012_GERP16way_1.2_2.5`/`001_synonymous`,
+         # Ratio_013_GERP16way_2.5_max=
+         #   `013_GERP16way_2.5_max`/`001_synonymous`,
+         Ratio_014_GERP16way_2.14_max = `014_GERP16way_2.14_max`/`001_synonymous`,
+         Ratio_015_LIST_S2=`015_LIST_S2`/`001_synonymous`,
+         # Ratio_016_PhyloP1.5_RefNotMask=`016_PhyloP1.5_RefNotMask`/`001_synonymous`,
+         Ratio_017_PhyloP1.5_RefMask=`017_PhyloP1.5_RefMask`/`001_synonymous`,
+         # Ratio_018_GERP16way_2.14andSIFT=`018_GERP16way_2.14andSIFT`/`001_synonymous`,
+         # Ratio_019_Alt_PolyPhen2 = `019_Alt_PolyPhen2`/`001_synonymous`,
+         # Ratio_020_Derived_PolyPhen2=`020_Derived_PolyPhen2`/`001_synonymous`,
+         # Ratio_021_GERP16way_2.14andPolyPhen2=`021_GERP16way_2.14andPolyPhen2`/`001_synonymous`,
+         # Ratio_022_GERP16way_1.78=`022_GERP16way_1.78`/`001_synonymous`,
+         # Ratio_023_GERP16way_1.78andPolyPhen2=`023_GERP16way_1.78andPolyPhen2`/`001_synonymous`,
+         # Ratio_024_GERP16way_1andPolyPhen2 = `024_GERP16way_1andPolyPhen2`/`001_synonymous`,
+         Ratio_025_GERP16way_3.1=`025_GERP16way_3.1`/`001_synonymous`,
+         # Ratio_026_Derived_PolyPhen2_probably = `026_Derived_PolyPhen2_probably`/`001_synonymous`,
+         # Ratio_027_GERP16way_1andDerived_PolyPhen2_probably=`027_GERP16way_1andDerived_PolyPhen2_probably`/`001_synonymous`,
+         # Ratio_028_GERP16way_1.78andDerived_PolyPhen2_probably=`028_GERP16way_1.78andDerived_PolyPhen2_probably`/`001_synonymous`,
+         # Ratio_029_GERP16way_2.14andDerived_PolyPhen2_probably=`029_GERP16way_2.14andDerived_PolyPhen2_probably`/`001_synonymous`,
+         # Ratio_030_GERP16way_3.1andDerived_PolyPhen2_probably=`030_GERP16way_3.1andDerived_PolyPhen2_probably`/`001_synonymous`,
+         Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5=`031_GERP16way_1.5andDerived_PolyPhen2_0.5`/`001_synonymous`,
+         Ratio_032_GERP16way_1.5=`032_GERP16way_1.5`/`001_synonymous`,
+         Ratio_033_Derived_PolyPhen2_0.5=`033_Derived_PolyPhen2_0.5`/`001_synonymous`) %>% 
+  ### wide -> long
+  pivot_longer(.,cols =c("Ratio_002_nonsynonymous":"Ratio_033_Derived_PolyPhen2_0.5"),names_to ="Stand_LoadGroup" ,values_to = "Stand_delCount") %>% 
+  ### 去除不必要的列，方便画图和管理数据
+  select(- ("001_synonymous":"033_Derived_PolyPhen2_0.5")) %>%
+    write_tsv(file.path("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub",str_replace_all(basename(filenamefun),"delCount","delRatio")))
+  
+  return(dfdelRatio)
+}
+
+### 函数调用
+inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
+
+df <- dir(inputDir,pattern = "delCount",full.names = T) %>%
+  map(fun_getDelRatio)
+
+```
+
+
+#### =================
+## Del load ratio 技巧画图测试
+```{r}
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
+labelsB <- c("Nonsynonymous","Deleterious","High impact")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  # filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  select(-c("IfSelected","Group_refobj")) %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(Stand_LoadGroup %in% factorB) %>% 
+  filter(DelCountGroup %in% factorC) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC))
+
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray80")
+
+p <- df %>%
+  filter(DelCountGroup=="Additive") %>% 
+  filter(Stand_LoadGroup=="Deleterious") %>% 
+  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
+  # ylab("Mutation burden")+xlab("")+
+  ylab("Mutation load")+xlab("")+
+  # ylab("Derived del SNPs/syn SNPs per accession")+xlab("")+
+  ### volin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.01, color="white", alpha=0.2,outlier.color = NA) +
+  # # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+
+  ### boxplot
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  
+    ### boxplot2
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.2),alpha = 0.3,aes(color=GroupbyContinent),size=0.03)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+
+    ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 12))+
+  theme(strip.background = element_blank())
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 5.3)
+
+```
+
+#### ======正文
+## Del load ratio
+```{r}
+choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
+
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
+labelsB <- c("Nonsynonymous","Deleterious","High impact")
+
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  select(-c("IfSelected","Group_refobj","DelCountGroup")) %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(Stand_LoadGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB))
+
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray80")
+
+```
+
+### plot
+```{r}
+p <- df %>%
+  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
+  ylab("Mutation burden")+xlab("")+
+  ### volin
+  geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  geom_boxplot(position = position_dodge(0.8), width=0.01, color="white", alpha=0.2,outlier.color = NA) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+
+  ### boxplot
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  
+  ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_grid(Stand_LoadGroup~.,scales = "free")+
+  # facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 1)+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4)
+    ,legend.position = 'none'
+    ,text = element_text(size = 9))
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "figs/Fig3/misc/whole_load.pdf",height = 3,width = 4)
+```
+
+## Del count
+```{r}
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delCount.txt.gz") 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5","007_VEP")
+labelsB <- c("Nonsynonymous","Deleterious","High impact")
+
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  select(-c("IfSelected","Group_refobj","SiteCountWithMinDepth")) %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB))
+
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray70")
+```
+
+
+### plot
+```{r}
+p <- df %>%
+  ggplot(aes(x=Subgenome,y=TotalDerivedSNPCount,fill=GroupbyContinent))+
+  labs(y="No. derived SNPs",x="")+
+  ### volin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.01, color="white", alpha=0.2,outlier.color = NA) +
+  # # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+
+  ### boxplot
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  
+  ### pointrange
+  stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position = position_dodge(0.8),geom="pointrange")+
+  stat_summary(fun=mean, geom="point", color="white",position = position_dodge(0.8))+
+  
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_grid(VariantsGroup~.,scales = "free")+
+  # facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 1)+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4)
+    ,legend.position = 'none'
+    ,text = element_text(size = 9))
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+# ggsave(p,filename = "figs/Fig3/misc/whole_load_count.pdf",height = 3,width = 4)
+```
+## 文件名字
+FigS_delCount
+FigS_delRatio
+FigS_DelVsNonsynProportion
+
+FigS_delCount_triads
+FigS_delRatio_triads
+FigS_triads_DelVsNonsynProportion
+
+FigS_delCount_hexaploid
+FigS_delRatio_hexaploid
+FigS_hexaploid_DelVsNonsynProportion
+
+FigS_delCount_hexaploid_triads
+FigS_delRatio_hexaploid_triads
+FigS_hexaploid_triads_DelVsNonsynProportion
+
+#### ====== 附件 1
+## Whole genome / Triads
+## Del count
+```{r}
+plot_getDelCount <- function(filenamefun){
+  
+  dfdel <- read_tsv(filenamefun)
+  dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("001_synonymous","002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5","007_VEP")
+labelsB <- c("Synonymous","Nonsynonymous","Deleterious","High impact")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>%
+  select(-c("IfSelected","Group_refobj","SiteCountWithMinDepth","HeterDerivedSNPCount")) %>% 
+  pivot_longer(cols = c(TotalDerivedSNPCount,HomoDerivedSNPCount,),names_to = "DelCountGroup",values_to = "Count") %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC))
+  
+
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray70")
+
+p <- df %>%
+  # filter(DelCountGroup=="Additive") %>% 
+  ggplot(aes(x=Subgenome,y=Count,fill=GroupbyContinent))+
+  labs(y="No. derived SNPs",x="")+
+  ### pointrange
+  stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position = position_dodge(0.8),geom="pointrange")+
+  stat_summary(fun=mean, geom="point", color="white",position = position_dodge(0.8))+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+  ### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_grid(VariantsGroup~DelCountGroup,scales = "free")+
+  # facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 1)+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    # legend.position = 'none',
+    ### 添加 legend
+    legend.key = element_blank(),
+    legend.position = "bottom",
+    text = element_text(size = 9))+
+  guides(color=guide_legend(ncol=7))
+p
+
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/figs/FigS_delCount/misc")
+
+outDir <- c("~/Documents/")
+
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],".pdf")),height = 4.45,width = 7.2)
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+
+}
+
+p <- plot_getDelCount("data/004_delCount/delCount.txt.gz")
+p
+p <- plot_getDelCount("data/004_delCount/delCount_triads.txt.gz")
+p
+```
+
+## Del count from 0 - max
+```{r}
+plot_getDelCount <- function(filenamefun){
+  
+  dfdel <- read_tsv(filenamefun)
+  dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("001_synonymous","002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5","007_VEP")
+labelsB <- c("Synonymous","Nonsynonymous","Deleterious","High impact")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>%
+  select(-c("IfSelected","Group_refobj","SiteCountWithMinDepth","HeterDerivedSNPCount")) %>% 
+  pivot_longer(cols = c(TotalDerivedSNPCount,HomoDerivedSNPCount,),names_to = "DelCountGroup",values_to = "Count") %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC))
+  
+
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray70")
+
+p <- df %>%
+  # filter(DelCountGroup=="Additive") %>% 
+  ggplot(aes(x=Subgenome,y=Count,fill=GroupbyContinent))+
+  labs(y="No. derived SNPs",x="")+
+  ### pointrange
+  stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position = position_dodge(0.8),geom="pointrange")+
+  stat_summary(fun=mean, geom="point", color="white",position = position_dodge(0.8))+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+  ### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_grid(VariantsGroup~DelCountGroup,scales = "free")+
+  # facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 1)+
+  expand_limits(y = 0)+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    # legend.position = 'none',
+    ### 添加 legend
+    legend.key = element_blank(),
+    legend.position = "bottom",
+    text = element_text(size = 12))+
+  guides(color=guide_legend(ncol=7))
+p
+
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/figs/FigS_delCount/misc")
+
+outDir <- c("~/Documents/")
+
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],".pdf")),height = 4.45,width = 7.2)
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+
+}
+
+p <- plot_getDelCount("data/004_delCount/delCount.txt.gz")
+p
+p <- plot_getDelCount("data/004_delCount/delCount_triads.txt.gz")
+p
+
+
+```
+
+
+
+## Del load ratio
+```{r}
+
+plot_getDelRatio <- function(filenamefun){
+  ### 先处理del文件
+dfdel <- read_tsv(filenamefun) 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
+labelsB <- c("Nonsynonymous","Deleterious","High impact")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  # filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  select(-c("IfSelected","Group_refobj")) %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(Stand_LoadGroup %in% factorB) %>% 
+  filter(DelCountGroup %in% factorC) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC))
+
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray80")
+
+p <- df %>%
+  # filter(DelCountGroup=="Additive") %>% 
+  # filter(Stand_LoadGroup=="Deleterious") %>% 
+  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
+  # ylab("Mutation burden")+xlab("")+
+  ylab("Mutation load")+xlab("")+
+  # ylab("Derived del SNPs/syn SNPs per accession")+xlab("")+
+  ### volin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.01, color="white", alpha=0.2,outlier.color = NA) +
+  # # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+
+  ### boxplot
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  
+    ### boxplot2
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.2),alpha = 0.3,aes(color=GroupbyContinent),size=0.03)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+
+    ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  # facet_grid(Stand_LoadGroup~DelCountGroup,scales = "free")+
+  facet_wrap(Stand_LoadGroup~DelCountGroup,scales = "free", ncol = 2,
+             strip.position = c("right"))+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    # legend.position = 'none',
+        ### 添加 legend
+    legend.key = element_blank(),
+    legend.position = "bottom",
+    strip.background = element_rect(color = "white",fill = "gray90"),
+    text = element_text(size = 12))+
+  guides(color=guide_legend(ncol=7))
+ 
+p
+
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/figs/FigS_delCount/misc")
+
+outDir <- c("~/Documents")
+
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],".pdf")),height = 7.2,width = 7.2)
+
+
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+
+}
+p <- plot_getDelRatio("data/004_delCount/delRatio.txt.gz")
+p
+
+# p <- plot_getDelRatio("data/004_delCount/delRatio_triads.txt.gz")
+# p
+
+
+```
+
+## Del load ratio -  AB subgenome
+```{r}
+
+plot_getDelRatio <- function(filenamefun){
+  ### 先处理del文件
+dfdel <- read_tsv(filenamefun) 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
+labelsB <- c("Nonsynonymous","Deleterious","High impact")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  # filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  select(-c("IfSelected","Group_refobj")) %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(Stand_LoadGroup %in% factorB) %>% 
+  filter(DelCountGroup %in% factorC) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC))
+
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray80")
+
+p <- df %>%
+  # filter(DelCountGroup=="Additive") %>% 
+  # filter(Stand_LoadGroup=="Deleterious") %>% 
+  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
+  # ylab("Mutation burden")+xlab("")+
+  ylab("Mutation load")+xlab("")+
+  # ylab("Derived del SNPs/syn SNPs per accession")+xlab("")+
+  ### volin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.01, color="white", alpha=0.2,outlier.color = NA) +
+  # # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+
+  ### boxplot
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  
+    ### boxplot2
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.2),alpha = 0.3,aes(color=GroupbyContinent),size=0.03)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+
+    ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  # facet_grid(Stand_LoadGroup~DelCountGroup,scales = "free")+
+  facet_wrap(Stand_LoadGroup~DelCountGroup,scales = "free", ncol = 2,
+             strip.position = c("right"))+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    # legend.position = 'none',
+        ### 添加 legend
+    legend.key = element_blank(),
+    legend.position = "bottom",
+    strip.background = element_rect(color = "white",fill = "gray90"),
+    text = element_text(size = 12))+
+  guides(color=guide_legend(ncol=7))
+ 
+p
+
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/figs/FigS_delCount/misc")
+
+outDir <- c("~/Documents")
+
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],".pdf")),height = 7.2,width = 7.2)
+
+
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+
+}
+p <- plot_getDelRatio("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub/delRatio.txt.gz")
+p
+
+# p <- plot_getDelRatio("data/004_delCount/delRatio_triads.txt.gz")
+# p
+
+
+```
+
+
+## Del/Nonsyn proportion
+```{r}
+plot_delVsNonsyn <- function(filenamefun){
+  ### 先处理del文件
+# dfdel <- read_tsv("data/004_delCount/delCount.txt.gz") 
+dfdel <- read_tsv(filenamefun)
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5")
+labelsB <- c("Nonsynonymous","Deleterious")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>%
+  select(-c("IfSelected","Group_refobj","SiteCountWithMinDepth","HeterDerivedSNPCount")) %>% 
+  pivot_longer(cols = c(TotalDerivedSNPCount,HomoDerivedSNPCount,),names_to = "DelCountGroup",values_to = "Count") %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC)) %>% 
+  pivot_wider(names_from =VariantsGroup,values_from = Count) %>% 
+  mutate(Proportion_delVsNonsyn = Deleterious/Nonsynonymous)
+  
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray70")
+
+p <- df %>%
+  ggplot(aes(x=Subgenome,y=Proportion_delVsNonsyn,fill=GroupbyContinent))+
+  ylab("Proportion of derived\ndel SNPs/nonsyn SNPs ")+xlab("")+
+    ### boxplot2
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.2),alpha = 0.3,aes(color=GroupbyContinent),size=0.03)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+    ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  # facet_grid(Stand_LoadGroup~DelCountGroup,scales = "free")+
+  facet_wrap(~DelCountGroup,scales = "free", ncol = 2,
+             strip.position = c("top"))+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    # legend.position = 'none',
+        ### 添加 legend
+    legend.key = element_blank(),
+    legend.position = "bottom",
+    strip.background = element_rect(color = "white",fill = "gray90"),
+    text = element_text(size = 12))+
+  guides(color=guide_legend(ncol=7))
+
+p
+
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/figs/FigS_delCount/misc")
+
+outDir <- c("~/Documents/")
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],"_DelVsNonsynProportion.pdf")),height = 3,width = 7.2)
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+}
+
+p <- plot_delVsNonsyn("data/004_delCount/delCount.txt.gz")
+p
+
+p <- plot_delVsNonsyn("data/004_delCount/delCount_triads.txt.gz")
+p
+
+```
+
+#### ====== 附件 2
+## hexaploid Whole genome / Triads
+## Del count
+```{r}
+plot_getDelCount <- function(filenamefun){
+  
+  dfdel <- read_tsv(filenamefun)
+  dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+# factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorA <- c("LR_EU","CL","LR_EA")
+
+factorB <- c("001_synonymous","002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5","007_VEP")
+labelsB <- c("Synonymous","Nonsynonymous","Deleterious","High impact")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>%
+  select(-c("IfSelected","Group_refobj","SiteCountWithMinDepth","HeterDerivedSNPCount")) %>% 
+  pivot_longer(cols = c(TotalDerivedSNPCount,HomoDerivedSNPCount,),names_to = "DelCountGroup",values_to = "Count") %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC))
+  
+
+# colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray70")
+colB <- c("#fc6e6e","#9900ff","gray70")
+
+p <- df %>%
+  # filter(DelCountGroup=="Additive") %>% 
+  ggplot(aes(x=Subgenome,y=Count,fill=GroupbyContinent))+
+  labs(y="No. derived SNPs",x="")+
+  ### pointrange
+  stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position = position_dodge(0.8),geom="pointrange")+
+  stat_summary(fun=mean, geom="point", color="white",position = position_dodge(0.8))+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+  ### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  facet_grid(VariantsGroup~DelCountGroup,scales = "free")+
+  # facet_wrap(Stand_LoadGroup~.,scales = "free", ncol = 1)+
+  expand_limits(y = 0)+ ### y 轴是否从0 开始
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    # legend.position = 'none',
+            ### 添加 legend
+    legend.key = element_blank(),
+    legend.position = "bottom",
+    text = element_text(size = 9))+  
+  guides(color=guide_legend(ncol=3))
+
+
+p
+
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/figs/FigS_delCount/misc")
+
+outDir <- c("~/Documents/")
+
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],".pdf")),height = 4.45,width = 7.2)
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+
+}
+
+p <- plot_getDelCount("data/004_delCount/delCount_hexaploid.txt.gz")
+p
+
+p <- plot_getDelCount("data/004_delCount/delCount_hexaploid_triads.txt.gz")
+p
+```
+
+
+## Del load ratio
+```{r}
+
+plot_getDelRatio <- function(filenamefun){
+  ### 先处理del文件
+dfdel <- read_tsv(filenamefun) 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("LR_EU","CL","LR_EA")
+factorB <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
+labelsB <- c("Nonsynonymous","Deleterious","High impact")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
+  # filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  select(-c("IfSelected","Group_refobj")) %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(Stand_LoadGroup %in% factorB) %>% 
+  filter(DelCountGroup %in% factorC) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC))
+
+colB <- c("#fc6e6e","#9900ff","gray80")
+
+p <- df %>%
+  # filter(DelCountGroup=="Additive") %>% 
+  # filter(Stand_LoadGroup=="Deleterious") %>% 
+  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
+  # ylab("Mutation burden")+xlab("")+
+  ylab("Mutation load")+xlab("")+
+  # ylab("Derived del SNPs/syn SNPs per accession")+xlab("")+
+  ### volin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
+  # geom_boxplot(position = position_dodge(0.8), width=0.01, color="white", alpha=0.2,outlier.color = NA) +
+  # # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+
+  ### boxplot
+  # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  
+    ### boxplot2
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.2),alpha = 0.3,aes(color=GroupbyContinent),size=0.03)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+
+    ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  # facet_grid(Stand_LoadGroup~DelCountGroup,scales = "free")+
+  facet_wrap(Stand_LoadGroup~DelCountGroup,scales = "free", ncol = 2,
+             strip.position = c("right"))+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    # legend.position = 'none',
+    ### 添加 legend
+    legend.key = element_blank(),
+    legend.position = "bottom",
+    strip.background = element_rect(color = "white",fill = "gray90"),
+    text = element_text(size = 12))+
+  guides(color=guide_legend(ncol=3))
+
+p
+
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/figs/FigS_delCount/misc")
+outDir <- c("~/Documents/")
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],".pdf")),height = 7.2,width = 7.2)
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+  
+}
+p <- plot_getDelRatio("data/004_delCount/delRatio_hexaploid.txt.gz")
+p
+
+p <- plot_getDelRatio("data/004_delCount/delRatio_hexaploid_triads.txt.gz")
+p
+
+```
+
+## Del/Nonsyn proportion
+```{r}
+plot_delVsNonsyn <- function(filenamefun){
+  ### 先处理del文件
+# dfdel <- read_tsv("data/004_delCount/delCount.txt.gz") 
+dfdel <- read_tsv(filenamefun,show_col_types = FALSE)
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("LR_EU","CL","LR_EA")
+factorB <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5")
+labelsB <- c("Nonsynonymous","Deleterious")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>%
+  select(-c("IfSelected","Group_refobj","SiteCountWithMinDepth","HeterDerivedSNPCount")) %>% 
+  pivot_longer(cols = c(TotalDerivedSNPCount,HomoDerivedSNPCount,),names_to = "DelCountGroup",values_to = "Count") %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC)) %>% 
+  pivot_wider(names_from =VariantsGroup,values_from = Count) %>% 
+  mutate(Proportion_delVsNonsyn = Deleterious/Nonsynonymous)
+  
+colB <- c("#fc6e6e","#9900ff","gray70")
+
+p <- df %>%
+  ggplot(aes(x=Subgenome,y=Proportion_delVsNonsyn,fill=GroupbyContinent))+
+  ylab("Proportion of derived\ndel SNPs/nonsyn SNPs ")+xlab("")+
+    ### boxplot2
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.2),alpha = 0.3,aes(color=GroupbyContinent),size=0.03)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+    ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  # facet_grid(Stand_LoadGroup~DelCountGroup,scales = "free")+
+  facet_wrap(~DelCountGroup,scales = "free", ncol = 2,
+             strip.position = c("top"))+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    # legend.position = 'none',
+    ### 添加 legend
+    legend.key = element_blank(),
+    legend.position = "bottom",
+    strip.background = element_rect(color = "white",fill = "gray90"),
+    text = element_text(size = 12))+
+  guides(color=guide_legend(ncol=3))
+
+p
+
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/figs/FigS_delCount/misc")
+outDir <- c("~/Documents/")
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],"_DelVsNonsynProportion.pdf")),height = 3,width = 7.2)
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+}
+
+p <- plot_delVsNonsyn("data/004_delCount/delCount_hexaploid.txt.gz")
+p
+
+p <- plot_delVsNonsyn("data/004_delCount/delCount_hexaploid_triads.txt.gz")
+p
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+

@@ -816,7 +816,6 @@ df1 <- read.delim("data/003_VCF_QC/AABBDD_taxa_QC.txt.gz")
 df2 <- read.delim("data/003_VCF_QC/AABB_taxa_QC.txt.gz")
 df3 <- read.delim("data/003_VCF_QC/DD_taxa_QC.txt.gz")
 df <- rbind(df1,df2,df3) %>% mutate(GenomeType = factor(GenomeType,levels = subA))
-
 p <- df %>% 
   filter(! Taxa %in% spelt) %>% 
   ggplot(aes(x=GenomeType,y=HeterozygousProportion,fill = GenomeType)) +
@@ -837,6 +836,8 @@ p
 
 # ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
 ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 1.8)
+
+mean(df2$HeterozygousProportion)
  
 ```
 
@@ -926,7 +927,7 @@ p <- df %>%
   labs(x="Heterozygous genotype proportion by site",y="Density")+
   scale_fill_manual(values = colB,name='')+
   scale_color_manual(values = colB,name='')+
-  # coord_cartesian(xlim = c(0,0.5))+
+  coord_cartesian(xlim = c(0,0.5))+
   facet_grid(.~GenomeType)+
   theme_classic()+
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()

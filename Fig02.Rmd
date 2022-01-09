@@ -37,6 +37,9 @@ dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>%
   # mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
   # mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
 
+dftotal_ancestral <- dftotal %>% 
+  filter(!is.na(Ancestral),Ancestral == Ref | Ancestral == Alt) 
+
 ### 现将基因组过滤，只保留有 ancestral 状态的，并且添加LoadGroup、IfRefisAnc、CommonOrRare 等分组信息
 dftotal_withAncestral <- dftotal %>% 
   filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>%
@@ -50,6 +53,17 @@ dftotal_withAncestral <- dftotal %>%
 ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
 ### 2个filter 5个mutate 1个filter
 
+
+df <- dftotal %>% 
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>%
+  filter(!is.na(Ancestral),Ancestral == Ref | Ancestral == Alt) %>%
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  filter(Ref_PolyPhen2_prob==Alt_PolyPhen2_prob)
 ```
 
 #### =====================

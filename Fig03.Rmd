@@ -489,27 +489,72 @@ dfall <- df
 ```
 
 ```{r}
+library(slider)
 df <- dfall %>% 
-  filter(!is.na(IntrogressionBurdenIndex)) 
+  filter(!is.na(IntrogressionBurdenIndex)) %>% 
+  group_by(Chr,P3) %>% 
+  mutate(bin=slide(Start,mean,.before = 50,.after = 50) %>% unlist(),
+         binBurdenIndex=slide(IntrogressionBurdenIndex, mean,.before = 50,.after = 50) %>% unlist())
+
+#### 设置每条染色体的点
+data1 <- data.frame(RefChr = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(RefChr = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(RefChr = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3) %>% 
+  mutate(Sub=str_sub(RefChr,2,2), SubID=str_sub(RefChr,1,1)) %>% 
+  filter(RefChr %in% c("1A","1B","1D"))
 
 p <- df %>%
-  ggplot(aes(x=Start/1000000,y=IntrogressionBurdenIndex,color=P3))+
+  group_by(SlightlyOrStrongly) %>% 
+  # filter(Chr %in% c("1A","1B","1D")) %>% 
+  group_map(~{ggplot(.x,aes(x=bin/1000000,y=binBurdenIndex,color=P3))+
+  # geom_point()+
+  geom_line(size=0.4)+
+  geom_hline(yintercept = 0, linetype=2, color="grey",size=0.4)+
+  facet_grid(SubID~Sub)+
+  geom_point(aes(x,y),color = "blue",size=0.5,data = data)+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  scale_y_continuous(breaks = seq(-0.3,0.1,by=0.3))+
+  # geom_smooth(method = "loess",span=0.2)+
+  labs(x="Genomic position (Mb)", y="Introgressed VS 
+       nonIntrogressed burden")+
+  theme_classic()+
+  theme(
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        legend.position = "none",
+        legend.title = element_blank(),
+        # axis.title.x = element_blank(),
+        axis.line = element_line(size = 0.3),
+        text = element_text(size = 9),
+        panel.border = element_rect(colour = "transparent",fill = "transparent"))})
+p
+ggsave("~/Documents/temp.pdf",p[[1]],width =4.73 , height = 2.31)
+
+
+p <- df %>%
+  filter(P3=="AT") %>%
+  ggplot(aes(x=bin/1000000,y=binBurdenIndex,color=SlightlyOrStrongly))+
   # geom_point()+
   geom_line()+
-  facet_grid(SubID~Sub+SlightlyOrStrongly)+
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_hline(yintercept = 0, linetype=2, color="grey")+
+  facet_grid(SubID~Sub)+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  labs(x="Genomic position (Mb)")+
   # geom_smooth(method = "loess",span=0.2)+
-  theme_bw()
+  theme_classic()+
+  theme(
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        # legend.position = "none", legend.title = element_blank(),
+        axis.title.x = element_blank(),
+        axis.line = element_blank(),
+        # text = element_text(size = 14),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
 
-p
-
-ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
-  
-
-  
-p <- df %>%
-  ggplot(aes(x=IntrogressionBurdenIndex),color=P3)+
-  geom_histogram()+
-  facet_grid(Sub~P3+SlightlyOrStrongly)
 p
 ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
   
