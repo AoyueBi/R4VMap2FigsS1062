@@ -803,6 +803,106 @@ p
 ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 3.43,width = 4)
 ```
 
+### IBS distance by 9+17+1=27 all species
+```{r}
+### ********************** Section1 *********************************###
+### taxa 属性数据框
+factorA <- c("dicoccoides","dicoccum","durum","turanicum","polonicum","turgidum","karamyschevii","ispahanicum","carthlicum","Landrace","Cultivar","OtherHexaploids","compactum","sphaerococcum","tibeticum","vavilovii","petropavlovskyi","yunna-nense","macha","spelta","strangulata")
+
+labelsA <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat ","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","Landrace","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Strangulata")
+
+dfhash <- tibble(Subspecies_by22_TreeValidated=factorA,Subspecies22=labelsA) 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,Subspecies_by22_TreeValidated,GroupbyContinent) %>%
+  left_join(.,dfhash,by="Subspecies_by22_TreeValidated") %>% 
+  mutate(GroupforExpansionLoad = if_else(Subspecies22=="Landrace",GroupbyContinent,Subspecies22)) %>% 
+  select(Taxa,GenomeType,GroupforExpansionLoad)
+
+dataFile <- c("data/002_pca/004_matrix_Asub.txt.gz")
+dfmatrixA <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "A")
+dataFile <- c("data/002_pca/005_matrix_Bsub.txt.gz") 
+dfmatrixB <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "B")
+dataFile <- c("data/002_pca/006_matrix_Dsub.txt.gz")
+dfmatrixD <- read.delim(dataFile) %>% select(Taxa,ABD_1142) %>% mutate(Sub = "D")
+
+df <- rbind(dfmatrixA,dfmatrixB,dfmatrixD) %>% 
+  rename(IBSdistance2CS=ABD_1142) %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(!is.na(GroupforExpansionLoad))
+
+```
+
+```{r}
+factorAo <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat ","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","LR_EA","LR_CSA","LR_WA","LR_AF","LR_EU","LR_AM","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Strangulata")
+
+df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = factorAo)
+```
+
+```{r}
+### 计算每个亚群的个数，并添加到taxa数据库后面
+dftaxaCount <- df %>% 
+  group_by(Sub,GroupforExpansionLoad) %>% 
+  count() %>% 
+  ungroup() %>%  
+  distinct(.,GroupforExpansionLoad,.keep_all = T) %>% 
+  select(-Sub) %>% 
+  mutate(GroupforExpansionLoad_AddCount = 
+           str_c(GroupforExpansionLoad," (", n, ")",sep = "")) %>% 
+  select(-n)
+
+```
+
+```{r}
+p <- ggplot(df,aes(x=GroupforExpansionLoad,y= IBSdistance2CS))+
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(1))+ # add error bar
+  # geom_violin(position = position_dodge(0.8),alpha=0.8) +
+  # geom_boxplot(position = position_dodge(1),outlier.color = 'white',alpha=0.8,width=0.5)+ #,width=0.2
+  # geom_point(position = position_jitterdodge(0.5),alpha = 0.6,aes(col=Sub),size=0.3)+
+  ylab("IBS distance to CS")+
+  xlab("")+
+  ### 加阴影
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5,color="white")+
+  geom_rect(aes(xmin=3-0.5,xmax=3+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=5-0.5,xmax=5+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=7+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=9-0.5,xmax=9+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=11-0.5,xmax=11+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=13-0.5,xmax=13+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=15-0.5,xmax=15+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=17+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=19-0.5,xmax=19+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=21-0.5,xmax=21+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=23-0.5,xmax=23+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=25-0.5,xmax=25+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  # 最上面的条纹
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=0.25,ymax=Inf),fill="#ffd702",alpha=0.5)+
+  geom_rect(aes(xmin=2-0.5,xmax=2+0.5,ymin=0.25,ymax=Inf),fill="#7f5701",alpha=0.5)+
+  geom_rect(aes(xmin=3-0.5,xmax=6+0.5,ymin=0.25,ymax=Inf),fill="#016699",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=9+0.5,ymin=0.25,ymax=Inf),fill="#00f3ff",alpha=0.5)+
+  geom_rect(aes(xmin=10-0.5,xmax=15+0.5,ymin=0.25,ymax=Inf),fill="#fc6e6e",alpha=0.5)+
+  geom_rect(aes(xmin=16-0.5,xmax=16+0.5,ymin=0.25,ymax=Inf),fill="#9900ff",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=25+0.5,ymin=0.25,ymax=Inf),fill="#fe63c2",alpha=0.5)+
+  geom_rect(aes(xmin=26-0.5,xmax=26+0.5,ymin=0.25,ymax=Inf),fill="#87cef9",alpha=0.5)+
+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(1),size=0.1)+
+  stat_summary(aes(color=Sub),fun.data=mean_sdl,position = position_dodge(0.5),geom="pointrange",size=0.3)+
+  geom_vline(xintercept = 9.5,linetype="dashed",color="black")+
+  geom_vline(xintercept = 25.5,linetype="dashed",color="black")+
+  scale_color_manual(values =c("#fd8582","#967bce","#4bcdc6"),name='')+
+  scale_x_discrete(labels = dftaxaCount$GroupforExpansionLoad_AddCount)+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(plot.margin=unit(rep(1.3,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    text = element_text(size = 10),legend.position = 'none')
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4,width = 7.2)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 3.5,width = 7)
+```
+
+
 ## Heter by taxa boxplot
 ```{r}
 library(brew)
