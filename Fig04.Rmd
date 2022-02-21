@@ -29,7 +29,9 @@ library(tidyverse)
 ```
 
 
-## === World map ===
+#### === map ====
+
+## World map
 ```{r}
 choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
 ### 先处理del文件
@@ -61,7 +63,7 @@ ggsave(mp,filename = "figs/map_s1062_1.pdf", height = 2.76,width = 6.89)
 ```
 
 
-### Bubble map
+## Bubble map
 ```{r}
 choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
 
@@ -104,7 +106,7 @@ ggsave(mp,filename = "figs/map_s1062_2.pdf", height = 2.76,width = 6.89)
 
 
 
-### Spatstat world map
+## Spatstat world map
 ```{r}
 choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
 
@@ -130,7 +132,7 @@ df <- df1 %>%
   
 ```
 
-#### plot
+### plot
 ```{r}
 library(raster)
 # detach(package:raster,unload = T)
@@ -186,7 +188,9 @@ dev.off()
 
 
 
-## === boxplot ===
+#### === boxplot ===
+
+## boxplot load
 - 可以选择定义有害突变的方式 
 unique(dfdel$Stand_LoadGroup)
 ```{r}
@@ -262,5 +266,665 @@ p
 ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 6,width = 5)
 ```
 
+#### === heter vs distance ===
 
+## Map by subspecies
+```{r}
+### ********************** Section1 *********************************###
+### taxa 属性数据框
+factorA <- c("dicoccoides","dicoccum","durum","turanicum","polonicum","turgidum","karamyschevii","ispahanicum","carthlicum","Landrace","Cultivar","OtherHexaploids","compactum","sphaerococcum","tibeticum","vavilovii","petropavlovskyi","yunna-nense","macha","spelta","strangulata")
+
+labelsA <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","Landrace","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Strangulata")
+
+dfhash <- tibble(Subspecies_by22_TreeValidated=factorA,Subspecies22=labelsA) 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,Subspecies_by22_TreeValidated,GroupbyContinent,Latitude,Longitude,orgCty,Country) %>%
+  left_join(.,dfhash,by="Subspecies_by22_TreeValidated") %>% 
+  mutate(GroupforExpansionLoad = if_else(Subspecies22=="Landrace",GroupbyContinent,Subspecies22)) %>% 
+  mutate(GroupforExpansionLoad2=
+if_else(Subspecies22=="Landrace",GroupbyContinent,Subspecies_by22_TreeValidated)) %>%
+  select(Taxa,GenomeType,GroupforExpansionLoad,GroupforExpansionLoad2,Latitude,Longitude,orgCty,Country) 
+
+# write_tsv(dftaxaDB,file = "/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/002_taxaDB_GroupforExpansionLoad.txt")
+
+
+### ********************** Section 2 *********************************###
+### 先将有经纬度信息的材料进行画图查看，将异常点的位置信息进行校正
+dftaxaDB2 <- dftaxaDB %>% 
+  filter(!is.na(Latitude))
+
+### 写出没有经纬度信息的336份材料，根据国家添加人为估计的经纬度信息
+dftaxaDB3_noPos <- dftaxaDB %>% 
+  filter(is.na(Latitude))
+
+# write_csv(dftaxaDB3_noPos,file = "/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/026_heter_load_distance/001_noPosition_table/001_taxa_noPosition.csv")
+
+### 写出具体的亚群，手动添加地区注释
+dftable <- dftaxaDB %>% 
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  distinct(GroupforExpansionLoad,.keep_all = T) %>% 
+  select(GenomeType,GroupforExpansionLoad,GroupforExpansionLoad2)
+# write_csv(dftable,file = "~/Documents/taxaDB_category.csv")
+
+plotfun_map <- function(fun_df,fun_factor){
+  mp <- NULL #定义一个空的地图
+  # 注意： borders函数中的colour是地图国家边界线的颜色,fill是国家的填充颜色
+  mapworld <- borders("world", colour = "#dedfe0", fill = "#dedfe0") #绘制基本地图
+  mpvoid <- ggplot() + mapworld + ylim(-55, 90) + theme_void()
+  
+  mp <- mpvoid +
+    geom_point(
+      data = fun_df,
+      aes(x = Longitude, y = Latitude),
+      shape = 21,
+      alpha = 0.8,
+      size = 1.5,
+      fill = "orange"
+    ) +
+    labs(title = fun_factor)+
+    theme(plot.title = element_text(hjust = 0.5)) +
+    theme(text = element_text(size = 6))+
+    theme(legend.position = 'none')
+  mp
+  
+  ggsave(mp,filename = str_c("~/Documents/",fun_factor,"_map.pdf"),height = 1.38,width = 3.445)
+  
+  return(mp)
+
+}
+
+#### 需要修饰的方面
+# 1.调节因子顺序
+# 2.标题居中，调节字体大小
+# 3.调节圆点大小
+
+### 建立2个一模一样的表格，为创建矩阵做准备
+df2 <- dftaxaDB2 %>% 
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  # mutate(GroupforExpansionLoad=factor(GroupforExpansionLoad,levels = factorAo,labels = factorAo)) %>%
+  # arrange(factor(GroupforExpansionLoad,levels = factorAo)) %>%
+  group_by(as.character(GroupforExpansionLoad)) %>%
+  group_map(~plotfun_map(.x,.y))
+
+### 图片保存
+q <- ggpubr::ggarrange(plotlist=df2,ncol = 4,nrow = 6)
+
+q
+
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+
+# factorAo <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","LR_EA","LR_CSA","LR_WA","LR_AF","LR_EU","LR_AM","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Strangulata")
+
+# factorAo <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat ","Polish wheat","Rivet wheat","Ispahanicum","Persian wheat","LR_EA","LR_CSA","LR_WA","LR_AF","LR_EU","LR_AM","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Xinjiang wheat","Macha","Spelt","Strangulata")
+
+### "Georgian wheat","Vavilovii","Yunan wheat"
+
+
+# q <- ggpubr::ggarrange(plotlist=list(df2[[22]],df2[[3]],df2[[4]],df2[[7]],df2[[17]],
+#                                      df2[[18]],df2[[]],df2[[]],df2[[]],df2[[]],
+#                                      df2[[]],df2[[]],df2[[]],df2[[]],df2[[]],
+#                                      df2[[]],df2[[]],df2[[]],df2[[]],df2[[]],
+#                                      df2[[]],df2[[]],df2[[]])
+#                        ,ncol = 4,nrow = 6)
+
+```
+
+## Latitude estimation by manual
+```{r}
+### ********************** Section1 *********************************###
+# df_all <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/002_taxaDB_GroupforExpansionLoad.txt")
+#
+### step1: 写出没有经纬度信息的336份材料，根据国家添加人为估计的经纬度信息
+### "Georgian wheat","Vavilovii","Yunan wheat"  47个国家
+#
+# df_noPosition <- read_csv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/026_heter_load_distance/001_noPosition_table/001_taxa_noPosition.csv")
+#
+### step2: 输出没有地理位置信息的国家，手动添加信息
+# dftest <- df_noPosition %>% 
+#   distinct(Country,.keep_all = T) %>% 
+#   select(4:7)
+### write_csv(dftest,file = "~/Documents/country_noLatitude.csv")
+#
+### step3: 336份没有经纬度信息的，加上经纬度信息和新的一列（是否是自己手动添加经纬度）
+# df_manualPosition <- read_csv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/026_heter_load_distance/001_noPosition_table/002_country_noLatitude.csv")
+#
+# df_336 <- df_noPosition %>% 
+#   select(Taxa,GenomeType,GroupforExpansionLoad,GroupforExpansionLoad2,Country) %>% 
+#   left_join(df_manualPosition,by="Country") %>% 
+#   mutate(IfLatitudebyManually="Yes") %>% 
+#   relocate(Country,.after = orgCty)
+### write_csv(df_336,file = "/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/026_heter_load_distance/001_noPosition_table/003_taxa_noPosition_addbyManually.csv")
+#
+### step4: 有些没有国家的材料，有种群信息，没有国家信息，但是可以根据种群信息手动添加经纬度信息。
+### 这一步进行剩余10几份材料(15)的手动添加
+### df_336_withManuallyPosition 
+#  
+### step5: 1062-336= 726 份材料添加注释信息
+# df_726_withPosition <- df_all %>% 
+#   anti_join(df_336,by="Taxa") %>% 
+#   mutate(IfLatitudebyManually="No") %>% 
+#   mutate(IfHasCountryInfo="Yes")
+#
+# df_336_withManuallyPosition <- read_csv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/026_heter_load_distance/001_noPosition_table/004_taxa_noPosition_addbyManually_secondTime.csv")
+# 
+# df_1062_withPosition <- df_726_withPosition %>% 
+#   bind_rows(df_336_withManuallyPosition) %>% 
+#   arrange(Taxa)
+#
+### write_tsv(df_1062_withPosition,file = "/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/003_taxaDB_GroupforExpansionLoad.txt")
+
+### write_csv(df_1062_withPosition,file = "/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/003_taxaDB_GroupforExpansionLoad.csv")
+
+### step6: 添加 6个群的信息
+# dftaxaDB <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/021_WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,Subspecies_by6_TreeValidated)
+# 
+# df_1062_withPosition <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/003_taxaDB_GroupforExpansionLoad.txt")
+# 
+# df_1062_update <- df_1062_withPosition %>% 
+#   left_join(dftaxaDB,by="Taxa") %>% 
+#   relocate(Subspecies_by6_TreeValidated,.after = GroupforExpansionLoad2)
+
+###write_tsv(df_1062_update,file = "/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/004_taxaDB_GroupforExpansionLoad.txt")
+
+### ------------ 开始画地图 ------------ ###
+### 先建立函数
+plotfun_map <- function(fun_df,fun_factor){
+  mp <- NULL #定义一个空的地图
+  # 注意： borders函数中的colour是地图国家边界线的颜色,fill是国家的填充颜色
+  mapworld <- borders("world", colour = "#dedfe0", fill = "#dedfe0") #绘制基本地图
+  mpvoid <- ggplot() + mapworld + ylim(-55, 90) + theme_void()
+  
+  mp <- mpvoid +
+    geom_point(
+      data = fun_df,
+      aes(x = Longitude, y = Latitude),
+      shape = 21,
+      alpha = 0.8,
+      size = 1.5,
+      fill = "orange"
+    ) +
+    labs(title = fun_factor)+
+    theme(plot.title = element_text(hjust = 0.5)) +
+    theme(text = element_text(size = 6))+
+    theme(legend.position = 'none')
+  mp
+  
+  ggsave(mp,filename = str_c("~/Documents/",fun_factor,"_map.pdf"),height = 1.38,width = 3.445)
+  
+  return(mp)
+
+}
+
+#### 需要修饰的方面
+# 1.调节因子顺序
+# 2.标题居中，调节字体大小
+# 3.调节圆点大小
+
+### 建立2个一模一样的表格，为创建矩阵做准备
+### 写出具体的亚群，手动添加地区注释
+
+df2 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/003_taxaDB_GroupforExpansionLoad.txt") %>% 
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  # mutate(GroupforExpansionLoad=factor(GroupforExpansionLoad,levels = factorAo,labels = factorAo)) %>%
+  # arrange(factor(GroupforExpansionLoad,levels = factorAo)) %>%
+  group_by(as.character(GroupforExpansionLoad)) %>%
+  group_map(~plotfun_map(.x,.y))
+
+### 图片保存
+# q <- ggpubr::ggarrange(plotlist=df2,ncol = 4,nrow = 7)
+# 
+# q
+# 
+# cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+### 按照自己定义的顺序进行图片保存
+q <- ggpubr::ggarrange(plotlist=list(df2[[24]],df2[[3]],df2[[4]],df2[[8]],df2[[18]],
+                                     df2[[19]],df2[[5]],df2[[7]],df2[[17]],
+                                     df2[[15]],df2[[20]],
+                                     df2[[9]],df2[[10]],df2[[11]],df2[[12]],df2[[13]],
+                                     df2[[14]],df2[[2]],df2[[16]],
+                                     df2[[1]],df2[[6]],df2[[22]],df2[[23]],df2[[25]],df2[[26]],
+                                     df2[[21]]
+                                     ),
+                       labels = as.character(c(1:26)),
+                       font.label = list(size = 7),
+                       ncol = 4,nrow = 7)
+
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+```
+
+
+
+### Heter by individual
+```{r}
+dfgroup <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/001_taxaDB_GroupforExpansionLoad.txt")
+
+factorAo <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","LR_EA","LR_CSA","LR_WA","LR_AF","LR_EU","LR_AM","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Strangulata")
+
+df1 <- read.delim("data/003_VCF_QC/AABBDD_taxa_QC.txt.gz")
+df2 <- read.delim("data/003_VCF_QC/AABB_taxa_QC.txt.gz")
+df3 <- read.delim("data/003_VCF_QC/DD_taxa_QC.txt.gz")
+df <- rbind(df1,df2,df3) %>%
+  mutate(GenomeType = factor(GenomeType,levels = c("AABB","AABBDD","DD"))) %>% 
+  left_join(dfgroup) %>% 
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  mutate(GroupforExpansionLoad=factor(GroupforExpansionLoad,levels = factorAo))
+
+### 计算每个亚群的个数，并添加到taxa数据库后面
+dftaxaCount <- df %>% 
+  group_by(GroupforExpansionLoad) %>% 
+  count() %>% 
+  ungroup() %>%  
+  distinct(.,GroupforExpansionLoad,.keep_all = T) %>% 
+  mutate(GroupforExpansionLoad_AddCount = 
+           str_c(GroupforExpansionLoad," (", n, ")",sep = "")) %>% 
+  select(-n)
+
+colB <- c('#ffd702','#fc6e6e',"#87cef9")
+yvalue <- 0.17
+
+p <- ggplot(df,aes(x=GroupforExpansionLoad,y=HeterozygousProportion))+
+  ylab("Heterozygous genotype\nproportion by individual")+
+  xlab("")+
+  ### 加阴影
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5,color="white")+
+  geom_rect(aes(xmin=3-0.5,xmax=3+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=5-0.5,xmax=5+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=7+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=9-0.5,xmax=9+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=11-0.5,xmax=11+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=13-0.5,xmax=13+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=15-0.5,xmax=15+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=17+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=19-0.5,xmax=19+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=21-0.5,xmax=21+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=23-0.5,xmax=23+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=25-0.5,xmax=25+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  # 最上面的条纹
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=yvalue,ymax=Inf),fill="#ffd702",alpha=0.5)+
+  geom_rect(aes(xmin=2-0.5,xmax=2+0.5,ymin=yvalue,ymax=Inf),fill="#7f5701",alpha=0.5)+
+  geom_rect(aes(xmin=3-0.5,xmax=6+0.5,ymin=yvalue,ymax=Inf),fill="#016699",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=9+0.5,ymin=yvalue,ymax=Inf),fill="#00f3ff",alpha=0.5)+
+  geom_rect(aes(xmin=10-0.5,xmax=15+0.5,ymin=yvalue,ymax=Inf),fill="#fc6e6e",alpha=0.5)+
+  geom_rect(aes(xmin=16-0.5,xmax=16+0.5,ymin=yvalue,ymax=Inf),fill="#9900ff",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=25+0.5,ymin=yvalue,ymax=Inf),fill="#fe63c2",alpha=0.5)+
+  geom_rect(aes(xmin=26-0.5,xmax=26+0.5,ymin=yvalue,ymax=Inf),fill="#87cef9",alpha=0.5)+
+  # 开始画图
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(1))+ # add error bar
+  # geom_point(position = position_jitterdodge(0.5),alpha = 0.6,aes(col=Sub),size=0.3)+
+  # stat_summary(fun.data=mean_sdl,geom="pointrange",size=0.3)+
+  ### boxplot
+  geom_boxplot(position = position_dodge(0.7),
+               outlier.color = 'black',
+               outlier.alpha = 0.8,
+               outlier.size = 0.7,
+               alpha=0.8,width=0.7)+ #,width=0.0.7
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(1),size=0.5)+
+  ### boxplot and point
+  # geom_boxplot(position = position_dodge(0.9),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  # geom_point(position = position_jitterdodge(0.6),alpha = 0.6,aes(color=GenomeType),size=0.8)+
+  geom_vline(xintercept = 9.5,linetype="dashed",color="black")+
+  geom_vline(xintercept = 25.5,linetype="dashed",color="black")+
+  scale_color_manual(values = c('#ffd702','#fc6e6e',"#87cef9"),name='')+
+  scale_x_discrete(labels = dftaxaCount$GroupforExpansionLoad_AddCount)+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(plot.margin=unit(rep(1.3,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    text = element_text(size = 10),legend.position = 'none')
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4,width = 7.2)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 3.5,width = 7)
+
+
+
+### 求四倍体 六倍体 二倍体的杂合度平均值
+dfave <- df %>% 
+  group_by(GenomeType) %>% 
+  summarise(mean_heter=mean(HeterozygousProportion))
+
+dfave
+# AABB	0.014694332			
+# AABBDD	0.006543548			
+# DD	0.016855904	
+```
+
+
+### Pi by individual
+```{r}
+### 对区间的 pi 进行总结，求平均值
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/data/014_PopParameters/001_pi/001_pi.txt.gz")
+# 
+# df1 <- df %>% 
+#   group_by(CHROM,Group) %>% 
+#   summarise(mean_pi = mean(PI))
+# 
+# write_tsv(df1,file = "data/014_PopParameters/001_pi/002_pi_summary.txt.gz")
+
+### 开始处理 pi 的结果
+dfori <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/004_taxaDB_GroupforExpansionLoad.txt") %>% 
+  filter(!is.na(GroupforExpansionLoad))
+
+dfhash <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/004_taxaDB_GroupforExpansionLoad.txt") %>% 
+  select(GroupforExpansionLoad,GroupforExpansionLoad2,GenomeType,Subspecies_by6_TreeValidated) %>% 
+  distinct(GroupforExpansionLoad,.keep_all = T)
+
+df <- read_tsv("data/014_PopParameters/001_pi/002_pi_summary.txt.gz") %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  filter(Group!="No1B1R", Group != "With1B1R") %>% 
+  left_join(dfhash,by=c("Group"="GroupforExpansionLoad2"))
+
+### 统计每个亚基因组内，按照B亚基因组排序
+### dfV2 为排序后的亚洲列表
+dfV1 <- df %>% 
+  mutate(Subspecies_by6_TreeValidated=factor(Subspecies_by6_TreeValidated,
+                                             levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploids","OtherTetraploids","Landrace","Cultivar","OtherHexaploids","Strangulata"))) %>% 
+  group_by(GenomeType,Sub,Subspecies_by6_TreeValidated,GroupforExpansionLoad) %>% 
+  summarise(mean = mean(mean_pi)) %>% 
+  ### 下一步记得排序的时候加上大群分类
+  arrange(.,GenomeType,Sub,Subspecies_by6_TreeValidated,-mean) %>% 
+  ungroup() %>%  
+  filter(Sub=="A") %>% 
+  select(GroupforExpansionLoad) %>% 
+  add_row(GroupforExpansionLoad="Strangulata")
+
+### 因子排序
+dfori$GroupforExpansionLoad <- factor(dfori$GroupforExpansionLoad,levels = dfV1$GroupforExpansionLoad)
+
+df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = dfV1$GroupforExpansionLoad)
+
+### 计算每个亚群的个数，并添加到taxa数据库后面
+dftaxaCount <- dfori %>% 
+  select(GroupforExpansionLoad) %>% 
+  group_by(GroupforExpansionLoad) %>% 
+  count() %>% 
+  ungroup() %>%
+  mutate(GroupforExpansionLoad_AddCount = str_c(GroupforExpansionLoad," (", n, ")",sep = "")) %>% 
+  select(-n)
+
+yvalue <- 2.6
+
+p <- ggplot(df,aes(x=GroupforExpansionLoad,y=mean_pi*1000))+
+  labs(y = expression(italic(theta)[pi]~"("~10^-3~")"),x="")+
+  ### 加阴影
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5,color="white")+
+  geom_rect(aes(xmin=3-0.5,xmax=3+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=5-0.5,xmax=5+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=7+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=9-0.5,xmax=9+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=11-0.5,xmax=11+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=13-0.5,xmax=13+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=15-0.5,xmax=15+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=17+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=19-0.5,xmax=19+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=21-0.5,xmax=21+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=23-0.5,xmax=23+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=25-0.5,xmax=25+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  # 最上面的条纹
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=yvalue,ymax=Inf),fill="#ffd702",alpha=0.5)+
+  geom_rect(aes(xmin=2-0.5,xmax=2+0.5,ymin=yvalue,ymax=Inf),fill="#7f5701",alpha=0.5)+
+  geom_rect(aes(xmin=3-0.5,xmax=6+0.5,ymin=yvalue,ymax=Inf),fill="#016699",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=9+0.5,ymin=yvalue,ymax=Inf),fill="#00f3ff",alpha=0.5)+
+  geom_rect(aes(xmin=10-0.5,xmax=15+0.5,ymin=yvalue,ymax=Inf),fill="#fc6e6e",alpha=0.5)+
+  geom_rect(aes(xmin=16-0.5,xmax=16+0.5,ymin=yvalue,ymax=Inf),fill="#9900ff",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=25+0.5,ymin=yvalue,ymax=Inf),fill="#fe63c2",alpha=0.5)+
+  geom_rect(aes(xmin=26-0.5,xmax=26+0.5,ymin=yvalue,ymax=Inf),fill="#87cef9",alpha=0.5)+
+  # 开始画图
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(1))+ # add error bar
+  # geom_point(position = position_jitterdodge(0.5),alpha = 0.6,aes(col=Sub),size=0.3)+
+  # stat_summary(fun.data=mean_sdl,geom="pointrange",size=0.3)+
+  ### boxplot
+  geom_boxplot(
+    aes(color=Sub),
+    position = position_dodge(0.8),
+               outlier.color = NA,
+               # outlier.alpha = 0.8,
+               # outlier.size = 0.7,
+               alpha=0.8,width=0.7)+ #,width=0.0.7
+  stat_summary(
+              aes(group=Sub),
+              color="black",
+              fun=mean, geom="point",position = position_dodge(0.8),size=0.4)+
+  ### boxplot and point
+  # geom_boxplot(position = position_dodge(0.9),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  # geom_point(position = position_jitterdodge(0.6),alpha = 0.6,aes(color=GenomeType),size=0.8)+
+  geom_vline(xintercept = 9.5,linetype="dashed",color="black")+
+  geom_vline(xintercept = 25.5,linetype="dashed",color="black")+
+  scale_color_manual(values = c("#fd8582","#967bce","#4bcdc6"),name='')+
+  scale_x_discrete(labels = dftaxaCount$GroupforExpansionLoad_AddCount)+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(plot.margin=unit(rep(1.3,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    # legend.position = 'none',
+    # legend.position = c(0.9,0.6),
+    text = element_text(size = 10))
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4,width = 7.2)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 3.5,width = 7)
+
+```
+
+
+### TajiamaD by individual
+```{r}
+### 对区间的 pi 进行总结，求平均值
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/data/014_PopParameters/002_tajimaD/001_TajimaD.txt.gz")
+# 
+# df1 <- df %>%
+#   group_by(CHROM,Group) %>%
+#   summarise(mean_tajimaD = mean(TajimaD,na.rm = T))
+# 
+# write_tsv(df1,file = "data/014_PopParameters/002_tajimaD/002_TajimaD_summary.txt.gz")
+
+### 开始处理 pi 的结果
+dfori <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/004_taxaDB_GroupforExpansionLoad.txt") %>% 
+  filter(!is.na(GroupforExpansionLoad))
+
+dfhash <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/004_taxaDB_GroupforExpansionLoad.txt") %>% 
+  select(GroupforExpansionLoad,GroupforExpansionLoad2,GenomeType,Subspecies_by6_TreeValidated) %>% 
+  distinct(GroupforExpansionLoad,.keep_all = T)
+
+df <- read_tsv("data/014_PopParameters/002_tajimaD/002_TajimaD_summary.txt.gz") %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  left_join(dfhash,by=c("Group"="GroupforExpansionLoad2"))
+
+### 统计每个亚基因组内，按照B亚基因组排序
+dfV1 <- df %>% 
+  mutate(Subspecies_by6_TreeValidated=factor(Subspecies_by6_TreeValidated,levels = c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploids","OtherTetraploids","Landrace","Cultivar","OtherHexaploids","Strangulata"))) %>% 
+  group_by(Sub,GenomeType,Subspecies_by6_TreeValidated,GroupforExpansionLoad) %>% 
+  summarise(mean = mean(mean_tajimaD)) %>% 
+  arrange(.,GenomeType,Sub,Subspecies_by6_TreeValidated,-mean) %>% 
+  ungroup() %>% 
+  filter(Sub=="A") %>% 
+  select(GroupforExpansionLoad) %>% 
+  add_row(GroupforExpansionLoad="Strangulata")
+
+### 因子排序
+dfori$GroupforExpansionLoad <- factor(dfori$GroupforExpansionLoad,levels = dfV1$GroupforExpansionLoad)
+
+df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = dfV1$GroupforExpansionLoad)
+
+### 计算每个亚群的个数，并添加到taxa数据库后面
+dftaxaCount <- dfori %>% 
+  select(GroupforExpansionLoad) %>% 
+  group_by(GroupforExpansionLoad) %>% 
+  count() %>% 
+  ungroup() %>%
+  mutate(GroupforExpansionLoad_AddCount = str_c(GroupforExpansionLoad," (", n, ")",sep = "")) %>% 
+  select(-n)
+
+yvalue <- 1.6
+
+p <- ggplot(df,aes(x=GroupforExpansionLoad,y=mean_tajimaD))+
+  labs(y= expression(paste("Tajima's ",italic(D))), x = "")+
+  ### 加阴影
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5,color="white")+
+  geom_rect(aes(xmin=3-0.5,xmax=3+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=5-0.5,xmax=5+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=7+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=9-0.5,xmax=9+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=11-0.5,xmax=11+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=13-0.5,xmax=13+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=15-0.5,xmax=15+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=17+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=19-0.5,xmax=19+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=21-0.5,xmax=21+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=23-0.5,xmax=23+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=25-0.5,xmax=25+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  # 最上面的条纹
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=yvalue,ymax=Inf),fill="#ffd702",alpha=0.5)+
+  geom_rect(aes(xmin=2-0.5,xmax=2+0.5,ymin=yvalue,ymax=Inf),fill="#7f5701",alpha=0.5)+
+  geom_rect(aes(xmin=3-0.5,xmax=6+0.5,ymin=yvalue,ymax=Inf),fill="#016699",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=9+0.5,ymin=yvalue,ymax=Inf),fill="#00f3ff",alpha=0.5)+
+  geom_rect(aes(xmin=10-0.5,xmax=15+0.5,ymin=yvalue,ymax=Inf),fill="#fc6e6e",alpha=0.5)+
+  geom_rect(aes(xmin=16-0.5,xmax=16+0.5,ymin=yvalue,ymax=Inf),fill="#9900ff",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=25+0.5,ymin=yvalue,ymax=Inf),fill="#fe63c2",alpha=0.5)+
+  geom_rect(aes(xmin=26-0.5,xmax=26+0.5,ymin=yvalue,ymax=Inf),fill="#87cef9",alpha=0.5)+
+  # 开始画图
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(1))+ # add error bar
+  # geom_point(position = position_jitterdodge(0.5),alpha = 0.6,aes(col=Sub),size=0.3)+
+  # stat_summary(fun.data=mean_sdl,geom="pointrange",size=0.3)+
+  ### boxplot
+  geom_boxplot(
+    aes(color=Sub),
+    position = position_dodge(0.8),
+               outlier.color = NA,
+               # outlier.alpha = 0.8,
+               # outlier.size = 0.7,
+               alpha=0.8,width=0.7)+ #,width=0.0.7
+  stat_summary(
+              aes(group=Sub),
+              color="black",
+              fun=mean, geom="point",position = position_dodge(0.8),size=0.4)+
+  ### boxplot and point
+  # geom_boxplot(position = position_dodge(0.9),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  # geom_point(position = position_jitterdodge(0.6),alpha = 0.6,aes(color=GenomeType),size=0.8)+
+  geom_vline(xintercept = 9.5,linetype="dashed",color="black")+
+  geom_vline(xintercept = 25.5,linetype="dashed",color="black")+
+  scale_color_manual(values = c("#fd8582","#967bce","#4bcdc6"),name='')+
+  scale_x_discrete(labels = dftaxaCount$GroupforExpansionLoad_AddCount)+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(plot.margin=unit(rep(1.3,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    # legend.position = 'none',
+    # legend.position = c(0.9,0.6),
+    text = element_text(size = 10))
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4,width = 7.2)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 3.5,width = 7)
+
+```
+
+## ThetaPi and ThetaW
+```{r}
+### 对区间的 pi 进行总结，求平均值
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/data/014_PopParameters/002_tajimaD/001_TajimaD.txt.gz")
+# 
+# df1 <- df %>%
+#   group_by(CHROM,Group) %>%
+#   summarise(mean_tajimaD = mean(TajimaD,na.rm = T))
+# 
+# write_tsv(df1,file = "data/014_PopParameters/002_tajimaD/002_TajimaD_summary.txt.gz")
+
+### 开始处理 pi 的结果
+dfori <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/002_taxaDB_GroupforExpansionLoad.txt") %>% 
+  filter(!is.na(GroupforExpansionLoad))
+
+dftaxaDB <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/Group/002_taxaDB_GroupforExpansionLoad.txt") %>% 
+  select(GroupforExpansionLoad,GroupforExpansionLoad2,GenomeType) %>% 
+  distinct(GroupforExpansionLoad,.keep_all = T)
+
+df <- read_tsv("data/014_PopParameters/002_tajimaD/002_TajimaD_summary.txt.gz") %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  left_join(dftaxaDB,by=c("Group"="GroupforExpansionLoad2"))
+
+### 统计每个亚基因组内，按照B亚基因组排序
+### dfV2 为排序后的亚洲列表
+dfV1 <- df %>% group_by(GenomeType,Sub,GroupforExpansionLoad) %>% summarise(mean = mean(mean_tajimaD)) %>% arrange(.,GenomeType,Sub,-mean) %>% ungroup() %>%  filter(Sub=="A") %>% select(GroupforExpansionLoad) %>% 
+  add_row(GroupforExpansionLoad="Strangulata")
+
+### 因子排序
+dfori$GroupforExpansionLoad <- factor(dfori$GroupforExpansionLoad,levels = dfV1$GroupforExpansionLoad)
+
+df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = dfV1$GroupforExpansionLoad)
+
+### 计算每个亚群的个数，并添加到taxa数据库后面
+dftaxaCount <- dfori %>% 
+  select(GroupforExpansionLoad) %>% 
+  group_by(GroupforExpansionLoad) %>% 
+  count() %>% 
+  ungroup() %>%
+  mutate(GroupforExpansionLoad_AddCount = str_c(GroupforExpansionLoad," (", n, ")",sep = "")) %>% 
+  select(-n)
+
+yvalue <- 1.6
+
+p <- ggplot(df,aes(x=GroupforExpansionLoad,y=mean_tajimaD))+
+  labs(y= expression(paste("Tajima's ",italic(D))), x = "")+
+  ### 加阴影
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5,color="white")+
+  geom_rect(aes(xmin=3-0.5,xmax=3+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=5-0.5,xmax=5+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=7+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=9-0.5,xmax=9+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=11-0.5,xmax=11+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=13-0.5,xmax=13+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=15-0.5,xmax=15+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=17+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=19-0.5,xmax=19+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=21-0.5,xmax=21+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=23-0.5,xmax=23+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  geom_rect(aes(xmin=25-0.5,xmax=25+0.5,ymin=-Inf,ymax=Inf),fill="#f2f2f2",alpha=0.5)+
+  # 最上面的条纹
+  geom_rect(aes(xmin=1-0.5,xmax=1+0.5,ymin=yvalue,ymax=Inf),fill="#ffd702",alpha=0.5)+
+  geom_rect(aes(xmin=2-0.5,xmax=2+0.5,ymin=yvalue,ymax=Inf),fill="#7f5701",alpha=0.5)+
+  geom_rect(aes(xmin=3-0.5,xmax=6+0.5,ymin=yvalue,ymax=Inf),fill="#016699",alpha=0.5)+
+  geom_rect(aes(xmin=7-0.5,xmax=9+0.5,ymin=yvalue,ymax=Inf),fill="#00f3ff",alpha=0.5)+
+  geom_rect(aes(xmin=10-0.5,xmax=15+0.5,ymin=yvalue,ymax=Inf),fill="#fc6e6e",alpha=0.5)+
+  geom_rect(aes(xmin=16-0.5,xmax=16+0.5,ymin=yvalue,ymax=Inf),fill="#9900ff",alpha=0.5)+
+  geom_rect(aes(xmin=17-0.5,xmax=25+0.5,ymin=yvalue,ymax=Inf),fill="#fe63c2",alpha=0.5)+
+  geom_rect(aes(xmin=26-0.5,xmax=26+0.5,ymin=yvalue,ymax=Inf),fill="#87cef9",alpha=0.5)+
+  # 开始画图
+  # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(1))+ # add error bar
+  # geom_point(position = position_jitterdodge(0.5),alpha = 0.6,aes(col=Sub),size=0.3)+
+  # stat_summary(fun.data=mean_sdl,geom="pointrange",size=0.3)+
+  ### boxplot
+  geom_boxplot(
+    aes(color=Sub),
+    position = position_dodge(0.8),
+               outlier.color = NA,
+               # outlier.alpha = 0.8,
+               # outlier.size = 0.7,
+               alpha=0.8,width=0.7)+ #,width=0.0.7
+  stat_summary(
+              aes(group=Sub),
+              color="black",
+              fun=mean, geom="point",position = position_dodge(0.8),size=0.4)+
+  ### boxplot and point
+  # geom_boxplot(position = position_dodge(0.9),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  # geom_point(position = position_jitterdodge(0.6),alpha = 0.6,aes(color=GenomeType),size=0.8)+
+  geom_vline(xintercept = 9.5,linetype="dashed",color="black")+
+  geom_vline(xintercept = 25.5,linetype="dashed",color="black")+
+  scale_color_manual(values = c("#fd8582","#967bce","#4bcdc6"),name='')+
+  scale_x_discrete(labels = dftaxaCount$GroupforExpansionLoad_AddCount)+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(plot.margin=unit(rep(1.3,4),'lines'))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    # legend.position = 'none',
+    legend.position = c(0.9,0.6),
+    text = element_text(size = 10))
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4,width = 7.2)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 3.5,width = 7)
+```
 

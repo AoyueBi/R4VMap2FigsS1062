@@ -803,7 +803,7 @@ p
 ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 3.43,width = 4)
 ```
 
-### IBS distance by 9+17+1=27 all species
+### IBS distance by 9+16+1=26 all species
 ```{r}
 ### ********************** Section1 *********************************###
 ### taxa 属性数据框
