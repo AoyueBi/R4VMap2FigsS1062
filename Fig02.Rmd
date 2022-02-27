@@ -284,9 +284,7 @@ ggsave(plot = p, "~/Documents/test.pdf", width = 3, height = 5)
 ```
 
 #### --------------------
-
 ## Deleterious count
-
 ### 1.区分亚基因组
 
 ```{r}
