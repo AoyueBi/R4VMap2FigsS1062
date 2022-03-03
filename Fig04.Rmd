@@ -29,8 +29,7 @@ library(tidyverse)
 ```
 
 #### === Fig4A ===
-## Fig4A: DAF
-### plot by loadGroup deleterious
+## Fig4A: DAF-plot by loadGroup deleterious
 ```{r}
 ### step1: df
 df <- read_tsv("data/015_AAF/001_aaf_bySubspecies/001_aaf_bySubspecies.txt.gz")
@@ -313,23 +312,23 @@ ggsave(mp,filename = "figs/map_s1062_2.pdf", height = 2.76,width = 6.89)
 choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
 
 ### 先处理del文件
-dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz")
 
 dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
   select(Taxa=VcfID,GenomeType,Longitude,Latitude)
 
 set.seed(123)
-df1 <- dfdel %>% right_join(.,dftaxaDB,by="Taxa") %>% 
-  filter(GenomeType=="AABBDD") %>% 
-  filter(Subgenome=="D") %>% 
-  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
-  filter(Stand_LoadGroup == choiceA) %>% 
-  select(-IfSelected,-Group_refobj) %>% 
-  select(-c("GenomeType","Subgenome","DelCountGroup","Stand_LoadGroup")) %>% 
+df1 <- dfdel %>% right_join(.,dftaxaDB,by="Taxa") %>%
+  filter(GenomeType=="AABBDD") %>%
+  filter(Subgenome=="D") %>%
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>%
+  filter(Stand_LoadGroup == choiceA) %>%
+  select(-IfSelected,-Group_refobj) %>%
+  select(-c("GenomeType","Subgenome","DelCountGroup","Stand_LoadGroup")) %>%
   filter(!is.na(Longitude)) %>%  ### 802个个体 -> 543 个有经纬度信息
-  arrange(Stand_delCount) 
+  arrange(Stand_delCount)
 
-df <- df1 %>% 
+df <- df1 %>%
   mutate(Longitude = Longitude + runif(nrow(df1),0.001,0.005)) ##通过添加随机数，避免重复
   
 ```
@@ -347,7 +346,7 @@ marks(ppp.df) <- df[, 2] ### load ratio 做为 marks 信息
 ppp.df2 <- Smooth(ppp.df) ### 求每个点对应的load值的大小
 ppp.df2.m <- ppp.df2$v  ### 获取矩阵内的密度数据
 ###矩阵上下颠倒128 -> 1 ,依次减一
-ppp.df2.m1 <- ppp.df2.m[seq(128, 1, by = -1), ] 
+ppp.df2.m1 <- ppp.df2.m[seq(128, 1, by = -1), ]
 
 ### 创建 raster 类，并将密度的结果填充进去
 df.raster <- raster(nrows = 128, ncols = 128, xmn = -180, xmx = 180, ymn = -60, ymx = 90)
@@ -1623,7 +1622,7 @@ df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = dfV1$Groupf
 dftaxaCount <- dfori %>% 
   select(GroupforExpansionLoad) %>% 
   group_by(GroupforExpansionLoad) %>% 
-  count() %>% 
+  count() %>%
   ungroup() %>%
   mutate(GroupforExpansionLoad_AddCount = str_c(GroupforExpansionLoad," (", n, ")",sep = "")) %>% 
   select(-n)
@@ -1777,6 +1776,7 @@ p <- ggplot(df,aes(x=GroupforExpansionLoad,y=mean_pi*1000))+
   # stat_boxplot(geom = "errorbar",width=0.15,position = position_dodge(1))+ # add error bar
   # geom_point(position = position_jitterdodge(0.5),alpha = 0.6,aes(col=Sub),size=0.3)+
   # stat_summary(fun.data=mean_sdl,geom="pointrange",size=0.3)+
+  geom_hline(yintercept = 1,linetype="dashed",color="black")+
   ### boxplot
   geom_boxplot(
     aes(color=Sub),
@@ -1923,4 +1923,846 @@ p
 ggsave(p,filename = "/Users/Aoyue/Documents/TajimaD_VCFtools.pdf",height = 3.5,width = 7)
 
 ```
+
+#### ======
+## PCA
+
+### Hexaploid by subspecise by founder effect
+```{r}
+library(factoextra)
+library(FactoMineR)
+
+df_colDB <- read_tsv("data/001_TaxaDB/003_VMap2_colorDB.txt") %>% 
+  filter(ColorCategory=="GroupforExpansionLoad") %>% 
+  select(Label,ColorCode)
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/004_taxaDB_GroupforExpansionLoad.txt") %>%
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  select(Taxa,GenomeType,GroupforExpansionLoad,GroupforExpansionLoad2,Subspecies_by6_TreeValidated) %>% 
+  left_join(df_colDB,by=c("GroupforExpansionLoad"="Label"))
+
+df_factor <- dftaxaDB %>% 
+  distinct(GroupforExpansionLoad,.keep_all = T) %>% 
+  filter(GenomeType=="AABBDD") %>% 
+  mutate(Subspecies_by6_TreeValidated=factor(Subspecies_by6_TreeValidated,
+         levels = c("Landrace","Cultivar","OtherHexaploids"))) %>% 
+  arrange(as.factor(Subspecies_by6_TreeValidated),GroupforExpansionLoad) %>% 
+  mutate(ColorCode=if_else(Subspecies_by6_TreeValidated %in% c("Landrace","Cultivar") | GroupforExpansionLoad=="OtherHexaploids" ,"gray90",ColorCode)) %>% 
+  mutate(ColorCode=if_else(GroupforExpansionLoad=="Club wheat","black",ColorCode))
+
+df <- read_tsv("data/016_mds/hexaploid_mds.txt") %>% 
+  left_join(dftaxaDB,by="Taxa") %>% 
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  mutate(Subspecies_by6_TreeValidated=factor(Subspecies_by6_TreeValidated,
+         levels = c("Landrace","Cultivar","OtherHexaploids"))) %>% 
+  arrange(as.factor(Subspecies_by6_TreeValidated),GroupforExpansionLoad)
+ 
+
+### 设置因子顺序及颜色
+df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = df_factor$GroupforExpansionLoad)
+
+colB <- df_factor$ColorCode
+
+df_eig <- read_tsv("data/016_mds/hexaploid_mds_eigenvalues.txt")
+
+
+
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,2],3),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,2],3),"%",sep="") ##第二个成分
+
+### start to plot
+p <- df %>% 
+  ggplot(aes(x=PC1,y=PC2,fill= GroupforExpansionLoad))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  # scale_color_manual(values = colB,name="Genetic group")+
+  scale_fill_manual(values = colB,name="Hexaploid by subspecies")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      # ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 6)
+
+library(plotly)
+fig <- df %>%
+  # filter(Subspecies %in% c("Landrace_Yunnan","yunna-nense")) %>%
+  # filter(Subspecies == "Spelt_CAU" |Subspecies == "spelta") %>%
+  # filter(Subspecies %in% c("petropavlovskyi","Landrace_Xinjiang")) %>%
+  # filter(Subspecies == "Landrace",Group %in% c("JiaoLab","LuLab","CAAS") ) %>%
+  plot_ly(x = ~ PC1, y = ~ PC2,color = ~ GroupforExpansionLoad,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+
+```
+
+
+
+### Hexaploid by 26pops 只加 landrace
+```{r}
+library(factoextra)
+library(FactoMineR)
+
+df_colDB <- read_tsv("data/001_TaxaDB/003_VMap2_colorDB.txt") %>% 
+  filter(ColorCategory=="GroupforExpansionLoad") %>% 
+  select(Label,ColorCode)
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/004_taxaDB_GroupforExpansionLoad.txt") %>%
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  select(Taxa,GenomeType,GroupforExpansionLoad,GroupforExpansionLoad2,Subspecies_by6_TreeValidated) %>% 
+  left_join(df_colDB,by=c("GroupforExpansionLoad"="Label"))
+
+df_factor <- dftaxaDB %>% 
+  distinct(GroupforExpansionLoad,.keep_all = T) %>% 
+  filter(GenomeType=="AABBDD") %>% 
+  mutate(Subspecies_by6_TreeValidated=factor(Subspecies_by6_TreeValidated,
+         levels = c("Landrace","Cultivar","OtherHexaploids"))) %>% 
+  arrange(as.factor(Subspecies_by6_TreeValidated),GroupforExpansionLoad) %>% 
+  mutate(ColorCode=if_else(Subspecies_by6_TreeValidated %in% c("Landrace","Cultivar") ,ColorCode ,"gray90"))
+
+df <- read_tsv("data/016_mds/hexaploid_mds.txt") %>% 
+  left_join(dftaxaDB,by="Taxa") %>% 
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  mutate(Subspecies_by6_TreeValidated=factor(Subspecies_by6_TreeValidated,
+         levels = c("OtherHexaploids","Cultivar","Landrace"))) %>% 
+  arrange(as.factor(Subspecies_by6_TreeValidated),GroupforExpansionLoad)
+ 
+
+### 设置因子顺序及颜色
+df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = df_factor$GroupforExpansionLoad)
+
+colB <- df_factor$ColorCode
+
+df_eig <- read_tsv("data/016_mds/hexaploid_mds_eigenvalues.txt")
+
+
+
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,2],3),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,2],3),"%",sep="") ##第二个成分
+
+### start to plot
+p <- df %>% 
+  ggplot(aes(x=PC1,y=PC2,fill= GroupforExpansionLoad))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  # scale_color_manual(values = colB,name="Genetic group")+
+  scale_fill_manual(values = colB,name="Hexaploid by subspecies")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      # ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 6)
+
+library(plotly)
+fig <- df %>%
+  # filter(Subspecies %in% c("Landrace_Yunnan","yunna-nense")) %>%
+  # filter(Subspecies == "Spelt_CAU" |Subspecies == "spelta") %>%
+  # filter(Subspecies %in% c("petropavlovskyi","Landrace_Xinjiang")) %>%
+  # filter(Subspecies == "Landrace",Group %in% c("JiaoLab","LuLab","CAAS") ) %>%
+  plot_ly(x = ~ PC1, y = ~ PC2,color = ~ GroupforExpansionLoad,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+
+```
+#### ====== Load Map and boxplot
+## plot Bubble map vivid 主题
+```{r}
+choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
+
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz") 
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,Longitude,Latitude)
+
+# dftaxaDB <- read_tsv("data/001_TaxaDB/004_taxaDB_GroupforExpansionLoad.txt") %>% 
+#   select(Taxa,GenomeType,Longitude,Latitude,GroupforExpansionLoad,Subspecies_by6_TreeValidated)
+
+df <- dfdel %>% 
+  left_join(dftaxaDB,by="Taxa") %>% 
+  filter(GenomeType=="AABBDD") %>% 
+  filter(Subgenome=="D") %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  filter(Stand_LoadGroup == choiceA) %>% ### choice
+  select(-c("GenomeType","Subgenome","DelCountGroup","Stand_LoadGroup")) %>% filter(!is.na(Longitude)) %>%  ### 802个个体 -> 543 个有经纬度信息
+  filter(!Taxa=="ABD_0047") %>% 
+  arrange(Stand_delCount)  #### 排序
+
+mp<-NULL #定义一个空的地图  
+# 注意： borders函数中的colour是地图国家边界线的颜色,fill是国家的填充颜色
+mapworld<-borders("world",colour = "#dedfe0",fill="#dedfe0") #绘制基本地图
+# mapworld<-borders("world",colour = "#dedfe0",fill="gray") #绘制基本地图
+mpvoid<-ggplot()+ mapworld + ylim(-55,90)+theme_void()
+# mpvoid<-ggplot()+ mapworld + ylim(0,70)+xlim(-20,147)+theme_void()
+
+library(viridis)
+mp<-mpvoid +
+  geom_point(data = df,mapping = aes(x=Longitude,y=Latitude,
+  size=Stand_delCount, color=Stand_delCount),
+  alpha = 0.6)+
+  scale_size_continuous(range=c(0.35,1.2))+ ## 0.5-3
+  # scale_color_manual(values = colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100))+
+  # scale_fill_manual(values = colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100))
+  # scale_fill_gradientn(colours =rev(colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100)))+
+  # scale_color_gradientn(colours = rev(colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100)))
+  scale_color_viridis(trans="log") +
+  # scale_fill_viridis(trans="log")+
+    # scale_color_gradient2(low = "blue", high = "red", mid = "white", 
+    #   midpoint = 0.082, limit = c(0.07,0.0865),name="test") +
+  # theme(legend.position = 'none')
+mp
+
+ggsave(mp,filename = "figs/map_s1062_2.pdf", height = 2.76,width = 6.89)
+      
+```
+
+
+## plot Bubble map 循环画图
+- 附件将 nonsyn  pph2 gerp1.5 gerp2.14 gerp3.1 vep  画出来
+```{r}
+### plot function
+fun_plotMapLoad <- function(df_fun,factor_fun){
+  # factor_fun <- str_sub(factor_fun,11)
+  
+  mp <- NULL #定义一个空的地图
+  mapworld <- borders("world", colour = "#dedfe0", fill = "#dedfe0")
+  mpvoid <- ggplot() + mapworld + ylim(-55, 90) + theme_void()
+  
+  library(viridis)
+  mp <- mpvoid +
+    geom_point(
+      data = df_fun,
+      mapping = aes(
+        x = Longitude,
+        y = Latitude,
+        size = Stand_delCount,
+        color = Stand_delCount
+        # fill = Stand_delCount
+      ),
+      alpha = 0.8
+    ) +
+    labs(title = factor_fun)+
+    theme(plot.title = element_text(hjust = 0.5))+
+    scale_size_continuous(range = c(1, 3)) + ## 0.5-3
+    # scale_color_manual(values = colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100))
+    # scale_fill_manual(values = colorRampPalette(brewer.pal(n = 3, name = "RdBu"))(100))
+    scale_color_viridis(trans = "log")+
+    # scale_fill_viridis(trans = "log")+
+    guides(color = guide_colorbar(order = 1,title = "Mutation load"),
+           size = "none"
+           # size = guide_legend(order = 2,reverse = T)
+           )
+
+  
+  mp
+  
+  filename_fun <- str_c("~/Documents/","map_",factor_fun,".pdf") 
+  print(filename_fun)
+  ggsave(mp,
+         filename = filename_fun,
+         height = 2.76,
+         width = 6.89)
+  
+  return(mp)
+}
+
+
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz")
+
+dftaxaDB <- read.delim("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/020_WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GenomeType,Longitude,Latitude)
+
+factorA <- c("Ratio_002_nonsynonymous","Ratio_033_Derived_PolyPhen2_0.5","Ratio_026_Derived_PolyPhen2_probably","Ratio_032_GERP16way_1.5","Ratio_014_GERP16way_2.14_max","Ratio_025_GERP16way_3.1","Ratio_007_VEP")
+
+factorA_label <- c("Nonsynonymous","PPH2","PPH2_Probably","GERP>1.5","GERP>2.14","GERP>3.1","VEP_HighImpact")
+
+df <- dfdel %>% 
+  right_join(dftaxaDB,by="Taxa") %>% 
+  filter(GenomeType=="AABBDD") %>% 
+  filter(Subgenome=="D") %>% 
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>% 
+  # filter(Stand_LoadGroup == choiceA) %>% ### choice
+  filter(Stand_LoadGroup %in% factorA) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorA,labels = factorA_label)) %>% 
+  mutate(Stand_LoadGroup=as.character(Stand_LoadGroup)) %>% 
+  filter(Stand_delCount!= 0) %>% 
+  select(-c("GenomeType","Subgenome","DelCountGroup")) %>%
+  filter(!is.na(Longitude)) %>%  ### 802个个体 -> 543 个有经纬度信息
+  group_by(Stand_LoadGroup) %>% 
+  arrange(Stand_delCount) %>%  #### 排序
+  group_map(~fun_plotMapLoad(.x,.y))
+
+
+q <- ggpubr::ggarrange(plotlist=list(df[[4]],df[[5]],df[[6]],
+                                     df[[1]],df[[2]],df[[3]],
+                                     df[[7]]),
+                       # labels = as.character(c(1:26)),
+                       font.label = list(size = 7),
+                       ncol = 2,nrow = 4)
+  
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+```
+
+
+
+## boxplot load hexaploid 多种情况循环画图
+- 可以选择定义有害突变的方式 
+unique(dfdel$Stand_LoadGroup)
+```{r}
+
+fun_plotMutationLoadBoxplot <- function(df,factor_fun){
+  
+  dfV1 <- df %>%
+    group_by(Subgenome, GroupforExpansionLoad) %>%
+    summarise(mean = mean(Stand_delCount)) %>%
+    arrange(Subgenome, mean) %>%
+    ungroup() %>%
+    filter(Subgenome == "D") %>%
+    select(GroupforExpansionLoad)
+
+  ### 因子排序,排序后计数
+  df$GroupforExpansionLoad <-
+    factor(df$GroupforExpansionLoad, levels = dfV1$GroupforExpansionLoad)
+
+  ### 计算每个亚群的个数
+  ### 千万注意数据框的分组情况，如sub VariantsGroup ，计算后核查确认！！！
+  dftaxaCount <- df %>%
+    group_by(Subgenome, GroupforExpansionLoad) %>%
+    count() %>% ungroup() %>%
+    distinct(GroupforExpansionLoad, .keep_all = T) %>%
+    select(-Subgenome) %>%
+    mutate(GroupforExpansionLoad_AddCount = str_c(GroupforExpansionLoad, " (", n, ")", sep = "")) %>%
+    select(-n)
+  
+  library(RColorBrewer)
+  p <- df %>%
+    ggplot(aes(x = GroupforExpansionLoad, y = Stand_delCount)) +
+    labs(y = str_c("Individual-based mutation load"),
+         x = "",
+         title = factor_fun) +
+    geom_boxplot(aes(fill = GroupforExpansionLoad),
+                 outlier.color = NA,
+                 alpha = 0.6) + ### width=0.1
+    geom_point(
+      position = position_jitterdodge(0.6),
+      alpha = 0.4,
+      aes(color = Subgenome),
+      size = 0.2
+    ) +
+    stat_summary(
+      aes(group = Subgenome),
+      fun = mean,
+      geom = "point",
+      color = "blue",
+      position = position_dodge(1),
+      size = 0.7
+    ) +
+    scale_color_manual(values = c("#fd8582", "#967bce", "#4bcdc6"),
+                       name = '') +
+    scale_fill_manual(values = colorRampPalette(rev(brewer.pal(
+      n = 1, name = "RdBu"
+    )))(16)) +
+    scale_x_discrete(labels = dftaxaCount$GroupforExpansionLoad_AddCount) +
+    theme(strip.background = element_blank()) +
+    # theme(plot.margin=unit(rep(1.3,4),'lines'))+
+    coord_flip() +
+    theme(
+      plot.title = element_text(hjust = 0.5),
+      panel.background = element_blank(),
+      panel.border = element_rect(
+        colour = "black",
+        fill = NA,
+        size = 0.4
+      ),
+      text = element_text(size = 7),
+      legend.position = 'none'
+    )
+  p
+  
+  filename_fun <- str_c("~/Documents/",factor_fun,".pdf")
+  ggsave(p,
+         # filename = "/Users/Aoyue/Documents/test.pdf",
+         filename = filename_fun,
+         height = 4.2,
+         width = 2.8)
+  
+  print(filename_fun)
+  
+  return(p)
+  
+}
+
+
+### Begin
+factorA <- c("Ratio_002_nonsynonymous","Ratio_033_Derived_PolyPhen2_0.5","Ratio_026_Derived_PolyPhen2_probably","Ratio_032_GERP16way_1.5","Ratio_014_GERP16way_2.14_max","Ratio_025_GERP16way_3.1","Ratio_007_VEP")
+
+factorA_label <- c("Nonsynonymous","PPH2","PPH2_Probably","GERP>1.5","GERP>2.14","GERP>3.1","VEP_HighImpact")
+
+
+### ********************** Section1 *********************************###
+dftaxaDB <- read_tsv("data/001_TaxaDB/004_taxaDB_GroupforExpansionLoad.txt") %>% 
+  select(Taxa,GenomeType,GroupforExpansionLoad)
+
+### ********************** Section2 *********************************###
+### del load 数据框
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz")
+df <- dfdel %>%
+  left_join(dftaxaDB, by = "Taxa") %>%
+  filter(GenomeType == "AABBDD") %>%
+  filter(Subgenome == "D") %>%
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>%
+  select(Taxa,Subgenome,Stand_LoadGroup,Stand_delCount,GroupforExpansionLoad) %>% 
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  filter(Stand_LoadGroup %in% factorA) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorA,labels = factorA_label)) %>% 
+  mutate(Stand_LoadGroup=as.character(Stand_LoadGroup)) %>% 
+  group_by(Stand_LoadGroup) %>% 
+  group_map(~fun_plotMutationLoadBoxplot(.x,.y))
+
+    
+q <- ggpubr::ggarrange(plotlist=list(df[[4]],df[[5]],df[[6]],
+                                     df[[1]],df[[2]],df[[3]],
+                                     df[[7]]),
+                       # labels = as.character(c(1:26)),
+                       font.label = list(size = 7),
+                       ncol = 3,nrow = 3)
+  
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+```
+
+
+
+## boxplot load tetraploid 多种情况循环画图
+- 可以选择定义有害突变的方式 
+unique(dfdel$Stand_LoadGroup)
+```{r}
+
+fun_plotMutationLoadBoxplot <- function(df,factor_fun){
+  
+  dfV1 <- df %>%
+    group_by(Subgenome, GroupforExpansionLoad) %>%
+    summarise(mean = mean(Stand_delCount)) %>%
+    arrange(Subgenome, mean) %>%
+    ungroup() %>%
+    filter(Subgenome == "A") %>%
+    select(GroupforExpansionLoad)
+
+  ### 因子排序,排序后计数
+  df$GroupforExpansionLoad <-
+    factor(df$GroupforExpansionLoad, levels = dfV1$GroupforExpansionLoad)
+
+  ### 计算每个亚群的个数
+  ### 千万注意数据框的分组情况，如sub VariantsGroup ，计算后核查确认！！！
+  dftaxaCount <- df %>%
+    group_by(Subgenome, GroupforExpansionLoad) %>%
+    count() %>% ungroup() %>%
+    distinct(GroupforExpansionLoad, .keep_all = T) %>%
+    select(-Subgenome) %>%
+    mutate(GroupforExpansionLoad_AddCount = str_c(GroupforExpansionLoad, " (", n, ")", sep = "")) %>%
+    select(-n)
+  
+  library(RColorBrewer)
+  p <- df %>%
+    ggplot(aes(x = GroupforExpansionLoad, y = Stand_delCount)) +
+    labs(y = str_c("Individual-based mutation load"),
+         x = "",
+         title = factor_fun) +
+    geom_boxplot(aes(fill = GroupforExpansionLoad),
+                 outlier.color = NA,
+                 alpha = 0.6) + ### width=0.1
+    geom_point(
+      position = position_jitterdodge(0.6),
+      alpha = 0.4,
+      aes(color = Subgenome),
+      size = 0.2
+    ) +
+    stat_summary(
+      aes(group = Subgenome),
+      fun = mean,
+      geom = "point",
+      color = "blue",
+      position = position_dodge(1),
+      size = 0.7
+    ) +
+    scale_color_manual(values = c("#fd8582", "#967bce", "#4bcdc6"),
+                       name = '') +
+    scale_fill_manual(values = colorRampPalette(rev(brewer.pal(
+      n = 3, name = "RdBu"
+    )))(9)) +
+    scale_x_discrete(labels = dftaxaCount$GroupforExpansionLoad_AddCount) +
+    theme(strip.background = element_blank()) +
+    # theme(plot.margin=unit(rep(1.3,4),'lines'))+
+    coord_flip() +
+    theme(
+      plot.title = element_text(hjust = 0.5),
+      panel.background = element_blank(),
+      panel.border = element_rect(
+        colour = "black",
+        fill = NA,
+        size = 0.4
+      ),
+      text = element_text(size = 7),
+      legend.position = 'none'
+    )
+  p
+  
+  filename_fun <- str_c("~/Documents/",factor_fun,".pdf")
+  ggsave(p,
+         # filename = "/Users/Aoyue/Documents/test.pdf",
+         filename = filename_fun,
+         height = 4.2,
+         width = 2.8)
+  
+  print(filename_fun)
+  
+  return(p)
+  
+}
+
+
+### Begin
+factorA <- c("Ratio_002_nonsynonymous","Ratio_033_Derived_PolyPhen2_0.5","Ratio_026_Derived_PolyPhen2_probably","Ratio_032_GERP16way_1.5","Ratio_014_GERP16way_2.14_max","Ratio_025_GERP16way_3.1","Ratio_007_VEP")
+
+factorA_label <- c("Nonsynonymous","PPH2","PPH2_Probably","GERP>1.5","GERP>2.14","GERP>3.1","VEP_HighImpact")
+
+
+### ********************** Section1 *********************************###
+dftaxaDB <- read_tsv("data/001_TaxaDB/004_taxaDB_GroupforExpansionLoad.txt") %>% 
+  select(Taxa,GenomeType,GroupforExpansionLoad)
+
+### ********************** Section2 *********************************###
+### del load 数据框
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz")
+df <- dfdel %>%
+  left_join(dftaxaDB, by = "Taxa") %>%
+  filter(GenomeType == "AABB") %>%
+  filter(Subgenome == "A") %>%
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>%
+  select(Taxa,Subgenome,Stand_LoadGroup,Stand_delCount,GroupforExpansionLoad) %>% 
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  filter(Stand_LoadGroup %in% factorA) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorA,labels = factorA_label)) %>% 
+  mutate(Stand_LoadGroup=as.character(Stand_LoadGroup)) %>% 
+  group_by(Stand_LoadGroup) %>% 
+  group_map(~fun_plotMutationLoadBoxplot(.x,.y))
+
+    
+q <- ggpubr::ggarrange(plotlist=list(df[[4]],df[[5]],df[[6]],
+                                     df[[1]],df[[2]],df[[3]],
+                                     df[[7]]),
+                       # labels = as.character(c(1:26)),
+                       font.label = list(size = 7),
+                       ncol = 3,nrow = 3)
+  
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+```
+
+
+
+#### ====== Proportion in intron 3_UTR 5_UTR
+## dftotal
+```{r}
+dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>%
+  mutate(Sub=str_sub(Transcript, 9, 9))
+
+  # filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
+  # mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  # mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
+
+dftotal_ancestral <- dftotal %>% 
+  filter(!is.na(Ancestral),Ancestral == Ref | Ancestral == Alt) 
+```
+
+
+```{r}
+### 每个位点的注释信息
+df1 <- dftotal %>% 
+  group_by(Region) %>% 
+  filter(!is.na(Region)) %>%
+  filter(Region %in% c("Intron","UTR_3","UTR_5")) %>% 
+  select(ID,Chr,Pos,Sub,Variants_Group=Region)
+
+df2 <- dftotal %>% 
+  anti_join(df1,by="ID") %>% 
+  filter(!is.na(Variant_type)) %>% 
+  filter( Variant_type %in%  c("NONSYNONYMOUS","SYNONYMOUS","STOP-GAIN")) %>% 
+  select(ID,Chr,Pos,Sub,Variants_Group=Variant_type)
+
+df3 <- dftotal %>% 
+  anti_join(df1,by="ID") %>% 
+  anti_join(df2,by="ID") %>% 
+  filter(Impact_VEP=="HIGH") %>%
+  filter(str_detect(Effect_VEP,"splice_")) %>% 
+  mutate(Variants_Group="Essential splice") %>% 
+  select(ID,Chr,Sub,Pos,Variants_Group)
+
+factorA <- c("Intron","UTR_5","UTR_3","SYNONYMOUS","NONSYNONYMOUS","Essential splice","STOP-GAIN")
+labelsA <- c("Intron","UTR_5","UTR_3","Synonymous","Nonsynonymous","Essential splice","Nonsense")
+
+df_anno <- rbind(df1,df2,df3) %>% 
+  mutate(Variants_Group=factor(Variants_Group,levels=factorA,labels = labelsA)) %>% 
+  select(ID,Sub,Variants_Group)
+
+### 合计 2670892 个位点得到注释
+
+### ---------------------------------------------------------------------------
+###每个亚群的AAF
+### 注意这里的AAF中，有 ancestral 状态的为DAF，没有ancestral 状态的 AAF
+### 因为使用的是 ancestralVCF 计算的AAF
+dftotal_AAF <- read_tsv("data/015_AAF/001_aaf_bySubspecies/source/aaf_bySubspecies_filterAAF0.txt.gz") 
+
+dftotal_AAF_filter1 <- dftotal_AAF %>% 
+    filter(AAF!=1)
+### 合计 5343891 AAF 在0-1之间
+
+### 联合上文求出的 ID,Chr,Pos,Variants_Group 对每个点进行注释,
+### 联合 dftaxaDB,对每个亚群进行倍性的注释
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/004_taxaDB_GroupforExpansionLoad.txt") %>% 
+  distinct(GroupforExpansionLoad,.keep_all = T) %>% 
+  select(GenomeType,GroupforExpansionLoad,GroupforExpansionLoad2)
+
+dfSNPdb <- dftotal_AAF_filter1 %>% 
+  mutate(ID=str_c(Chr,"-",Pos)) %>% 
+  left_join(df_anno,by="ID") %>% 
+  filter(!is.na(Variants_Group))
+
+dfSNPdb_count <- dfSNPdb %>% 
+  group_by(Group,Variants_Group) %>% 
+  count() %>% 
+  left_join(dftaxaDB,by=c("Group"="GroupforExpansionLoad2"))
+```
+
+
+### plot 全基因组各种变异类型的比例
+```{r}
+
+factorA <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","LR_WA","LR_AF","LR_EU","LR_AM","LR_EA","LR_CSA","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Strangulata")
+
+df <- dfSNPdb_count %>% 
+  mutate(GroupforExpansionLoad=factor(GroupforExpansionLoad,levels = factorA)) %>% 
+  mutate(GenomeType2=if_else(GenomeType=="AABBDD",GenomeType,"AABB_DD")) %>% 
+  group_by(GenomeType2) %>% 
+  group_map(~{
+    ### 画图函数
+   p <- .x %>% 
+      ggplot(aes(x=GroupforExpansionLoad, y=n,fill=Variants_Group)) +
+      geom_bar(
+        stat = "identity",
+        # alpha = 1,
+        position = "fill",
+        alpha = 0.9
+      ) +
+      # geom_vline(xintercept = 4.5,linetype = "solid",color = "black") +
+      # geom_text(aes(label=  paste(prettyNum(ObservedCount,big.mark = ","))),position = position_fill(),hjust=1, size=3) +
+      # scale_fill_manual(values=colB)+
+      scale_fill_brewer(palette = "Accent") +
+      labs(y = "Frequency of categories by subspecies", x = "") +
+      coord_flip() +
+      theme(
+        panel.background = element_rect(
+          size = 0.7,
+          colour = 'black',
+          fill = 'white'
+        ),
+        panel.grid = element_blank(),
+        text = element_text(size = 12)
+        # ,legend.position = 'none'
+      )
+    
+    p
+    ggsave(p,
+           filename = str_c("~/Documents/",.y,"_proportion_VariantsGroup.pdf"),
+           height = 4,
+           width = 6)
+    
+    return(p)
+    
+  })
+  
+  q <- ggpubr::ggarrange(plotlist=list(df[[2]],df[[1]]),
+                       # labels = as.character(c(1:26)),
+                       font.label = list(size = 7),
+                       ncol = 1,nrow = 2)
+  
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+```
+
+## plot 不同变异类型，不同亚群的比较-分面图
+```{r}
+factorA <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","LR_WA","LR_AF","LR_EU","LR_AM","LR_EA","LR_CSA","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Strangulata")
+
+
+df <- dfSNPdb_count %>% 
+  mutate(GroupforExpansionLoad=factor(GroupforExpansionLoad,levels = factorA)) %>% 
+  mutate(GenomeType2=if_else(GenomeType=="AABBDD",GenomeType,"AABB_DD")) %>% 
+  group_by(GenomeType2) %>% 
+  group_map(~{
+    group1 <- c("Intron","UTR_5","UTR_3","Syn","Nonsyn","Essential splice","Nonsense")
+    
+    p <- .x %>%
+      mutate(Group = factor(Variants_Group, levels = group1)) %>%
+      ggplot(aes(x = GroupforExpansionLoad, y = n, fill = Variants_Group)) +
+      geom_bar(stat = "identity") +
+      scale_fill_brewer(palette = "Accent") +
+      facet_wrap( ~ Variants_Group, scales = "free",ncol = 2) +
+      labs(x = "Subspecies", y = "Number of sites observed\nto be variable") +
+      scale_y_continuous(labels = scales::comma_format(big.mark = ',')) +
+      theme_bw() +
+      theme(legend.position = "none") +
+      theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1,size = 7))
+    p
+    
+       ggsave(p,
+           filename = str_c("~/Documents/",.y,"_count_VariantsGroup.pdf"),
+           height = 7,
+           width = 7)
+    
+    return(p)
+    
+  })
+```
+
+#### ====== Proportion in del non syn
+```{r}
+###每个亚群的AAF
+### 注意这里的AAF中，指得是DAF，全是有 ancestral 状态的位点
+### 因为使用的是 ancestralVCF 计算的AAF
+dftotal_withAncestral_AAF <- read_tsv("data/015_AAF/001_aaf_bySubspecies/001_aaf_bySubspecies.txt.gz")
+
+dftotal_withAncestral_AAF_filter1 <- dftotal_withAncestral_AAF %>% 
+  filter(AAF!=1)
+
+dfSNPdb_count <- dftotal_withAncestral_AAF_filter1 %>% 
+  group_by(Group,LoadGroup,GenomeType) %>% 
+  count() %>% 
+  rename(GroupforExpansionLoad=Group,Variants_Group=LoadGroup)
+
+```
+
+
+### plot derived 各种变异类型的比例
+```{r}
+
+factorA <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","LR_WA","LR_AF","LR_EU","LR_AM","LR_EA","LR_CSA","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Strangulata")
+
+df <- dfSNPdb_count %>% 
+  mutate(GroupforExpansionLoad=factor(GroupforExpansionLoad,levels = factorA)) %>% 
+  mutate(GenomeType2=if_else(GenomeType=="AABBDD",GenomeType,"AABB_DD")) %>% 
+  group_by(GenomeType2) %>% 
+  group_map(~{
+    ### 画图函数
+   p <- .x %>% 
+     mutate(Variants_Group=factor(Variants_Group,levels = c("Deleterious","Nonsynonymous","Synonymous"))) %>% 
+      ggplot(aes(x=GroupforExpansionLoad, y=n,fill=Variants_Group)) +
+      geom_bar(
+        stat = "identity",
+        # alpha = 1,
+        position = "fill",
+        alpha = 0.9
+      ) +
+      # geom_vline(xintercept = 4.5,linetype = "solid",color = "black") +
+      # geom_text(aes(label=  paste(prettyNum(ObservedCount,big.mark = ","))),position = position_fill(),hjust=1, size=3) +
+      # scale_fill_manual(values=colB)+
+      scale_fill_manual(values = c("#d5311c","#e69f00","#004680"))+
+      labs(y = "Frequency of categories by subspecies", x = "") +
+      coord_flip() +
+      theme(
+        panel.background = element_rect(
+          size = 0.7,
+          colour = 'black',
+          fill = 'white'
+        ),
+        panel.grid = element_blank(),
+        text = element_text(size = 12)
+        # ,legend.position = 'none'
+      )
+    
+    p
+    ggsave(p,
+           filename = str_c("~/Documents/",.y,"_proportion_VariantsGroup.pdf"),
+           height = 4,
+           width = 6)
+    
+    return(p)
+    
+  })
+  
+  q <- ggpubr::ggarrange(plotlist=list(df[[2]],df[[1]]),
+                       # labels = as.character(c(1:26)),
+                       font.label = list(size = 7),
+                       ncol = 1,nrow = 2)
+  
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+```
+
+## plot 不同LoadGroup变异类型，不同亚群的比较-分面图
+```{r}
+factorA <- c("Wild emmer","Domesticated emmer","Durum","Khorasan wheat","Polish wheat","Rivet wheat","Georgian wheat","Ispahanicum","Persian wheat","LR_WA","LR_AF","LR_EU","LR_AM","LR_EA","LR_CSA","Cultivar","OtherHexaploids","Club wheat","Indian dwarf wheat","Tibetan semi-wild","Vavilovii","Xinjiang wheat","Yunan wheat","Macha","Spelt","Strangulata")
+
+
+df <- dfSNPdb_count %>% 
+  mutate(GroupforExpansionLoad=factor(GroupforExpansionLoad,levels = factorA)) %>% 
+  mutate(GenomeType2=if_else(GenomeType=="AABBDD",GenomeType,"AABB_DD")) %>% 
+  group_by(GenomeType2) %>% 
+  group_map(~{
+    group1 <- c("Intron","UTR_5","UTR_3","Syn","Nonsyn","Essential splice","Nonsense")
+    
+    p <- .x %>%
+     mutate(Variants_Group=factor(Variants_Group,levels = c("Deleterious","Nonsynonymous","Synonymous"))) %>% 
+      mutate(Group = factor(Variants_Group, levels = group1)) %>%
+      ggplot(aes(x = GroupforExpansionLoad, y = n, fill = Variants_Group)) +
+      geom_bar(stat = "identity") +
+      scale_fill_manual(values = c("#d5311c","#e69f00","#004680"))+
+      facet_wrap( ~ Variants_Group, scales = "free",ncol = 2) +
+      labs(x = "Subspecies", y = "Number of sites observed\nto be variable") +
+      scale_y_continuous(labels = scales::comma_format(big.mark = ',')) +
+      theme_bw() +
+      theme(legend.position = "none") +
+      theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1,size = 8))
+    p
+    
+       ggsave(p,
+           filename = str_c("~/Documents/",.y,"_count_VariantsGroup.pdf"),
+           height = 7,
+           width = 7)
+    
+    return(p)
+    
+  })
+```
+
+
+
 
