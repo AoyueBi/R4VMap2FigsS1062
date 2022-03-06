@@ -99,6 +99,22 @@ ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/distribution.pdf",
 
 ```
 
+#### ====
+## 相关性分析
+```{r}
+p <- dftotal %>% 
+  filter(!is.na(Gerp_16way),!is.na(Derived_PolyPhen2_prob)) %>% 
+  filter(Variant_type=="NONSYNONYMOUS") %>% 
+  slice_sample(n=5000) %>% 
+  ggplot(aes(x=Gerp_16way,y=Derived_PolyPhen2_prob))+
+  geom_point(alpha=0.5)
+
+p
+  
+```
+
+
+
 ## Diff methods
 ```{r}
 dftotal_mini <- dftotal %>% 

@@ -39,7 +39,7 @@ df1 <- df %>%
   rename(DAF=AAF) %>% 
   filter(DAF!=0) %>%
   filter(DAF!=1) %>%
-  mutate(bin=cut_width(DAF,width = 0.1,boundary = 0)) %>%
+  mutate(bin=cut_width(DAF,width = 0.2,boundary = 0)) %>%
   # mutate(MergedSub=if_else(Sub=="D","D","AB")) %>% 
   group_by(Group,GenomeType,LoadGroup,Sub) %>% 
   count(bin) %>% 
@@ -95,17 +95,17 @@ p <- df2 %>%
   # scale_color_manual(values = colorRampPalette(rev(brewer.pal(n = 12, name = "Set3")))(16))+
   # scale_fill_manual(values = colB)+
   # scale_y_continuous(limits = c(0,1))+
-  scale_x_discrete(label=c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
+  # scale_x_discrete(label=c("0.1","","0.3","","0.5","","0.7","","0.9",""))+
   # facet_grid(Sub~Group)+
   theme(strip.background = element_blank())+
   # theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
   theme(
     # plot.margin=unit(rep(1,4),'lines'),
     panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
     legend.key = element_blank(),
-    # legend.position = 'none',
-    text = element_text(size = 7))
+    legend.position = 'none',
+    text = element_text(size = 6))
 
 p
 # ggsave(p,filename = "~/Documents/temp.png",height = 6,width = 8)
@@ -114,7 +114,8 @@ library("ggpubr")
 ggp_legend <- get_legend(p)
 ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 4,width = 1.5)
 
-ggsave(p,filename = "~/Documents/test.pdf",height = 3.2,width = 3.2) ### 刚好可以把所有图例展示出来
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3.2,width = 3.2) ### 刚好可以把所有图例展示出来
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.28,width = 2.28) ### 刚好可以把所有图例展示出来
 
 ```
 
@@ -223,10 +224,11 @@ p <- df %>%
     panel.border = element_rect(colour = "black", fill=NA, size=0.5),
     legend.position = 'none',
     # legend.position = c(0.9,0.6),
-    text = element_text(size = 6))
+    text = element_text(size = 7))
 p
 # ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4,width = 7.2)
 ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 2.12,width = 4.23)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 2,width = 3.5)
 
 ```
 
@@ -335,55 +337,55 @@ df <- df1 %>%
 
 ### plot
 ```{r}
-library(raster)
-# detach(package:raster,unload = T)
-library(spatstat)
-library(RColorBrewer)
-
-ppp.df <- ppp(df$Longitude, df$Latitude, c(-180, 180), c(-60, 90))
-marks(ppp.df) <- df[, 2] ### load ratio 做为 marks 信息
-# plot(density(ppp.df)) ###画出点的聚集程度 测试
-ppp.df2 <- Smooth(ppp.df) ### 求每个点对应的load值的大小
-ppp.df2.m <- ppp.df2$v  ### 获取矩阵内的密度数据
-###矩阵上下颠倒128 -> 1 ,依次减一
-ppp.df2.m1 <- ppp.df2.m[seq(128, 1, by = -1), ]
-
-### 创建 raster 类，并将密度的结果填充进去
-df.raster <- raster(nrows = 128, ncols = 128, xmn = -180, xmx = 180, ymn = -60, ymx = 90)
-values(df.raster) <- as.vector(t(as.matrix(ppp.df2.m1)))
-plot(df.raster)
-
-world.shp <- shapefile("data/002_spatstat/spatstat/shapefile/TM_WORLD_BORDERS_SIMPL-0.3/TM_WORLD_BORDERS_SIMPL-0.3.shp")
-df.raster.final <- mask(df.raster, world.shp)
-par(mfrow = c(1,1))
-
-# pdf(file = str_c("figs/Fig4/misc",choiceA,"_wholeWorld.pdf"),height = 3,width = 4)
-### whole world
-png(filename = str_c("~/Documents/",choiceA,"_wholemap.png"),units = 'in',height = 4,width = 5.3,res = 300)
-plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xaxt="n",yaxt="n")
-points(df$Longitude, df$Latitude, pch = 16, cex = 0.5,col=rgb(252, 110, 110,90,maxColorValue=255))
-axis(1,at=seq(-150,180,60))
-axis(2,at=seq(-90,90,60))
-dev.off()
-
-### 亚欧大陆和非洲
-png(filename =str_c("~/Documents/",choiceA,"_Eurasia.png"),units = 'in',height = 4,width = 5.3,res = 300)
-# pdf( "~/Documents/test.pdf")
-plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xlim=c(-20,150),ylim=c(-35,62),xaxt="n",yaxt="n")
-points(df$Longitude, df$Latitude, pch = 16, cex = 0.8,col=rgb(252, 110, 110,90,maxColorValue=255))
-axis(1,at=seq(0,150,30))
-axis(2,at=seq(-20,62,20))
-# axis(1,at=seq(0,150,30),labels = c("0","","","","",""))
-# axis(2,at=seq(0,62,20))
-dev.off()
-
-### 美洲和非洲
-png(filename = str_c("~/Documents/",choiceA,"_American.png"),units = 'in',height = 4,width = 5.3,res = 300)
-plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xlim=c(-150,60),ylim=c(-60,62),xaxt="n",yaxt="n")
-points(df$Longitude, df$Latitude, pch = 16, cex = 0.8,col=rgb(252, 110, 110,90,maxColorValue=255))
-axis(1,at=seq(-150,60,30))
-axis(2,at=seq(-60,62,30))
-dev.off()
+# library(raster)
+# # detach(package:raster,unload = T)
+# library(spatstat)
+# library(RColorBrewer)
+# 
+# ppp.df <- ppp(df$Longitude, df$Latitude, c(-180, 180), c(-60, 90))
+# marks(ppp.df) <- df[, 2] ### load ratio 做为 marks 信息
+# # plot(density(ppp.df)) ###画出点的聚集程度 测试
+# ppp.df2 <- Smooth(ppp.df) ### 求每个点对应的load值的大小
+# ppp.df2.m <- ppp.df2$v  ### 获取矩阵内的密度数据
+# ###矩阵上下颠倒128 -> 1 ,依次减一
+# ppp.df2.m1 <- ppp.df2.m[seq(128, 1, by = -1), ]
+# 
+# ### 创建 raster 类，并将密度的结果填充进去
+# df.raster <- raster(nrows = 128, ncols = 128, xmn = -180, xmx = 180, ymn = -60, ymx = 90)
+# values(df.raster) <- as.vector(t(as.matrix(ppp.df2.m1)))
+# plot(df.raster)
+# 
+# world.shp <- shapefile("data/002_spatstat/spatstat/shapefile/TM_WORLD_BORDERS_SIMPL-0.3/TM_WORLD_BORDERS_SIMPL-0.3.shp")
+# df.raster.final <- mask(df.raster, world.shp)
+# par(mfrow = c(1,1))
+# 
+# # pdf(file = str_c("figs/Fig4/misc",choiceA,"_wholeWorld.pdf"),height = 3,width = 4)
+# ### whole world
+# png(filename = str_c("~/Documents/",choiceA,"_wholemap.png"),units = 'in',height = 4,width = 5.3,res = 300)
+# plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xaxt="n",yaxt="n")
+# # points(df$Longitude, df$Latitude, pch = 16, cex = 0.5,col=rgb(252, 110, 110,90,maxColorValue=255))
+# axis(1,at=seq(-150,180,60))
+# axis(2,at=seq(-90,90,60))
+# dev.off()
+# 
+# ### 亚欧大陆和非洲
+# png(filename =str_c("~/Documents/",choiceA,"_Eurasia.png"),units = 'in',height = 4,width = 5.3,res = 300)
+# # pdf( "~/Documents/test.pdf")
+# plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xlim=c(-20,150),ylim=c(-35,62),xaxt="n",yaxt="n")
+# # points(df$Longitude, df$Latitude, pch = 16, cex = 0.8,col=rgb(252, 110, 110,90,maxColorValue=255))
+# axis(1,at=seq(0,150,30))
+# axis(2,at=seq(-20,62,20))
+# # axis(1,at=seq(0,150,30),labels = c("0","","","","",""))
+# # axis(2,at=seq(0,62,20))
+# dev.off()
+# 
+# ### 美洲和非洲
+# png(filename = str_c("~/Documents/",choiceA,"_American.png"),units = 'in',height = 4,width = 5.3,res = 300)
+# plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xlim=c(-150,60),ylim=c(-60,62),xaxt="n",yaxt="n")
+# # points(df$Longitude, df$Latitude, pch = 16, cex = 0.8,col=rgb(252, 110, 110,90,maxColorValue=255))
+# axis(1,at=seq(-150,60,30))
+# axis(2,at=seq(-60,62,30))
+# dev.off()
 
 ```
 
@@ -412,7 +414,7 @@ dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
 ### ********************** Section2 *********************************###
 ### del load 数据框
 df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>% 
-  filter(Subgenome=="D") %>% 
+  filter(Subgenome=="B") %>% 
   filter(DelCountGroup=="TotalDerivedSNPCount") %>% 
   filter(GenomeType=="AABBDD") %>% 
   select(-c(DelCountGroup,IfSelected,Group_refobj,GenomeType)) %>% 
@@ -425,7 +427,7 @@ dfV1 <- df %>%
   summarise(mean = mean(Stand_delCount)) %>%
   arrange(.,Subgenome,Stand_LoadGroup,mean) %>% 
   ungroup() %>%  
-  filter(Subgenome=="D",Stand_LoadGroup== choiceA) %>% 
+  filter(Subgenome=="B",Stand_LoadGroup== choiceA) %>% 
   select(GroupforExpansionLoad)
 ### 因子排序,排序后计数
 df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = dfV1$GroupforExpansionLoad)
@@ -462,7 +464,13 @@ p <- df %>%
     panel.border = element_rect(colour = "black", fill=NA, size=0.4),
     text = element_text(size = 7),legend.position = 'none')
 p
+### 竖版
+# size=7
 ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4.2,width = 2.6)
+### 横版
+# size=14
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4.2,width = 2.6) 
+
 ```
 
 
@@ -587,11 +595,16 @@ p <-
   theme(panel.grid= element_blank(), 
         panel.background = element_blank(),
         axis.line = element_line(size=0.4, colour = "black"),
-        text = element_text(size = 7),legend.position = 'none')
+        text = element_text(size = 14.5),legend.position = 'none')
 
 p
-  
+
+### AI size=7
 ggsave(p,filename = "~/Documents/test.pdf",height = 3.9,width = 1.96)
+
+### PPT size=14.5
+ggsave(p,filename = "~/Documents/test.pdf",height = 6,width = 6)
+
 ```
 
 
@@ -2091,6 +2104,161 @@ fig <- df %>%
 fig
 
 ```
+
+
+## macha
+### A subgenome
+```{r}
+library(factoextra)
+library(FactoMineR)
+### 导入种质数据库,并选取特定的列
+dataFile <- c("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt")
+dftaxaDB <- read.delim(dataFile) %>% 
+  select(Taxa=VcfID,GenomeType,Subspecies_by22, Subspecies_by22_TreeValidated,Subspecies_by6_TreeValidated,Continent_forTree,Group,GroupByOriPublication_Abbre)
+
+### import matrix
+dataFile <- c("data/002_pca/004_matrix_Asub.txt.gz")
+df <- read.delim(dataFile)
+
+### 建立Taxa对应的属性变量数据框
+dfTaxaInfo <- df %>% select(Taxa) %>% left_join(.,dftaxaDB,by="Taxa")
+
+### pca analysis
+c1 <- which(colnames(df) == 'Taxa')
+df.pca <- PCA(df[,-c(c1)], graph = F)
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,3],2),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,3] - df.pca$eig[1,3],2),"%",sep="") ##第二个成分
+dfpca <- as.data.frame(df.pca$ind$coord)
+df <- cbind(dfTaxaInfo,dfpca)
+
+factorA <- c("Wild_emmer","Domesticated_emmer","Free_threshing_tetraploids","OtherTetraploids", "Landrace","Cultivar","OtherHexaploids")
+
+labelsA <- c("Wild emmer","Domesticated emmer","Free-threshing tetraploids","OtherTetraploids", "Landrace","Cultivar","OtherHexaploids")
+
+colB <- c("#ffd702","#7f5701","#016699","#00f3ff", "#fc6e6e","#9900ff","#fe63c2")
+
+df$Subspecies_by6_TreeValidated <- factor(df$Subspecies_by6_TreeValidated,levels=factorA,labels=labelsA)
+
+```
+
+```{r}
+### start to plot
+p <- df %>% 
+  # filter(! Taxa %in%  c("AB_183","AB_185","AB_039")) %>%
+  ggplot(aes(x=Dim.1,y=Dim.2,fill= Subspecies_by22_TreeValidated))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  # scale_color_manual(values = colB,name="Genetic group")+
+  # scale_fill_manual(values = colB,name="Genetic group")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+
+
+library(plotly)
+fig <- df %>%
+  mutate(Subspecies_by22_TreeValidated=if_else(Subspecies_by6_TreeValidated=="Free-threshing tetraploids","OtherTetraploids",Subspecies_by22_TreeValidated)) %>% 
+  plot_ly(x = ~ Dim.1, y = ~ Dim.2,color = ~ Subspecies_by22_TreeValidated,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+```
+### macha 聚类查看
+```{r}
+library(factoextra)
+library(FactoMineR)
+
+df_colDB <- read_tsv("data/001_TaxaDB/003_VMap2_colorDB.txt") %>% 
+  filter(ColorCategory=="GroupforExpansionLoad") %>% 
+  select(Label,ColorCode)
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/004_taxaDB_GroupforExpansionLoad.txt") %>%
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  select(Taxa,GenomeType,GroupforExpansionLoad,GroupforExpansionLoad2,Subspecies_by6_TreeValidated) %>% 
+  left_join(df_colDB,by=c("GroupforExpansionLoad"="Label"))
+
+df_factor <- dftaxaDB %>% 
+  distinct(GroupforExpansionLoad,.keep_all = T) %>% 
+  filter(GenomeType=="AABBDD") %>% 
+  mutate(Subspecies_by6_TreeValidated=factor(Subspecies_by6_TreeValidated,
+         levels = c("Landrace","Cultivar","OtherHexaploids"))) %>% 
+  arrange(as.factor(Subspecies_by6_TreeValidated),GroupforExpansionLoad) %>% 
+  mutate(ColorCode=if_else(Subspecies_by6_TreeValidated %in% c("Landrace","Cultivar") | GroupforExpansionLoad=="OtherHexaploids" ,"gray90",ColorCode)) %>% 
+  mutate(ColorCode=if_else(GroupforExpansionLoad=="Club wheat","black",ColorCode))
+
+df <- read_tsv("data/016_mds/hexaploid_mds.txt") %>% 
+  left_join(dftaxaDB,by="Taxa") %>% 
+  filter(!is.na(GroupforExpansionLoad)) %>% 
+  mutate(Subspecies_by6_TreeValidated=factor(Subspecies_by6_TreeValidated,
+         levels = c("Landrace","Cultivar","OtherHexaploids"))) %>% 
+  arrange(as.factor(Subspecies_by6_TreeValidated),GroupforExpansionLoad)
+ 
+
+### 设置因子顺序及颜色
+df$GroupforExpansionLoad <- factor(df$GroupforExpansionLoad,levels = df_factor$GroupforExpansionLoad)
+
+colB <- df_factor$ColorCode
+
+df_eig <- read_tsv("data/016_mds/hexaploid_mds_eigenvalues.txt")
+
+
+
+
+### 提取变异解释度并合并数据
+variance1 <-  paste(round(df.pca$eig[1,2],3),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df.pca$eig[2,2],3),"%",sep="") ##第二个成分
+
+### start to plot
+p <- df %>% 
+  ggplot(aes(x=PC1,y=PC2,fill= GroupforExpansionLoad))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.8,size=2,color="gray",shape=21)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  # scale_color_manual(values = colB,name="Genetic group")+
+  scale_fill_manual(values = colB,name="Hexaploid by subspecies")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      # ,legend.position = 'none'
+      ,text = element_text(size = 12))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 6)
+
+library(plotly)
+fig <- df %>%
+  # filter(Subspecies %in% c("Landrace_Yunnan","yunna-nense")) %>%
+  # filter(Subspecies == "Spelt_CAU" |Subspecies == "spelta") %>%
+  # filter(Subspecies %in% c("petropavlovskyi","Landrace_Xinjiang")) %>%
+  # filter(Subspecies == "Landrace",Group %in% c("JiaoLab","LuLab","CAAS") ) %>%
+  plot_ly(x = ~ PC1, y = ~ PC2,color = ~ GroupforExpansionLoad,
+               text = ~paste(Taxa),
+               colors = colB)
+
+fig
+
+```
+
 #### ====== Load Map and boxplot
 ## plot Bubble map vivid 主题
 ```{r}

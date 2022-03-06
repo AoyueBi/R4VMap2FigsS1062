@@ -307,6 +307,7 @@ p <- df %>%
       ,text = element_text(size = 12))  
 p
 ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+ggsave(p,filename = "~/Documents/test.pdf",height = 5,width = 5)
 
 library(plotly)
 fig <- df %>%
