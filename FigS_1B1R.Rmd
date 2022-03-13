@@ -97,27 +97,33 @@ shinyApp(ui = ui, server = server)
 
 ## Load pattern
 ```{r message=FALSE, warning=FALSE}
-dfTaxaInfo <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
-  filter(GroupbyContinent=="CL")
+### 目的：将 CL 的load 统计出来，根据sub chr 统计个数
+# dfTaxaInfo <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+#   filter(GroupbyContinent=="CL")
+# 
+# df_delCount <- dir("data/fromDaxing/1B1R/001_data/002_byGene/003_GERP1.5_PPH0.5", full.names = T) %>%
+#   ### 过滤文件
+#   keep(~str_remove_all(basename(.x), ".txt.gz") %in% dfTaxaInfo$VcfID) %>% 
+#   map(~read_tsv(.x) %>% mutate(Taxa=str_remove_all(basename(.x), ".txt.gz"))) %>% 
+#   bind_rows() %>%
+#   mutate(Sub=str_sub(geneName, 9,9)) %>%
+#   mutate(Chr=str_sub(geneName,8,9)) %>% 
+#   group_by(Taxa,Sub, Chr) %>%
+#   summarise(n=n(),
+#             synNum=sum(numDerivedInSyn),
+#             synHeteroNum=sum(numHeterInSyn*0.5),
+#             nonNum=sum(numDerivedInNonsyn),
+#             nonHeteroNum=sum(numHeterInNonsyn*0.5),
+#             delNum=sum(numDerivedInHGDeleterious),
+#             delHeteroNum=sum(numHeterInHGDeleterious*0.5))
 
-df_delCount <- dir("data/fromDaxing/1B1R/001_data/002_byGene/003_GERP1.5_PPH0.5", full.names = T) %>%
-  keep(~str_remove_all(basename(.x), ".txt.gz") %in% dfTaxaInfo$VcfID) %>% 
-  map(~read_tsv(.x) %>% mutate(Taxa=str_remove_all(basename(.x), ".txt.gz"))) %>% 
-  bind_rows() %>%
-  mutate(Sub=str_sub(geneName, 9,9)) %>%
-  mutate(Chr=str_sub(geneName,8,9)) %>% 
-  group_by(Taxa,Sub, Chr) %>%
-  summarise(n=n(),
-            synNum=sum(numDerivedInSyn),
-            synHeteroNum=sum(numHeterInSyn*0.5),
-            nonNum=sum(numDerivedInNonsyn),
-            nonHeteroNum=sum(numHeterInNonsyn*0.5),
-            delNum=sum(numDerivedInHGDeleterious),
-            delHeteroNum=sum(numHeterInHGDeleterious*0.5))
+# write_tsv(df_delCount,"data/fromDaxing/1B1R/001_data/002_byGene/004_merge003/001_delCount_byTaxa_bySub_byChr.txt.gz")
 ```
 
 ### plot
 ```{r}
+df_delCount <- read_tsv("data/fromDaxing/1B1R/001_data/002_byGene/004_merge003/001_delCount_byTaxa_bySub_byChr.txt.gz")
+
 dfWith1B1R <- read_tsv("data/007_1B1R/000_group/With1B1R.txt",col_names = F) %>%
   mutate(If1B1R="With1B1R")
 dfNo1B1R <- read_tsv("data/007_1B1R/000_group/No1B1R.txt",col_names = F) %>% 
@@ -352,51 +358,134 @@ p
 ggsave(p,filename = "~/Documents/test.pdf",height=3,width=6)
 ```
 
-### fd
+
+
+
+#### ====
+## Load count in cultivar 按照 chr 输出
 ```{r message=FALSE, warning=FALSE}
-dfChr <- read_tsv("data/fromDaxing/1B1R/centromereStartEnd.txt") %>% 
+df_delCount <- read_tsv("data/fromDaxing/1B1R/001_data/002_byGene/004_merge003/001_delCount_byTaxa_bySub_byChr.txt.gz")
+
+df_Count <- df_delCount %>% 
+  mutate(Synonymous=synNum+synHeteroNum,
+         Nonsynonymous=nonNum+nonHeteroNum,
+         Deleterious=delNum+delHeteroNum) %>% 
+  select(Taxa,Sub,Chr,Synonymous:Deleterious) %>%
+  pivot_longer(cols = Synonymous:Deleterious, 
+               names_to = "Methods", values_to = "Burden")
+
+p <- df_Count %>%
+  mutate(SubID=str_c("Chr",str_sub(Chr,1,1))) %>%
+  ggplot(aes(x=Sub,y=Burden))+
+  geom_boxplot(position = position_dodge(0.8),outlier.shape = NA, alpha = 0.9) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.8),aes(color=Sub),alpha=0.3)+
+  facet_grid(Methods~SubID, scales = "free")+
+  # scale_fill_brewer(palette = "Set2")+
+  # scale_color_brewer(palette = "Set2")+
+  scale_color_manual(values = c("#fd8582","#967bce","#4bcdc6"))+
+  labs(y="Individual-based derived alleles count",x="Subgenome")+ 
+  theme(
+    strip.text = element_text(size=7),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    legend.position = 'none',
+    text = element_text(size = 12))
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3.6,width = 7.2)
+
+```
+
+
+## Load ratio in cultivar 按照 chr 输出
+```{r}
+df_delCount <- read_tsv("data/fromDaxing/1B1R/001_data/002_byGene/004_merge003/001_delCount_byTaxa_bySub_byChr.txt.gz")
+
+df_Ratio <- df_delCount %>% 
+  mutate(Nonsynnonymous=(nonNum+nonHeteroNum)/(synNum+synHeteroNum),
+         Deleterious=(delNum+delHeteroNum)/(synNum+synHeteroNum)) %>%
+  select(Taxa,Sub,Chr,Nonsynnonymous,Deleterious) %>%
+  pivot_longer(cols = Nonsynnonymous:Deleterious, 
+               names_to = "Methods", values_to = "Burden")
+
+p <- df_Ratio %>%
+  mutate(SubID=str_c("Chr",str_sub(Chr,1,1))) %>%
+  ggplot(aes(x=Sub,y=Burden,fill=Sub))+
+  geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.2) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.8),aes(color=Sub),alpha=0.3)+
+  # scale_fill_brewer(palette = "Set2")+
+  # scale_color_brewer(palette = "Set2")+
+  facet_grid(Methods~SubID,scales = "free")+
+  scale_color_manual(values = c("#fd8582","#967bce","#4bcdc6"))+
+  labs(y="Individual-based mutation load",x="Subgenome")+ 
+  theme(
+    strip.text = element_text(size=7),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    legend.position = 'none',
+    text = element_text(size = 12))
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3.6,width = 7.2)
+
+```
+
+#### ======
+## fd - 1B1R
+```{r message=FALSE, warning=FALSE}
+dfChr_point <- read_tsv("data/fromDaxing/1B1R/centromereStartEnd.txt") %>% 
   mutate(Chr=str_sub(Chr,4,5)) %>% 
   dplyr::select(Chr,Mid) %>% 
-  filter(Chr %in% c("1A","1B","1D"))
+  filter(Chr %in% c("1A","1B","1D")) %>% 
+  rename(scaffold=Chr)
 
-dfChr_point <- dfChr %>% 
-  dplyr::rename(scaffold=Chr)
+# df_fd <- dir("data/fromDaxing/1B1R/002_1B1R/005_fd",full.names = T) %>%
+#     # str_subset(., pattern %in% c("chr1A","chr1B","chr1D")) %>% 
+#   map(~read_csv(.x,show_col_types = F,col_types = list(scaffold=col_character())) %>% 
+#         mutate(P1=map_chr(map(str_split(basename(.x), "_"),`[`, c(3,4)), ~str_c(.x[[1]], .x[[2]],sep = "_")),
+#                P2=map_chr(map(str_split(basename(.x), "_"),`[`, c(5,6)), ~str_c(.x[[1]], .x[[2]],sep = "_")))) %>% 
+#   bind_rows() %>% 
+#   mutate(P2=factor(P2,levels = c("CL_NonSV","CL_SV"),labels = c("No1B1R","With1B1R"))) %>% 
+#   #fd is meaningless when D is negative, as it is designed to quantify the excess of ABBA over BABA only when an excess exists. We therefore convert all fd values to 0 at sites where D is negative
+#   mutate(fdModify=ifelse(is.na(D) | D <= 0, 0, ifelse(fd > 1, 0, ifelse(fd < 0, 0, fd))))
+# 
+# write_tsv(df_fd,"data/fromDaxing/1B1R/002_1B1R/006_merge005_addP1P2_fdModify/001_fd.txt.gz")
 
-df_fd <- dir("data/fromDaxing/1B1R/002_1B1R/005_fd",full.names = T) %>%
-    # str_subset(., pattern %in% c("chr1A","chr1B","chr1D")) %>% 
-  map(~read_csv(.x) %>% 
-        mutate(P1=map_chr(map(str_split(basename(.x), "_"),`[`, c(3,4)), ~str_c(.x[[1]], .x[[2]],sep = "_")),
-               P2=map_chr(map(str_split(basename(.x), "_"),`[`, c(5,6)), ~str_c(.x[[1]], .x[[2]],sep = "_")))) %>% 
-  bind_rows() %>% 
-  mutate(P2=factor(P2,levels = c("CL_NonSV","CL_SV"),labels = c("No1B1R","With1B1R"))) %>% 
-  #fd is meaningless when D is negative, as it is designed to quantify the excess of ABBA over BABA only when an excess exists. We therefore convert all fd values to 0 at sites where D is negative
-  mutate(fdModify=ifelse(is.na(D) | D <= 0, 0, ifelse(fd > 1, 0, ifelse(fd < 0, 0, fd))))
+df_fd <- read_tsv("data/fromDaxing/1B1R/002_1B1R/006_merge005_addP1P2_fdModify/001_fd.txt.gz",col_types = list(scaffold=col_character()))
 
-colB <- c("skyblue","#004680")
+# colB <- c("skyblue","#004680")
+colB <- c("#377FB8","#EB2C2C")
 
 p <- df_fd %>% 
   filter(scaffold %in% c("1A","1B","1D"), P1=="LR_EU") %>% 
   ggplot(aes(x=(start+end)/2000000,y=fdModify))+
-  geom_point(alpha=0.5,aes(color=P2))+
+  # geom_point(alpha=0.5,aes(color=P2))+
   # geom_smooth(method = "loess")+
   geom_line(aes(color=P2))+
-  geom_point(data = dfChr_point, aes(x=Mid/1000000,y=0), size=2)+
+  geom_point(data = dfChr_point, aes(x=Mid/1000000,y=0), size=2,color="gray")+
   facet_grid(P2~scaffold)+
   labs(x="Genomic position (Mb)",y=expression(italic("f"["d"])))+
   scale_color_manual(values = colB)+
   scale_fill_manual(values = colB)+
-  theme_classic()+
-  theme(legend.title = element_blank(),
-        legend.position = "none",
-        panel.background = element_rect(fill="transparent"),
-        # legend.text = element_text(size = 10),
-        # legend.key.size = unit(1,"cm"),
-        legend.background = element_rect(fill="transparent"),
-        strip.background = element_blank(),
-        # axis.title.x = element_blank(),
-        axis.line = element_blank(),
-        text = element_text(size = 14),
-        panel.border = element_rect(colour = "black",fill = "transparent"))
+  theme(
+    strip.background = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    legend.position = 'none',
+    text = element_text(size = 12))
+
+  # theme_classic()+
+  # theme(legend.title = element_blank(),
+  #       legend.position = "none",
+  #       panel.background = element_rect(fill="transparent"),
+  #       # legend.text = element_text(size = 10),
+  #       # legend.key.size = unit(1,"cm"),
+  #       legend.background = element_rect(fill="transparent"),
+  #       strip.background = element_blank(),
+  #       # axis.title.x = element_blank(),
+  #       axis.line = element_blank(),
+  #       text = element_text(size = 14),
+  #       panel.border = element_rect(colour = "black",fill = "transparent"))
 
 p
 
@@ -405,14 +494,97 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 3.5,width = 5)
 ```
 
 
+## Missing rate - 1B1R
+```{r}
+dfChrConver <- read_tsv("data/fromDaxing/1B1R/chrConvertionRule.txt") %>% 
+  mutate(Chr=str_remove(OriChrName,"chr")) %>% 
+  select(ChrID,Chr)
+
+dfMissingRate <- dir("data/fromDaxing/1B1R/002_1B1R/001_data", full.names = T) %>% 
+  map(read_tsv, show_col_types = FALSE) %>% 
+  bind_rows() %>% 
+  pivot_longer(cols = MissingRate1B1R:MissingRateNon1B1R, 
+               names_to = "group", values_to = "MissingRate") %>% 
+  mutate(group=factor(group, levels = c("MissingRate1B1R","MissingRateNon1B1R"), 
+                            labels = c("With1B1R","No1B1R"))) %>% 
+  left_join(dfChrConver,by = c("ChrID"))
+
+dfChr <- read_tsv("data/fromDaxing/1B1R/centromereStartEnd.txt") %>% 
+  mutate(Chr=str_sub(Chr,4,5)) %>% 
+  select(Chr,Mid) %>% 
+  filter(Chr %in% c("1A","1B","1D"))
+
+p <- dfMissingRate %>% 
+  # slice_sample(prop = 0.2) %>%
+  ggplot(aes(x=Pos/1000000, y=MissingRate, color=group))+
+  geom_point(size=0.2)+
+  facet_grid(Chr~.)+
+  # geom_line()+
+  # geom_smooth()+
+  geom_point(data = dfChr,aes(x=Mid/1000000, y=0), color="grey")+
+  scale_color_brewer(palette = "Set2")+
+  scale_color_manual(values = c("#377FB8","#EB2C2C"))+
+  labs(x="Genomic position (Mb)", y= "Missing rate")+
+  theme(
+    strip.background = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    legend.position = 'none',
+    text = element_text(size = 12))
+
+p
+# ggsave(plot = q, "~/Documents/temp.png", width = 4, height = 3, dpi = 300)
+
+```
 
 
 
 
+## Load ratio - 1B1R
+```{r}
+df_delCount <- read_tsv("data/fromDaxing/1B1R/001_data/002_byGene/004_merge003/001_delCount_byTaxa_bySub_byChr.txt.gz")
 
+dfWith1B1R <- read_tsv("data/007_1B1R/000_group/With1B1R.txt",col_names = F) %>%
+  mutate(If1B1R="With1B1R")
+dfNo1B1R <- read_tsv("data/007_1B1R/000_group/No1B1R.txt",col_names = F) %>% 
+  mutate(If1B1R="No1B1R")
+df_if1B1R <- rbind(dfWith1B1R,dfNo1B1R) %>% rename(Taxa=X1)
 
+df_Ratio <- df_delCount %>% 
+  mutate(Nonsyn=(nonNum+nonHeteroNum)/(synNum+synHeteroNum),
+         Deleterious=(delNum+delHeteroNum)/(synNum+synHeteroNum)) %>%
+  dplyr::select(Taxa,Sub,Chr,Nonsyn,Deleterious) %>%
+  filter(Chr %in% c("1A","1B","1D")) %>% 
+  pivot_longer(cols = Nonsyn:Deleterious, 
+               names_to = "Methods", values_to = "Burden")
 
+colB <- c("#377FB8","#EB2C2C")
 
+p <- df_Ratio %>%
+  right_join(.,df_if1B1R,by="Taxa") %>% 
+  mutate(SubID=str_sub(Chr,1,1)) %>%
+  ggplot(aes(x=Chr,y=Burden,fill=If1B1R))+
+  geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 1) +
+  geom_point(aes(color=If1B1R),position = position_jitterdodge(jitter.width = 0.4, dodge.width = 0.8),alpha=0.1)+
+  scale_color_manual(values = colB)+
+  scale_fill_manual(values = colB)+
+  # scale_color_manual(values = c("Gray50","steelblue"))+
+  # scale_fill_manual(values = c("Gray50","steelblue"))+
+  # scale_fill_brewer(palette = "Set2")+
+  # scale_color_brewer(palette = "Set2")+
+  facet_grid(Methods~.,scales = "free")+
+  labs(y="Mutation burden")+ 
+    theme(
+    strip.background = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    legend.position = 'none',
+    text = element_text(size = 12))
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+```
 
 
 

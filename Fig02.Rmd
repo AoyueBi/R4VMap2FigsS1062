@@ -2012,6 +2012,14 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
 ```
 
 
+## TaMLO-B1
+```{r}
+df1 <- dftotal %>% 
+  mutate(gene=str_sub(Transcript,1,18)) %>% 
+  filter(gene==)
+```
+
+
 
 
 
