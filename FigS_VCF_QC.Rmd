@@ -1138,19 +1138,36 @@ df <- rbind(df1,df2,df3) %>%
   ungroup()
 
 #Lines
+# p <-  ggplot(df, aes(x=AverageDepth, y=SD)) +
+#   geom_hex(bins = 30, size = 0.5, color = "black") +
+#   scale_fill_viridis_c(option = "C")+
+#   scale_y_continuous(limits=c(3,8),breaks = seq(0,8,2))+
+#   scale_x_continuous(limits=c(6,12),breaks = seq(0,12,2))+
+#   labs(x="Average depth",y="SD")+
+#   theme(
+#     panel.background = element_blank(),
+#     panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+#     text = element_text(size = 12))
+# p
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+
+### 为了画进流程图
 p <-  ggplot(df, aes(x=AverageDepth, y=SD)) +
-  geom_hex(bins = 30, size = 0.5, color = "black") +
+  geom_hex(bins = 30, size = 0.01, color = "black") +
   scale_fill_viridis_c(option = "C")+
   scale_y_continuous(limits=c(3,8),breaks = seq(0,8,2))+
   scale_x_continuous(limits=c(6,12),breaks = seq(0,12,2))+
   labs(x="Average depth",y="SD")+
   theme(
     panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
-    text = element_text(size = 12))
+    panel.border = element_rect(colour = "black", fill=NA, size=0.2),
+    axis.ticks = element_line(size=0.2),
+    legend.position = "none",
+    text = element_text(size = 6.5))
 p
-ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
-
+# ggsave(p,filename = "~/Documents/test.pdf",height = 1.2,width = 2)
+ggsave(p,filename = "~/Documents/test.pdf",height = 1.238,width = 1.315)
 
 ```
 ## Depth by taxa-histgram
@@ -1467,6 +1484,30 @@ ggsave(q,filename = "~/Documents/test.pdf",height = 3,width = 4)
 ```
 
 
+#### ============
+## 补充材料：SNP计数
+## A B D亚基因组各自的 SNP 数目
+```{r}
+df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/data/017_VMap2_SNPcount/001_VMap2_SNP_count.txt") %>% 
+  mutate(Sub=str_sub(Chr,5)) 
+
+### 求每一列的和
+df_sum <- df %>% 
+  group_by(Sub) %>% 
+  summarise(across(.cols = c(TotalVariants:Delection_Num,Gene_Region), .fns = sum)) 
+
+df_sum
+
+df_sum <- df %>% 
+  summarise(across(.cols = c(TotalVariants:Delection_Num,Gene_Region), .fns = sum)) 
+
+
+df_sum
+
+biSNP_Num <- sum(df$BiallelicSNP_Num)
+
+print(str_c("biSNP_Num: ",biSNP_Num))
+```
 
 
 
