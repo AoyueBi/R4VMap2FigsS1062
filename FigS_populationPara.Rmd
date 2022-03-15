@@ -90,13 +90,17 @@ library(ggpubr)
 
 ## Pi TajimaD data import
 ```{r}
-df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/002_pi_merge/001_pi.txt.gz")
-df2 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/004_pi_merge/001_pi.txt.gz")
+# df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/002_pi_merge/001_pi.txt.gz")
+# df2 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/001_Pi/004_pi_merge/001_pi.txt.gz")
+
+df1 <- read_tsv("data/014_PopParameters/004_Pi/001_pi_WE_DE_FTT_LR_CL_AT.txt.gz")
+df2 <- read_tsv("data/014_PopParameters/004_Pi/001_pi_LR_EU_EA_SCA_AM_AF_WA_CL.txt.gz")
+
 unique(df1$Group)
 unique(df2$Group)
 
-df3 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/002_TajimaD_merge/001_TajimaD.txt.gz")
-df4 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/003_TajimaD/004_TajimaD_merge/001_TajimaD.txt.gz")
+df3 <- read_tsv("data/014_PopParameters/005_tajimaD/001_tajimaD_WE_DE_FTT_LR_CL_AT.txt.gz")
+df4 <- read_tsv("data/014_PopParameters/005_tajimaD/001_tajimaD_LR_EU_EA_SCA_AM_AF_WA_CL.txt.gz")
 unique(df3$Group)
 unique(df4$Group)
 
@@ -314,7 +318,7 @@ cowplot::save_plot(q,filename = "/Users/Aoyue/Documents/test.pdf",base_height = 
 ## step1:矩阵生成 测试
 ```{r}
 
-df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/002_fst_Subsummary.txt.gz")
+df1 <- read_tsv("data/014_PopParameters/006_fst/002_fst_Subsummary.txt.gz")
 
 ### 建立2个一模一样的表格，为创建矩阵做准备
 df2 <- df1 %>% 
@@ -376,7 +380,7 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 7.2, width = 7.2)
 ```
 ## FST heatmap 相关性矩阵
 ```{r}
-df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/002_fst_Subsummary.txt.gz")
+df1 <- read_tsv("data/014_PopParameters/006_fst/002_fst_Subsummary.txt.gz")
 
 fun_plotHeatmap <- function(df,subfun){
   p <- df %>% 
@@ -419,7 +423,7 @@ cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 2.4,base_wi
 
 ## PCA by FST
 ```{r}
-df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/002_fst_Subsummary.txt.gz")
+df1 <- read_tsv("data/014_PopParameters/006_fst/002_fst_Subsummary.txt.gz")
 
 ### 建立2个一模一样的表格，为创建矩阵做准备
 df2 <- df1 %>% 
@@ -569,7 +573,7 @@ cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 2.4,base_wi
 ```
 ## Fst by point 两两相关性
 ```{r}
-df1 <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/018_popPara/002_Fst/003_fst_merge_002/002_fst_Subsummary.txt.gz")
+df1 <- read_tsv("data/014_PopParameters/006_fst/002_fst_Subsummary.txt.gz")
 
 p <- df1 %>% 
   filter(Sub=="A") %>% 
@@ -585,6 +589,92 @@ ggsave(p,filename = "/Users/Aoyue/Documents/fst.pdf",height = 3,width = 7.2)
 ```
 
 
+#### ============
+## TajimaD
+
+```{r}
+################################# ##
+#                               #
+#   genome Scan of Tajima D            
+#                               #
+################################# ##
+###读入数据，先将数据进行滑窗，再写出
+# dfori <- read_tsv("data/014_PopParameters/005_tajimaD/001_tajimaD_WE_DE_FTT_LR_CL_AT.txt.gz") %>% 
+#   rename(Ave=TajimaD) %>% 
+#   # filter(Group!="LR_EA") %>% 
+#   filter(!is.na(Ave), is.finite(Ave), !is.nan(Ave))
+# 
+# dftest <- dfori %>%
+#     winScan(
+#       x = .,
+#       ### 注意这里是按照2个变量进行分组
+#       groups = c("Group","CHROM"),
+#       position = "BIN_START",
+#       values = c("Ave"),
+#       win_size = 2000000,
+#       win_step = 1000000,
+#       funs = c("mean", "sd")
+#     ) %>% 
+#       mutate(Sub=str_sub(CHROM,2,2))
+#     
+# df <- dftest %>% rename(Ave_mean_TajimaD=Ave_mean,Ave_sd_TajimaD=Ave_sd)
+outfileA <- "data/014_PopParameters/005_tajimaD/002_tajimaD_WE_DE_FTT_LR_CL_AT_2Mwin1Mslide.txt.gz"
+# write_tsv(df,outfileA)
+
+df <- read_tsv(outfileA,col_types = list(CHROM=col_character())) %>% 
+  filter(Group!="LR_EA") %>% 
+  rename(Ave=Ave_mean_TajimaD,BIN_START=win_start)
+
+#### 设置每条染色体的点
+data1 <- data.frame(CHROM = paste(rep("Chr ",7),1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(rep("Chr ",7),1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(rep("Chr ",7),1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+### 修改因子标签,并重新设置为因子变量,即添加 Chr 在每行的前方
+df <- mutate(df,CHROM = paste(rep("Chr",dim(df)[1]),df$CHROM,sep=" "))
+# df$CHROM <- as.factor(df$CHROM)
+
+df$CHROM <- factor(df$CHROM,levels = paste(rep("Chr ",21),rep(1:7,each=3),rep(c("A","B","D"),7),sep = ""),ordered=TRUE)
+
+
+colB <- c('#87cef9','#9900ff','#7f5701','#016699','#fc6e6e','#ffd702') ## 按照字母顺序
+
+df <- df %>% 
+  filter(!is.na(Ave), is.finite(Ave), !is.nan(Ave)) 
+
+p <- df %>% 
+  ggplot(aes(x=BIN_START/1000000, y=Ave))+
+  geom_line(aes(color=Group),alpha = 0.95,size=0.3)+
+  geom_hline(yintercept = 0,linetype="dashed",color='gray')+
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(aes(label = CHROM, x=median(df$BIN_START/1000000), y= 3/4 *max(y=df$Ave)), 
+            data = data.frame(CHROM = unique(df$CHROM)),size=2)+
+  scale_color_manual(values =colB)+
+  labs(x="Physical position (Mb)", y = expression(paste("Tajima's ",italic(D))))+
+  scale_y_continuous(expand = c(0,0),limits = c(-3,6),breaks = seq(-2,4,2))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      axis.line = element_line(size=0.4, colour = "black"),
+      legend.position = 'none',
+      # legend.position = "bottom",
+      text = element_text(size = 9))+
+  facet_wrap(~ CHROM,ncol = 3,scales = "free_y",strip.position = "right")+
+  theme(strip.text = element_blank())
+
+
+# p
+# library("ggpubr")
+# ggp_legend <- get_legend(p)
+# ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 5)
+
+
+
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 7.2*9/16,width = 7.2)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.png",height = 4,width = 7.2)
+
+```
 
 
 
