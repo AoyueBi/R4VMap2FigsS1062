@@ -139,17 +139,21 @@ p
 
 ```
 
+
+
 #### --------------------
 
 ## \*\*Fig2:variants count all region
 
 ```{r}
+### "Intron" "UTR_3"  "UTR_5" 
 df1 <- dftotal %>% group_by(Region) %>% 
   # filter(!is.na(Region)) %>% 
   summarise(n=n()) %>% 
   rename(Type=Region) %>% 
   filter(!Type=="CDS")
 
+### "NONSYNONYMOUS" "STOP-GAIN"     "SYNONYMOUS" 
 df2 <- dftotal %>% group_by(Variant_type) %>% 
   filter(!is.na(Variant_type)) %>% 
   summarise(n=n()) %>% 
@@ -158,6 +162,8 @@ df2 <- dftotal %>% group_by(Variant_type) %>%
 
 # expression(paste("Length-Freq of", italic("E. coruscans"), "by Gear")) 
 
+### "Essential splice"
+### 主要发生在内含子区域
 df3 <- dftotal %>% 
   filter(Impact_VEP=="HIGH") %>%
   filter(str_detect(Effect_VEP,"splice_")) %>% 
@@ -165,6 +171,7 @@ df3 <- dftotal %>%
   mutate(Type="Essential splice") %>% 
   relocate(Type,.before = n)
 
+### Intergenic
 df4 <- tibble(Type="Intergenic",n=193285480)
   
 df <- rbind(df1,df2,df3,df4)
@@ -407,17 +414,20 @@ df$LoadGroup <- factor(df$LoadGroup,levels = c("Deleterious","Nonsynonymous","Sy
 p <- df %>%
 ggplot(aes(x=LoadGroup,y=n,fill=LoadGroup))+
   geom_bar(stat = 'identity',position = "dodge")+
-  geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,
+  geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=1,
             position = position_dodge(0.9))+
   # geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,nudge_y = 1)+
   labs(x="", y="SNP count")+
   scale_fill_manual(values = colB)+
   theme_classic()+
-  # theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
   theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
-          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
+          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 7))
 
 p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 1.725,width = 2.3)
+
 ```
 
 
@@ -1920,7 +1930,7 @@ p
 ```
 
 #### ========================
-## whole genome scan
+## del ratio whole genome scan
 ```{r}
 ### step1:根据原来数据框，求出 2方面值，1：单位CDS的结果，2：有害突变和同义突变的比
 # df <- read_tsv("data/006_Fig2/genomeScan/002_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt")
@@ -2012,14 +2022,193 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
 ```
 
 
-## TaMLO-B1
+### nonsyn ratio
 ```{r}
-df1 <- dftotal %>% 
-  mutate(gene=str_sub(Transcript,1,18)) %>% 
-  filter(gene==)
+df <- read_tsv("data/006_Fig2/genomeScan/004_delVSsynOnChr_windowScanbyRpackage.txt")
+
+# rec <- data.frame(x1=c(0,9,28,50,80), x2=c(9,28,50,80,100), y1=c(-Inf,-Inf,-Inf,-Inf,-Inf), y2=c(Inf,Inf,Inf,Inf,Inf), region=c('R1','R2a','C','R2b','R3'))
+colB <- c("#fffcd4","#1e3c84","#3ab4c4","#3ab4c4","#1e3c84")
+p <- df %>% 
+  ggplot()+
+  # geom_rect(data=rec, mapping=aes(xmin=x1, xmax=x2, ymin=y1, ymax=y2,fill=region))+
+  annotate(geom = "rect", xmin = 28.14,xmax = 53.08, ymin = -Inf, ymax = Inf, fill = "#fffcd4",alpha = 1)+
+  geom_line(mapping=aes(x=df$win_start,y=df$NonsynSynRatio_mean,group=CHROM),col='#F4A460')+
+  stat_smooth(mapping=aes(x=df$win_start,y=df$NonsynSynRatio_mean),col = "#d5311c",method = "loess",formula = y~x,span = 0.04,se=F,size=1) +
+  # geom_point()+
+  geom_line(mapping=aes(x=df$win_start,y=df$RecombinationRate_mean*2,group=CHROM),col='#56B4E9')+
+  stat_smooth(df, mapping=aes(x=df$win_start,y=df$RecombinationRate_mean*2),col = "blue",method = "loess",formula = y~x,span = 0.04,se=F,size=1) +
+    # geom_point(df_centromere,mapping = aes(x=x,y=y),color='black',size=0.5)+
+  xlab("Scale position")+ylab("Nonsynonymous SNPs/syn SNPs") +
+  theme(legend.position = 'none')+
+  scale_fill_manual(values = colB)+
+  scale_y_continuous(expand = c(0, 0),sec.axis = sec_axis(~./2, name="Recombination rate"))+
+  scale_x_continuous(expand = c(0, 0))+
+  theme(
+    # plot.margin=unit(rep(1,4),'lines'),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 9))
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
 ```
 
 
 
 
+#### ============
+## Extended data
+#### ============
+## SNP count in gene region
+
+## 查看 coding 区有哪些类型及个数
+```{r}
+df_test <- dftotal %>% 
+  filter(Region=="CDS") %>% 
+  group_by(Variant_type) %>% 
+  count()
+```
+
+## FigS:SNP count in gene region
+UTR           Synonymous    Stop-loss     Stop-gain     Start-lost    Nonsynonymous
+以上几种类型的计数
+```{r}
+### Goal: 将 Region列和Variant_type列柔和在一起，成为新的一列，即将UTR的信息加入分析
+### 第一步，Region 列，是 UTR_3 UTR_5的，新列就命名为UTR，不是的，则按照Variant_type类型添加
+
+dfUTR <- dftotal %>% 
+  filter(Region == "UTR_3" | Region == "UTR_5") %>% 
+  mutate(VariantGroup = "UTR")
+
+dfnotUTR <- dftotal %>% 
+  filter(Region == "CDS") %>% 
+  mutate(VariantGroup = Variant_type)
+
+dfnew <- rbind(dfUTR,dfnotUTR)
+
+df_variantGroup<- dfnew %>% 
+  filter(!is.na(VariantGroup)) %>%
+  group_by(VariantGroup) %>% 
+  summarise(n=n()) %>% 
+  ungroup() %>% 
+  mutate(fre=n/sum(n)) %>% 
+  arrange(desc(VariantGroup))
+
+# colB <- c("#a9a9a9","#e69f00","#871f12","#d5311c","#5a150c","#004680")
+colB <- c("#e69f00","#871f12","#d5311c","#5a150c","#004680","#a9a9a9")
+
+df_variantGroup$VariantGroup <- factor(df_variantGroup$VariantGroup,levels = c("NONSYNONYMOUS","START-LOST","STOP-GAIN", "STOP-LOSS","SYNONYMOUS","UTR"), labels = c("Nonsynonymous","Start-lost", "Stop-gain","Stop-loss","Synonymous","UTR"))
+p <- df_variantGroup %>%
+ggplot(aes(x=VariantGroup,y=n,fill=VariantGroup))+
+  geom_bar(stat = 'identity',position = "stack")+
+  # geom_text(aes(label=n),size=3,nudge_y = 1)+
+    geom_text(aes(label=paste(n,"\n(",round(fre,3),")",sep = "")),size=3,
+            position = position_dodge(0.9))+
+  labs(x="", y="SNP count")+
+  # scale_fill_brewer(palette = "Set2")+
+  scale_fill_manual(values = colB)+
+  # scale_fill_brewer(palette = "Blues")+
+  theme_classic()+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
+          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 12))
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+```
+
+## FigS: AABBDD DAF
+#### AABBDD: keep all sites in segregation
+AABBDD AABB DD 三个群体都必须有分离
+```{r}
+###step1: add AAF to GeneDB
+dfAAF <- read_tsv("data/015_AAF/002_aaf_byPloidy/002_AAF_byPloidy.txt.gz")
+
+df <- dftotal %>% 
+  # mutate(Sub=str_sub(Transcript, 9, 9)) %>%
+  ### 定义load
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  filter(!Ancestral == "NA") %>% 
+  filter(Ancestral==Ref|Ancestral==Alt) %>% 
+  ### 将AAF数据代入其中
+  left_join(.,dfAAF,by=c("Chr","Pos")) %>% 
+  mutate(DAF_42 = ifelse(Ref==Ancestral,AAF_AABB_DD,1-AAF_AABB_DD)) %>% 
+  mutate(DAF_06 = ifelse(Ref==Ancestral,AAF_AABBDD,1-AAF_AABBDD))
+
+#### ======================================================================
+### 必须在六倍体群体分离
+df06 <- df %>% 
+  mutate(Sub=factor(Sub,levels = c("A","B","D"),labels = c("A subgenome","B subgenome","D subgenome"))) %>% 
+  select(Sub,LoadGroup,DAF_42,DAF_06) %>% 
+  ### data deal
+  filter(!is.na(DAF_06)) %>%  ###*****
+  mutate(bin=cut_width(DAF_06,width = 0.05,boundary = 0)) %>% 
+  group_by(Sub,LoadGroup) %>% 
+  count(bin) %>% 
+  mutate(fre=n/sum(n)) %>% 
+  arrange(Sub,desc(LoadGroup)) 
+ 
+#### facet by sub
+colB <- rep(c("#d5311c","#e69f00","#004680"),2)
+q <- df06 %>% 
+  ggplot(aes(x=bin,y=fre,group=LoadGroup,fill=LoadGroup))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  labs(y="Proportion",x="Derived allele frequency")+
+  # scale_color_brewer(palette = "Set2")+
+  scale_fill_manual(values = colB)+
+  # scale_fill_brewer(palette = "Blues")+
+  scale_y_continuous(limits = c(0,0.855),breaks = seq(0,0.8,0.2))+
+  scale_x_discrete(labels=c("0","","","","0.2","","","","0.4","","","","0.6","","","","0.8","","","",""))+
+  facet_grid(Sub~.)+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 9))
+q
+
+ggsave(q,filename = "~/Documents/DAF_06.pdf",height = 3.17,width = 3.17)
+
+
+#### ======================================================================
+### 必须在四二倍体群体分离
+df42 <- df %>% 
+  mutate(Sub=factor(Sub,levels = c("A","B","D"),labels = c("A subgenome","B subgenome","D subgenome"))) %>% 
+  select(Sub,LoadGroup,DAF_42,DAF_06) %>% 
+  ### data deal
+  filter(!is.na(DAF_42)) %>%  ###*****
+  mutate(bin=cut_width(DAF_42,width = 0.05,boundary = 0)) %>% 
+  group_by(Sub,LoadGroup) %>% 
+  count(bin) %>% 
+  mutate(fre=n/sum(n)) %>% 
+  arrange(Sub,desc(LoadGroup)) 
+ 
+#### facet by sub
+colB <- rep(c("#d5311c","#e69f00","#004680"),2)
+q <- df42 %>% 
+  ggplot(aes(x=bin,y=fre,group=LoadGroup,fill=LoadGroup))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  labs(y="Proportion",x="Derived allele frequency")+
+  # scale_color_brewer(palette = "Set2")+
+  scale_fill_manual(values = colB)+
+  # scale_fill_brewer(palette = "Blues")+
+  scale_y_continuous(limits = c(0,0.855),breaks = seq(0,0.8,0.2))+
+  scale_x_discrete(labels=c("0","","","","0.2","","","","0.4","","","","0.6","","","","0.8","","","",""))+
+  facet_grid(Sub~.)+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 9))
+q
+
+ggsave(q,filename = "~/Documents/DAF_42.pdf",height = 3.17,width = 3.17)
+
+```
 

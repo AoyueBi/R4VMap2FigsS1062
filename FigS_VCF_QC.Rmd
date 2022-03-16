@@ -1561,6 +1561,28 @@ convertSVG("chromosome.svg", device = "pdf",file = "vmap2.1SNPDensity111111.pdf"
 #### ============
 ## 补充材料：最原始VCF计数
 ```{r}
+### 合并文件
+# inputDir <- c("data/019_rawVCF_count/001_rawVCF_count")
+# 
+# df <- dir(inputDir,full.names = T) %>% 
+#   map(~read_tsv(.x,show_col_types = FALSE) %>% mutate(Chr=as.numeric(str_sub(basename(.x),4,6)))) %>% 
+#   bind_rows()
+# 
+# write_tsv(df,"data/019_rawVCF_count/002_merge001/001_vmap2.alt.count.txt.gz")
+
+
+### 打印每个文件的行数，看看具体有多少种情况
+df <- read_tsv("data/019_rawVCF_count/002_merge001/001_vmap2.alt.count.txt.gz") %>%  
+  group_by(Chr) %>% 
+  count()
+##### conclusion: 46-51 cases
+
+### 统计Alt只含有 A T G C 中的一种，一共有多少SNP
+df <- read_tsv("data/019_rawVCF_count/002_merge001/001_vmap2.alt.count.txt.gz") %>% 
+  mutate(CaseGroup = ifelse(Case %in% c("A","T","G","C"),"One","Out")) %>% 
+  filter(CaseGroup=="One") %>% 
+  summarise(sum=sum(Count))
+
 
 ```
 
