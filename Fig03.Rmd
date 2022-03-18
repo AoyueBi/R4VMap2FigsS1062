@@ -91,6 +91,27 @@ p
 # ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 ggsave(p,filename = "figs/Fig3/misc/whole_load.pdf",height = 3,width = 4)
 ```
+### significance test - slightly
+- 在分析显著性差异前，先将数据框赋予一个新的变量，存储下来。
+```{r}
+dfdf <- df
+```
+- 先计算平均值 标准差之类的
+```{r}
+### 平均数，标准差，方差等统计
+  
+df <- df %>% 
+  filter(Stand_LoadGroup == "Nonsynonymous") %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
+  group_by(Subgenome,GroupbyContinent) %>% 
+summarise(n=n(),mean=mean(Stand_delCount),median=median(Stand_delCount),max=max(Stand_delCount),min=min(Stand_delCount),sd=sd(Stand_delCount), se = sd/sqrt(n))
+
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+
+```
+
 
 ## Del count
 ```{r}
@@ -160,25 +181,8 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 
 
 
-### significance test - slightly
-- 在分析显著性差异前，先将数据框赋予一个新的变量，存储下来。
-```{r}
-dfdf <- df
-```
-- 先计算平均值 标准差之类的
-```{r}
-### 平均数，标准差，方差等统计
-  
-df <- dfdf %>% filter(Stand_LoadGroup == "Nonsynonymous") %>% 
-  mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
-  group_by(Subgenome,GroupbyContinent) %>% 
-summarise(n=n(),mean=mean(Stand_delCount),median=median(Stand_delCount),max=max(Stand_delCount),min=min(Stand_delCount),sd=sd(Stand_delCount), se = sd/sqrt(n))
 
 
-df
-write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
-
-```
 
 
 ```{r}
@@ -219,11 +223,6 @@ print("******************************")
 ```
 
 
-#### ====
-## del by AB sub D sub
-```{r}
-
-```
 
 
 #### =============
@@ -568,15 +567,1029 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
 
 
 
-##  
-
+#### ===============
+## ***Extended Data***
+#### ===============
+## FigS:XPCLR positive control
+### Important data
 ```{r}
+dataFile <- c("data/020_xpclr/ab_WE_DE_log2_0.0001_200_100000.clrgs.txt.gz")
+df_wede <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/020_xpclr/ab_DE_Durum_log2_0.0001_200_100000.clrgs.txt.gz")
+df_dedm <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/020_xpclr/abd_log2_0.0001_200_100000.clrgs.txt.gz")
+df_lrcl <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+df_wede <- df_wede %>% mutate(group="WE vs DE", subID=substr(ChrRef,1,1), sub=substr(ChrRef,2,2))
+df_dedm <- df_dedm %>% mutate(group="DE vs Durum", subID=substr(ChrRef,1,1), sub=substr(ChrRef,2,2))
+df_lrcl <- df_lrcl %>% mutate(group="LR vs CL", subID=substr(ChrRef,1,1), sub=substr(ChrRef,2,2))
+
+df <- rbind(df_wede,df_dedm,df_lrcl)
+df$group <- factor(df$group, levels = c("WE vs DE","DE vs Durum","LR vs CL"))
 
 ```
 
+### Start to plot - 循环
+- 一一验证比较慢，故采用循环的方式，瞬间出来
+```{r}
+df_positive <- read_tsv("data/020_xpclr/GeneList_forPositiveControl.txt")
+
+aoFactor <- c("Btr-A1","Btr-B1","Q","Tg","Rht-B1","Rht-D1","Ppd-D1","Vrn-A1","Vrn-B1","Vrn-D1","Fhb1","Sm1","Lr10","Lr21","Lr34-Yr18-Sr57-Pm38-Ltn1-Sb1")
+for (i in aoFactor) {
+  dfgeneinfo <- df_positive %>% filter(GeneName==i)
+  
+  groupA <- dfgeneinfo$Group
+  chrRefA <- dfgeneinfo$ChrRef
+  genePosA <- dfgeneinfo$GenePos
+  centromerePosA <- dfgeneinfo$CentromerePos
+  xlabA <- dfgeneinfo$XLab
+  
+   p <- df %>% 
+    filter(ChrRef == chrRefA, group == groupA) %>%
+     ggplot(aes(x=PosRef/1000000, y=XPCLR_100score,col=group))+
+     geom_line(size=0.5)+
+     geom_point(aes(x=centromerePosA,y=0),color='grey')+ ### 标记着丝粒
+    # geom_hline(yintercept = 19.48245)+
+    ### 标记蓝色点
+    geom_point(aes(x=genePosA,y=0),color='blue')+ ###标记基因
+    # geom_point(aes(x=gene2,y=0),color='blue')+
+    labs(x=xlabA,y="XP-CLR score")+
+    facet_wrap(~group,scales = "free_x",ncol = 1)+
+    # scale_x_continuous(breaks = seq(0,600,by = 300))+
+    # scale_x_continuous(limits = c(0,50), breaks = seq(0,25,by = 5))+
+    scale_y_continuous(breaks = seq(0,40,by = 25))+
+    # scale_color_manual(values = colB)+
+    scale_color_brewer(palette = "Set2")+
+    theme_classic()+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 12))+
+    theme(strip.background = element_rect(fill = "lightgray",color = "white"))
+
+  p
+  
+  filename <- str_c("~/Documents/",i,".png",sep = "")
 
 
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 5)
+ggsave(p,filename = filename,height = 2,width = 5) ###由于线条过多，故保存成图片
+}
 
+```
+
+#### ======
+## xpclr-whole genome
+## ***XPCLR score
+## WE vs. DE manhattan plot for add signal dot
+
+```{r}
+################################# ##
+#                               #
+#  XPCLR genome line -- manhattan 100kb 50 kb 
+#                               #
+################################# ##
+library(tidyverse)
+# ### log2 snp method whole-genome SNP 3%
+dataFile <- c("data/020_xpclr/ab_WE_DE_log2_0.0001_200_100000.clrgs.txt.gz")
+df_wede <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/020_xpclr/ab_DE_Durum_log2_0.0001_200_100000.clrgs.txt.gz")
+df_dedm <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/020_xpclr/abd_log2_0.0001_200_100000.clrgs.txt.gz")
+df_lrcl <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+### ******************************************************************************
+### choice: 1.df 2.color 3.threshold  
+### ******************************************************************************
+### 1. data
+df <- df_wede
+# df <- df_dedm
+# df <- df_lrcl
+### 2.color
+test <- "wede"
+# test <- "dedm"
+# test <- "lrcl"
+colB <- NULL
+labelB <- NULL
+
+# colB1 <- c("#ffd702","#7f5701") ### we de
+# colB2 <- c("#7f5701","#016699") ### de durum
+# colB3 <- c("#fc6e6e","#9900ff")  ### lr cl
+## use subgenome color
+colB1 <- c("#fd8582","#967bce") ### we de
+colB2 <- c("#fd8582","#967bce") ### de durum
+colB3 <- c("#fd8582","#967bce","#4bcdc6")  ### lr cl
+
+### if else failed to use
+if(test == "wede"){
+  colB <- colB1
+  labelB <- "WE vs. DE"
+} 
+if(test == "dedm"){
+  colB <- colB2
+  labelB <- "DE vs. Durum"
+}
+if(test == "lrcl"){
+  colB <- colB3
+  labelB <- "Landrace vs. Cultivar"
+}
+
+### 3. 
+# top <- 0.01
+top <- 0.05
+
+# head(df)
+# nrow(df)
+### step2: 修改列名，使之固定
+names(df)[names(df)=="XPCLR_100score"] = "Ave"
+names(df)[names(df)=="CHROM"] = "Chr"
+names(df)[names(df)=="ChrRef"] = "CHROM"
+names(df)[names(df)=="PosRef"] = "BIN_START"
+max(df$Ave)
+min(df$Ave)
+### step3: 去除NA和无限小的值
+df <- dplyr::filter(df,!is.na(Ave) & is.finite(Ave))
+nrow(df)
+head(df)
+max(df$Ave) # 48.50477
+min(df$Ave) # 0
+### step4: 获取TOP K 截距
+### step4a: 排序
+df_sorted <- df %>% 
+  dplyr::arrange(-Ave) 
+head(df_sorted)
+### step4b: 获取top1% 的值，即水平截距
+threshod <- df_sorted[top*nrow(df_sorted),8]
+threshod
+
+# write.table(d,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+### step5: 建立累积坐标系统和x轴标签位置
+don <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len) %>% ##去除 chr_len这一列
+  # Add this info to the initial dataset
+  left_join(df, ., by=c("CHROM"="CHROM")) %>%  ## 将原数据框和don数据框进行合并
+  # Add a cumulative position of each SNP
+  arrange(CHROM, BIN_START) %>% ##根据CHROM BIN_START 进行排序
+  mutate( BPcum=BIN_START+tot)  ##增加新的一列，改变每行点的位置
+
+### 记录增量
+dfadd <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len)  ##去除 chr_len这一列
+# dfadd  
+
+## x轴标签位置：求出每条染色体在坐标轴上的中间位置
+axisdf = don %>% group_by(CHROM) %>% summarize(center=( max(BPcum) + min(BPcum) ) / 2 )
+
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+geneList <- read.table("data/020_xpclr/gene.txt",sep = "\t",header = T)
+geneList
+geneList$Gene <- as.vector(geneList$Gene)
+geneList$Chromosome <- as.vector(geneList$Chromosome)
+geneList$Start <- as.numeric(geneList$Start)  ## 为了可以进行预测
+geneList$End <- as.numeric(geneList$End)
+
+### 写一个函数，返回基因的标签，以及在图上的range位置
+aoGetGenepos <- function(geneRow){
+  gene <- geneList[geneRow,] ### get gene's dataframe, only has one line
+  labelgene <- gene[1,1]### get gene's label
+  chrGene <- as.vector(gene[1,2]) ### get gene's chr
+  posSignal <- gene[,3:4] ### get gene's pos, a dataframe
+  posOnchr <- c(posSignal[1,1],posSignal[1,2]) ### change to x 
+  ### select chr, only one line
+  dfadd_one <- dfadd %>% 
+    filter(CHROM == chrGene) 
+  # dfadd_one
+  posSignalCum <- posOnchr + as.numeric(dfadd_one[1,2])
+  # geneSummary <- list( labelgene,as.numeric(posSignalCum[1]),as.numeric(posSignalCum[2]))
+  geneSummary <- list( labelgene,posSignalCum[1],posSignalCum[2])
+  
+  return(geneSummary)
+}
+ 
+#### btr1 
+btra1 <- aoGetGenepos(5)
+btrb1 <- aoGetGenepos(6)
+btra2 <- aoGetGenepos(8)
+btrb2 <- aoGetGenepos(9)
+
+### step6: 颜色设置并画图
+### 开始作图
+
+### sample
+don <- sample_frac(don,0.5)
+p <- ggplot(don, aes(x=BPcum, y=Ave)) +  ##新的横坐标，Y轴的XPCLR值不变
+  # Show all points
+  # geom_point( aes(color=as.factor(CHROM)), alpha=0.2, size=0.5) +  ## alpha=0.5 first test
+  geom_line(aes(color=as.factor(CHROM)), alpha=0.9, size=0.2) +  ## alpha=0.5 first test
+  annotate("text",x=Inf,y= threshod ,hjust= 2,vjust= -0.3,label="top 5%", size = 3)+
+  geom_hline(yintercept = threshod, linetype= "dashed", color = "gray",size=0.2)+
+  annotate("text",x=0,y= Inf ,hjust= -0.2,vjust= 1.1,label= labelB, size = 2)+ ## add group annotation
+  scale_color_manual(values = rep(colB, 14 )) + ##合计42条染色体。故21*2=42
+  # custom X axis: 每条染色体对应一个中间位置，完美！
+  scale_x_continuous(expand = c(0,0), label = axisdf$CHROM, breaks= axisdf$center) +
+  scale_y_continuous(expand = c(0,1),limits = c(-6,54)) +
+  # scale_y_continuous(expand = c(0, 0),limits = c(-1,52) ) +     # remove space between plot area and x axis
+  
+  ## add arrow to represent the selection signal 
+  # geom_vline(xintercept = unlist(btra1[2]),color="black",size=0.2)+
+  # geom_segment(aes(x=unlist(btra1[2]) ,xend = unlist(btra1[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(btra1[2]) ,xend = unlist(btra1[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") + 
+  annotate(geom = "text",x = unlist(btra1[3]),y=0.2,label= unlist(btra1[1]),fontface = 'italic',hjust = -0.2,size=1.4,color="blue") +
+
+  # geom_segment(aes(x=unlist(btrb1[2]) ,xend = unlist(btrb1[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(btrb1[2]),xend = unlist(btrb1[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(btrb1[3]),y=0.2,label=unlist(btrb1[1]),fontface = 'italic',hjust = -0.2,size=1.4,color="blue") +
+  
+  # annotate(geom = "segment",x=unlist(btra2[2]),xend = unlist(btra2[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(btra2[3]),y=-4,label=unlist(btra2[1]),fontface = 'italic',hjust = -0.3,size=1.4,color="blue") +
+  # geom_vline(xintercept = unlist(btra2[2]),color="red",size=0.5)+
+  
+  # annotate(geom = "segment",x=unlist(btrb2[2]),xend = unlist(btrb2[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(btrb2[3]),y=-4,label=unlist(btrb2[1]),fontface = 'italic',hjust = -0.3,size=1.4,color="blue") +
+  # geom_vline(xintercept = unlist(btrb2[2]),color="red",size=0.5)+
+  
+   # Custom the theme:
+  xlab("")+ylab("XP-CLR")+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(),axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 9),legend.position = 'none')
+
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.png",width = 7,height = 7*3/16)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",width = 7,height = 7*3/16)
+
+```
+
+```{r eval=FALSE, include=FALSE}
+### 最初添加pos 设计代码
+## 选择 btr2, 某一行依旧为数据框
+btrb1 <- geneList[6,]
+btrb1
+gene <- btrb1
+gene
+labelBtrb1 <- gene[1,1] 
+chrGene <- as.vector(gene[1,2])  
+posSignal <- gene[,3:4]
+posOnplot <- data.frame(x=c(posSignal[1,1],posSignal[1,2])) 
+### select chr
+donSignal <- don %>% 
+  filter(CHROM == chrGene) 
+donSignal
+y <- donSignal$BPcum
+x <- donSignal$BIN_START
+### build regression
+relation <- lm( y ~ x )
+relation
+# summary(relation)
+### input data frame
+posSignalCum <-  predict(relation,posOnplot)
+posSignalCum
+
+
+  ## add arrow to represent the selection signal 
+  # geom_segment(data=genes, mapping=aes(x=x, y= -5, xend=xend, yend=0), arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="red") + 
+  # annotate(geom = "segment",x=posSignalCum[1],xend = posSignalCum[2],y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="red") + 
+  # annotate(geom = "text",x = posSignalCum[2],y=-3,label=labelBtrb1,fontface = 'italic',hjust = -0.5,size=1.2,color="red") 
+
+```
+
+## DE vs. Durum manhattan plot for add signal dot
+
+```{r}
+################################# ##
+#                               #
+#  XPCLR genome line -- manhattan 100kb 50 kb 
+#                               #
+################################# ##
+library(tidyverse)
+
+dataFile <- c("data/020_xpclr/ab_WE_DE_log2_0.0001_200_100000.clrgs.txt.gz")
+df_wede <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/020_xpclr/ab_DE_Durum_log2_0.0001_200_100000.clrgs.txt.gz")
+df_dedm <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/020_xpclr/abd_log2_0.0001_200_100000.clrgs.txt.gz")
+df_lrcl <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+# df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+### ******************************************************************************
+### choice: 1.df 2.color 3.threshold  
+### ******************************************************************************
+### 1. data
+# df <- df_wede
+df <- df_dedm
+# df <- df_lrcl
+### 2.color
+# test <- "wede"
+test <- "dedm"
+# test <- "lrcl"
+colB <- NULL
+labelB <- NULL
+
+# colB1 <- c("#ffd702","#7f5701") ### we de
+# colB2 <- c("#7f5701","#016699") ### de durum
+# colB3 <- c("#fc6e6e","#9900ff")  ### lr cl
+## use subgenome color
+colB1 <- c("#fd8582","#967bce") ### we de
+colB2 <- c("#fd8582","#967bce") ### de durum
+colB3 <- c("#fd8582","#967bce","#4bcdc6")  ### lr cl
+
+### if else failed to use
+if(test == "wede"){
+  colB <- colB1
+  labelB <- "WE vs. DE"
+} 
+if(test == "dedm"){
+  colB <- colB2
+  labelB <- "DE vs. Durum"
+}
+if(test == "lrcl"){
+  colB <- colB3
+  labelB <- "Landrace vs. Cultivar"
+}
+
+### 3. 
+ # top <- 0.01
+top <- 0.05
+
+# head(df)
+# nrow(df)
+### step2: 修改列名，使之固定
+names(df)[names(df)=="XPCLR_100score"] = "Ave"
+names(df)[names(df)=="CHROM"] = "Chr"
+names(df)[names(df)=="ChrRef"] = "CHROM"
+names(df)[names(df)=="PosRef"] = "BIN_START"
+max(df$Ave)
+min(df$Ave)
+### step3: 去除NA和无限小的值
+df <- dplyr::filter(df,!is.na(Ave) & is.finite(Ave))
+nrow(df)
+head(df)
+max(df$Ave) # 48.50477
+min(df$Ave) # 0
+### step4: 获取TOP K 截距
+### step4a: 排序
+df_sorted <- df %>% 
+  dplyr::arrange(-Ave) 
+head(df_sorted)
+### step4b: 获取top1% 的值，即水平截距
+threshod <- df_sorted[top*nrow(df_sorted),8]
+ print(paste(threshod," threshod ", top))
+
+# write.table(d,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+### step5: 建立累积坐标系统和x轴标签位置
+don <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len) %>% ##去除 chr_len这一列
+  # Add this info to the initial dataset
+  left_join(df, ., by=c("CHROM"="CHROM")) %>%  ## 将原数据框和don数据框进行合并
+  # Add a cumulative position of each SNP
+  arrange(CHROM, BIN_START) %>% ##根据CHROM BIN_START 进行排序
+  mutate( BPcum=BIN_START+tot)  ##增加新的一列，改变每行点的位置
+
+### 记录增量
+dfadd <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len)  ##去除 chr_len这一列
+dfadd  
+  
+# don
+# write.table(don,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+## x轴标签位置：求出每条染色体在坐标轴上的中间位置
+axisdf = don %>% group_by(CHROM) %>% summarize(center=( max(BPcum) + min(BPcum) ) / 2 )
+
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+geneList <- read.table("data/020_xpclr/gene.txt",sep = "\t",header = T)
+geneList
+geneList$Gene <- as.vector(geneList$Gene)
+geneList$Chromosome <- as.vector(geneList$Chromosome)
+geneList$Start <- as.numeric(geneList$Start)  ## 为了可以进行预测
+geneList$End <- as.numeric(geneList$End)
+
+### 写一个函数，返回基因的标签，以及在图上的range位置
+aoGetGenepos <- function(geneRow){
+  gene <- geneList[geneRow,] ### get gene's dataframe, only has one line
+  labelgene <- gene[1,1]### get gene's label
+  chrGene <- as.vector(gene[1,2]) ### get gene's chr
+  posSignal <- gene[,3:4] ### get gene's pos, a dataframe
+  posOnchr <- c(posSignal[1,1],posSignal[1,2]) ### change to x 
+  ### select chr, only one line
+  dfadd_one <- dfadd %>% 
+    filter(CHROM == chrGene) 
+  # dfadd_one
+  posSignalCum <- posOnchr + as.numeric(dfadd_one[1,2])
+  # geneSummary <- list( labelgene,as.numeric(posSignalCum[1]),as.numeric(posSignalCum[2]))
+  geneSummary <- list( labelgene,posSignalCum[1],posSignalCum[2])
+  
+  return(geneSummary)
+}
+ 
+#### btr1 
+q <- aoGetGenepos(1)
+q2 <- aoGetGenepos(2)
+tg <- aoGetGenepos(4)
+
+### step6: 颜色设置并画图
+### 开始作图
+
+### sample
+don <- sample_frac(don,0.5)
+p <- ggplot(don, aes(x=BPcum, y=Ave)) +  ##新的横坐标，Y轴的XPCLR值不变
+  # Show all points
+  # geom_point( aes(color=as.factor(CHROM)), alpha=0.2, size=0.5) +  ## alpha=0.5 first test
+  geom_line(aes(color=as.factor(CHROM)), alpha=0.9, size=0.2) +  ## alpha=0.5 first test
+  annotate("text",x=Inf,y= threshod ,hjust= 2,vjust= -0.3,label="top 5%", size = 3)+
+  geom_hline(yintercept = threshod, linetype= "dashed", color = "gray",size=0.2)+
+  annotate("text",x=0,y= Inf ,hjust= -0.2,vjust= 1.1,label= labelB, size = 2)+ ## add group annotation
+  scale_color_manual(values = rep(colB, 14 )) + ##合计42条染色体。故21*2=42
+  # custom X axis: 每条染色体对应一个中间位置，完美！
+  scale_x_continuous(expand = c(0,0), label = axisdf$CHROM, breaks= axisdf$center) +
+  scale_y_continuous(expand = c(0,1),limits = c(-6,54)) +
+  # scale_y_continuous(expand = c(0, 0),limits = c(-1,52) ) +     # remove space between plot area and x axis
+  
+  ## add arrow to represent the selection signal 
+  # geom_vline(xintercept = 5838260571,color="black",size=0.2)+
+  # geom_segment(aes(x=6490914897,xend = 6490914897,y=0,yend = Inf) , size=0.2, color="blue") +
+  # annotate(geom = "segment",x=6490914897 ,xend = 6490914897,y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") + 
+  # annotate(geom = "text",x = 6490914897,y=-3,label= unlist(q[1]),fontface = 'italic',hjust = -0.4,size=1.2,color="blue") +
+  # 
+  # geom_segment(aes(x=7202289667 ,xend = 7202289667,y=0,yend = Inf) , size=0.2, color="blue") +
+  # annotate(geom = "segment",x=7202289667,xend = 7202289667,y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  # annotate(geom = "text",x = 7202289667,y=-3,label=unlist(q2[1]),fontface = 'italic',hjust = -0.4,size=1.2,color="blue") +
+  # # 
+  # geom_segment(aes(x=2076798318 ,xend = 2076798318,y=0,yend = Inf) , size=0.2, color="blue") +
+  # annotate(geom = "segment",x=2076798318,xend = 2080198318,y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  # annotate(geom = "text",x = 2080198318,y=-3,label=unlist(tg[1]),fontface = 'italic',hjust = -0.4,size=1.2,color="blue") +
+
+  
+  # geom_segment(aes(x=unlist(q[2]) ,xend = unlist(q[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(q[2]) ,xend = unlist(q[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") + 
+  annotate(geom = "text",x = unlist(q[3]),y=-3,label= unlist(q[1]),fontface = 'italic',hjust = -0.4,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(q2[2]) ,xend = unlist(q2[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(q2[2]),xend = unlist(q2[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(q2[3]),y=-3,label=unlist(q2[1]),fontface = 'italic',hjust = -0.4,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(tg[2]) ,xend = unlist(tg[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(tg[2]),xend = unlist(tg[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(tg[3]),y=-3,label=unlist(tg[1]),fontface = 'italic',hjust = -0.4,size=1.4,color="blue") +
+  
+   # Custom the theme:
+  xlab("")+ylab("XP-CLR")+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(),axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 9),legend.position = 'none')
+
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.png",width = 7,height = 7*3/16)
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",width = 7,height = 7*3/16)
+
+
+```
+
+## LR vs. Cultivar manhattan plot for add signal dot
+
+```{r}
+################################# ##
+#                               #
+#  XPCLR genome line -- manhattan 100kb 50 kb 
+#                               #
+################################# ##
+library(tidyverse)
+
+# ### log2 snp method whole-genome SNP 3%
+dataFile <- c("data/020_xpclr/ab_WE_DE_log2_0.0001_200_100000.clrgs.txt.gz")
+df_wede <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/020_xpclr/ab_DE_Durum_log2_0.0001_200_100000.clrgs.txt.gz")
+df_dedm <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+dataFile <- c("data/020_xpclr/abd_log2_0.0001_200_100000.clrgs.txt.gz")
+df_lrcl <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+# df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+### ******************************************************************************
+### choice: 1.df 2.color 3.threshold  
+### ******************************************************************************
+### 1. data
+# df <- df_wede
+# df <- df_dedm
+df <- df_lrcl
+### 2.color
+# test <- "wede"
+# test <- "dedm"
+test <- "lrcl"
+colB <- NULL
+labelB <- NULL
+
+# colB1 <- c("#ffd702","#7f5701") ### we de
+# colB2 <- c("#7f5701","#016699") ### de durum
+# colB3 <- c("#fc6e6e","#9900ff")  ### lr cl
+## use subgenome color
+colB1 <- c("#fd8582","#967bce") ### we de
+colB2 <- c("#fd8582","#967bce") ### de durum
+colB3 <- c("#fd8582","#967bce","#4bcdc6")  ### lr cl
+
+### if else failed to use
+if(test == "wede"){
+  colB <- colB1
+  labelB <- "WE vs. DE"
+} 
+if(test == "dedm"){
+  colB <- colB2
+  labelB <- "DE vs. Durum"
+}
+if(test == "lrcl"){
+  colB <- colB3
+  labelB <- "Landrace vs. Cultivar"
+}
+
+### 3. 
+# top <- 0.01
+top <- 0.05
+
+# head(df)
+# nrow(df)
+### step2: 修改列名，使之固定
+names(df)[names(df)=="XPCLR_100score"] = "Ave"
+names(df)[names(df)=="CHROM"] = "Chr"
+names(df)[names(df)=="ChrRef"] = "CHROM"
+names(df)[names(df)=="PosRef"] = "BIN_START"
+max(df$Ave)
+min(df$Ave)
+### step3: 去除NA和无限小的值
+df <- dplyr::filter(df,!is.na(Ave) & is.finite(Ave))
+nrow(df)
+head(df)
+max(df$Ave) # 48.50477
+min(df$Ave) # 0
+### step4: 获取TOP K 截距
+### step4a: 排序
+df_sorted <- df %>% 
+  dplyr::arrange(-Ave) 
+head(df_sorted)
+### step4b: 获取top1% 的值，即水平截距
+threshod <- df_sorted[top*nrow(df_sorted),8]
+ print(paste(threshod," threshod ", top))
+
+# write.table(d,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+### step5: 建立累积坐标系统和x轴标签位置
+don <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len) %>% ##去除 chr_len这一列
+  # Add this info to the initial dataset
+  left_join(df, ., by=c("CHROM"="CHROM")) %>%  ## 将原数据框和don数据框进行合并
+  # Add a cumulative position of each SNP
+  arrange(CHROM, BIN_START) %>% ##根据CHROM BIN_START 进行排序
+  mutate( BPcum=BIN_START+tot)  ##增加新的一列，改变每行点的位置
+
+### 记录增量
+dfadd <- df %>%
+  # Compute chromosome size
+  group_by(CHROM) %>%
+  summarise(chr_len=max(BIN_START)) %>%  ##每条染色体的最大值赋值给 chr_len
+  # Calculate cumulative position of each chromosome
+  mutate(tot=cumsum(as.numeric(chr_len))-chr_len) %>%  ##所有之和减去该行的染色体对应的长度，如：1B起始为1A长度，1D起始为1A 1B之和的长度
+  select(-chr_len)  ##去除 chr_len这一列
+dfadd  
+  
+# don
+# write.table(don,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t")
+
+## x轴标签位置：求出每条染色体在坐标轴上的中间位置
+axisdf = don %>% group_by(CHROM) %>% summarize(center=( max(BPcum) + min(BPcum) ) / 2 )
+
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+### 建立函数关系，添加驯化信号的位点
+geneList <- read.table("data/020_xpclr/gene.txt",sep = "\t",header = T)
+geneList
+geneList$Gene <- as.vector(geneList$Gene)
+geneList$Chromosome <- as.vector(geneList$Chromosome)
+geneList$Start <- as.numeric(geneList$Start)  ## 为了可以进行预测
+geneList$End <- as.numeric(geneList$End)
+
+### 写一个函数，返回基因的标签，以及在图上的range位置
+aoGetGenepos <- function(geneRow){
+  gene <- geneList[geneRow,] ### get gene's dataframe, only has one line
+  labelgene <- gene[1,1]### get gene's label
+  chrGene <- as.vector(gene[1,2]) ### get gene's chr
+  posSignal <- gene[,3:4] ### get gene's pos, a dataframe
+  posOnchr <- c(posSignal[1,1],posSignal[1,2]) ### change to x 
+  ### select chr, only one line
+  dfadd_one <- dfadd %>% 
+    filter(CHROM == chrGene) 
+  # dfadd_one
+  posSignalCum <- posOnchr + as.numeric(dfadd_one[1,2])
+  # geneSummary <- list( labelgene,as.numeric(posSignalCum[1]),as.numeric(posSignalCum[2]))
+  geneSummary <- list( labelgene,posSignalCum[1],posSignalCum[2])
+  
+  return(geneSummary)
+}
+ 
+#### btr1 
+q <- aoGetGenepos(11)
+q2 <- aoGetGenepos(12)
+tg <- aoGetGenepos(13)
+sig4 <- aoGetGenepos(20)
+sig5 <- aoGetGenepos(21)
+sig6 <- aoGetGenepos(22)
+sig7 <- aoGetGenepos(23)
+sig8 <- aoGetGenepos(24)
+
+
+### step6: 颜色设置并画图
+### 开始作图
+
+### sample
+# don <- sample_frac(don,0.1)
+p <- ggplot(don, aes(x=BPcum, y=Ave)) +  ##新的横坐标，Y轴的XPCLR值不变
+  # Show all points
+  # geom_point( aes(color=as.factor(CHROM)), alpha=0.2, size=0.5) +  ## alpha=0.5 first test
+  geom_line(aes(color=as.factor(CHROM)), alpha=0.9, size=0.2) +  ## alpha=0.5 first test
+  annotate("text",x=Inf,y= threshod ,hjust= 2,vjust= -0.3,label="top 5%", size = 3)+
+  geom_hline(yintercept = threshod, linetype= "dashed", color = "gray",size=0.2)+
+  annotate("text",x=0,y= Inf ,hjust= -0.2,vjust= 1.1,label= labelB, size = 2)+ ## add group annotation
+  scale_color_manual(values = rep(colB, 14 )) + ##合计42条染色体。故21*2=42
+  # custom X axis: 每条染色体对应一个中间位置，完美！
+  scale_x_continuous(expand = c(0,0), label = axisdf$CHROM, breaks= axisdf$center) +
+  scale_y_continuous(expand = c(0,1),limits = c(-6,54)) +
+  # scale_y_continuous(expand = c(0, 0),limits = c(-1,52)) +     # remove space between plot area and x axis
+  
+  ## add arrow to represent the selection signal 
+  # geom_vline(xintercept = 5838260571,color="black",size=0.2)+
+  #geom_segment(aes(x=unlist(q[2]) ,xend = unlist(q[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(q[2]) ,xend = unlist(q[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") + 
+  annotate(geom = "text",x = unlist(q[3]),y=-3,label= unlist(q[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  #geom_segment(aes(x=unlist(q2[2]) ,xend = unlist(q2[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(q2[2]),xend = unlist(q2[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(q2[3]),y=-3,label=unlist(q2[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  #geom_segment(aes(x=unlist(tg[2]) ,xend = unlist(tg[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(tg[2]),xend = unlist(tg[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(tg[3]),y=-3,label=unlist(tg[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig4[2]) ,xend = unlist(sig4[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig4[2]),xend = unlist(sig4[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig4[3]),y=-3,label=unlist(sig4[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig5[2]) ,xend = unlist(sig5[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig5[2]),xend = unlist(sig5[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig5[3]),y=-3,label=unlist(sig5[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig6[2]) ,xend = unlist(sig6[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig6[2]),xend = unlist(sig6[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig6[3]),y=-3,label=unlist(sig6[1]),fontface = 'italic',hjust = 1.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig7[2]) ,xend = unlist(sig7[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig7[2]),xend = unlist(sig7[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig7[3]),y=-3,label=unlist(sig7[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+  # geom_segment(aes(x=unlist(sig8[2]) ,xend = unlist(sig8[2]),y=0,yend = Inf) , size=0.2, color="blue") +
+  annotate(geom = "segment",x=unlist(sig8[2]),xend = unlist(sig8[3]),y=-5,yend = 0, arrow=arrow(length = unit(0.08, "cm"), type = "closed"), size=0.1, color="blue") +
+  annotate(geom = "text",x = unlist(sig8[3]),y=-3,label=unlist(sig8[1]),fontface = 'italic',hjust = -0.1,size=1.4,color="blue") +
+  
+   # Custom the theme:
+  xlab("")+ylab("XP-CLR")+
+  theme(plot.margin=unit(rep(1,4),'lines'))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(),axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 9),legend.position = 'none')
+
+p
+# ggsave(p,filename = "/Users/Aoyue/Documents/test.png",width = 7,height = 7*3/16)
+
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",width = 7,height = 7*3/16)
+
+```
+
+### Top 5%
+```{r}
+# ### log2 snp method whole-genome SNP 3%
+
+
+dataFile <- c("data/020_xpclr/ab_WE_DE_log2_0.0001_200_100000.clrgs.txt.gz")
+df_wede <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+### 找到 top5 的值域是多少，并且输出bins数目  
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+dftest <- df %>% slice_max(XPCLR_100score,prop = 0.05)
+dffinalline <- dftest %>% slice(n())
+regions <- nrow(dftest)
+print(paste("Threshod is",round(dffinalline[1,8],3) ,"Regions total",regions))
+```
+
+```{r}
+dataFile <- c("data/020_xpclr/ab_DE_Durum_log2_0.0001_200_100000.clrgs.txt.gz")
+df_dedm <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+### 找到 top5 的值域是多少，并且输出bins数目  
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+dftest <- df %>% slice_max(XPCLR_100score,prop = 0.05)
+dffinalline <- dftest %>% slice(n())
+regions <- nrow(dftest)
+print(paste("Threshod is",round(dffinalline[1,8],3) ,"Regions total",regions))
+```
+
+```{r}
+dataFile <- c("data/020_xpclr/abd_log2_0.0001_200_100000.clrgs.txt.gz")
+df_lrcl <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+
+### 找到 top5 的值域是多少，并且输出bins数目  
+df <- read.table(dataFile, header=TRUE, sep="\t",row.names=NULL)
+dftest <- df %>% slice_max(XPCLR_100score,prop = 0.05)
+dffinalline <- dftest %>% slice(n())
+regions <- nrow(dftest)
+print(paste("Threshod is",round(dffinalline[1,8],3) ,"Regions total",regions))
+```
+
+
+### Top 5% 和 Top 1% 求值域;求受选择区域的CDS长度及占比
+- a:ind top K and its threshod
+- b:Get slective regions num
+- c:Get proportion of whole-genome region gene region and cds region
+- d:Get gene list and GO analysis
+
+Table:
+Group   TopK    Threshod    SelectiveSweep    GeneNum   Len_wholegenome   Len_Gene    Len_CDS   Prop_whole    Prop_Gene    Prop_CDS
+
+#### Get nonoverlap trans
+```{r}
+# dataFile <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/001_geneTable/wheat_v1.1_nonoverlap_addPos.txt.gz")
+# df <- read.delim(dataFile) %>% 
+#   filter(Is_Unique_gene.1.0. == 1) %>% 
+#   select(Longest_transcript)
+# 
+# write_tsv(df,file = "/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/006_nonoverlapGene/nonoverlapGene.txt")
+```
+#### 函数构建及运行
+```{r}
+AoGetXPCLRsummary <- function(Group,TopK,bin,dataFile){
+  library(bedtoolsr)
+  # bin <- 100000
+  ### 注意不加 chl mt and chrUn
+  genomeSize_aabbdd <- 14066280851
+  ### genomeSize_aabb <- 9652829943
+  ### genomeSize_dd <- 3951074735 
+  ### 注意不加 chr0
+  geneSize <- 370393700
+  cdsSize <- 130348274
+  
+  ### @para1 Group
+  # Group <- "wede"
+  ### @para2 TopK
+  # TopK <- top1
+  
+  # ### log2 snp method whole-genome SNP 3%
+  ### 找到 topK 的值域是多少，并且输出bins数目
+  df <- read.delim(dataFile) %>% slice_max(XPCLR_100score, prop = TopK)
+  dffinalline <- df %>% slice(n()) ### 最后一行的内容,为了找到值域的确切值
+  ### @para3 Threshod
+  Threshod <- round(dffinalline[1, 8], 3)
+  ### @para4 SelectiveSweep
+  SelectiveSweep <- nrow(df)
+  
+  print(paste("Threshod is", Threshod, "Regions total", SelectiveSweep))
+  
+  ### ============================================================
+  ### step1:make bed
+  dfquery <- df %>% select(CHROM, POS) %>% mutate(POS_end = POS + bin)
+  dfgff3gene <-
+    read.delim(
+      "/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/007_bed_onWholeGenome/GFF3_gene_nonoverlap.bed"
+    )
+  dfgff3cds <-
+    read.delim(
+      "/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/007_bed_onWholeGenome/GFF3_CDS_nonoverlap.bed"
+    )
+  ### step2:calculate the length on whole genome, gene region, and cds region
+  ### a::genomesize AABBDD : 14066280851 AABB : 9652829943  DD : 3951074735  do not add chl and mt
+  dfwhole <- dfquery %>% mutate(Length = POS_end - POS) %>%
+    summarise(sum_whole = sum(Length)) %>%
+    mutate(prop_whole = sum_whole / genomeSize_aabbdd)
+  
+  dataFile <-
+    c(
+      "/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/000_chrDB/chrConvertionRule_byAoyue.txt"
+    )
+  dfchrDB <- read.delim(dataFile) %>% select(CHROM = ChrID, Subgenome)
+  
+  dfsub <- dfquery %>% mutate(Length = POS_end - POS) %>%
+    left_join(.,dfchrDB,by="CHROM") %>% 
+    group_by(Subgenome) %>% 
+    summarise(sum_whole = sum(Length)) %>%
+    mutate(prop_whole = sum_whole / genomeSize_aabbdd) %>% 
+    mutate(Group = Group, TopK = TopK)
+  
+  ### b::目的：保留选择区和 gene 的交集，并且得到交集所在的基因
+  dfintersect_gene <-
+    bt.intersect(dfgff3gene, dfquery) %>% arrange(V1, V2) %>% mutate(Subtract = V3 - V2)
+  ### c::目的：保留选择区和 cds 的交集，并且得到交集所在的基因
+  dfintersect_cds <-
+    bt.intersect(dfgff3cds, dfquery) %>% arrange(V1, V2) %>% mutate(Subtract = V3 - V2)
+  
+  ### @para5 GeneNum
+  dfgeneSelected <- dfintersect_gene %>% group_by(V4) %>% count() %>% distinct(., V4) %>% mutate(Group = Group, TopK = TopK)
+
+  GeneNum <- dfintersect_gene %>% group_by(V4) %>% count() %>% distinct(., V4) %>% nrow()
+  ### @para6 Len_wholegenome
+  Len_wholegenome <- dfwhole$sum_whole
+  ### @para7 Len_Gene
+  Len_Gene <- sum(dfintersect_gene$Subtract)
+  ### @para8 Len_CDS
+  Len_CDS <- sum(dfintersect_cds$Subtract)
+  ### @para9 Prop_whole
+  Prop_whole <- dfwhole$prop_whole
+  ### @para10 Prop_Gene
+  Prop_Gene <- Len_Gene / geneSize
+  ### @para11 Prop_CDS
+  Prop_CDS <- Len_CDS / cdsSize
+  
+  dffinal <-
+    data.frame(
+      Group = Group,
+      TopK = TopK,
+      Threshod = Threshod,
+      SelectiveSweep = SelectiveSweep,
+      GeneNum = GeneNum,
+      Len_wholegenome = Len_wholegenome,
+      Len_Gene = Len_Gene,
+      Len_CDS = Len_CDS,
+      Prop_whole = Prop_whole,
+      Prop_Gene = Prop_Gene,
+      Prop_CDS = Prop_CDS
+    )
+  
+  dfout <- list(dffinal,dfsub,dfgeneSelected)  ### 测试失败
+  # return(dffinal)
+  # return(dfgeneSelected)
+  # return(dfsub)
+  return(dfout)
+}
+
+
+dataFile1 <-c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/004_output/ab_WE_DE_log2_0.0001_600_100000.clrgs.txt.gz")
+dataFile2 <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/004_output/ab_DE_Durum_log2_0.0001_600_100000.clrgs.txt.gz")
+dataFile3 <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/004_output/abd_log2_0.0001_600_100000.clrgs.txt.gz")
+ 
+Group <- c("wede","wede","dedurum","dedurum","lrcl","lrcl")
+TopK <- c(0.05,0.01,0.05,0.01,0.05,0.01)
+bin <- rep(100000,6)
+dataFile <- c(dataFile1,dataFile1,dataFile2,dataFile2,dataFile3,dataFile3) 
+dfpara <- data.frame(Group=Group,TopK=TopK,bin=bin,dataFile=dataFile,stringsAsFactors = F)
+
+dfm <- dfpara %>%
+  # group_modify(~{.x %>% AoGetXPCLRsummary()})  %>% 
+  rowwise() %>% 
+  summarise(sum = list(AoGetXPCLRsummary(Group,TopK,bin,dataFile))) %>% 
+  unnest()
+
+### output   
+# filename <- c("~/Documents/test.txt")
+# write_tsv(dfm,file = filename)
+```
+
+
+#### 单个文件测试
+```{r}
+
+Group <- dfpara$Group[1]
+TopK <- dfpara$TopK[1]
+bin <- dfpara$bin[1]
+dataFile <- dfpara$dataFile[1]
+
+library(bedtoolsr)
+  # bin <- 100000
+  ### 注意不加 chl mt and chrUn
+  genomeSize_aabbdd <- 14066280851
+  ### genomeSize_aabb <- 9652829943
+  ### genomeSize_dd <- 3951074735 
+  ### 注意不加 chr0
+  geneSize <- 370393700
+  cdsSize <- 130348274
+  
+  ### @para1 Group
+  # Group <- "wede"
+  ### @para2 TopK
+  # TopK <- top1
+  
+  # ### log2 snp method whole-genome SNP 3%
+  ### 找到 topK 的值域是多少，并且输出bins数目
+  df <- read.delim(dataFile) %>% slice_max(XPCLR_100score, prop = TopK)
+  dffinalline <- df %>% slice(n()) ### 最后一行的内容,为了找到值域的确切值
+  ### @para3 Threshod
+  Threshod <- round(dffinalline[1, 8], 3)
+  ### @para4 SelectiveSweep
+  SelectiveSweep <- nrow(df)
+  
+  print(paste("Threshod is", Threshod, "Regions total", SelectiveSweep))
+  
+  ### ============================================================
+  ### step1:make bed
+  dfquery <- df %>% select(CHROM, POS) %>% mutate(POS_end = POS + bin)
+  dfgff3gene <-
+    read.delim(
+      "/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/007_bed_onWholeGenome/GFF3_gene_nonoverlap.bed"
+    )
+  dfgff3cds <-
+    read.delim(
+      "/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/009_xpclr/007_bed_onWholeGenome/GFF3_CDS_nonoverlap.bed"
+    )
+  ### step2:calculate the length on whole genome, gene region, and cds region
+  ### a::genomesize AABBDD : 14066280851 AABB : 9652829943  DD : 3951074735  do not add chl and mt
+  dfwhole <- dfquery %>% mutate(Length = POS_end - POS) %>%
+    summarise(sum_whole = sum(Length)) %>%
+    mutate(prop_whole = sum_whole / genomeSize_aabbdd)
+  
+  dataFile <-
+    c(
+      "/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/000_chrDB/chrConvertionRule_byAoyue.txt"
+    )
+  dfchrDB <- read.delim(dataFile) %>% select(CHROM = ChrID, Subgenome)
+  
+  dfsub <- dfquery %>% mutate(Length = POS_end - POS) %>%
+    left_join(.,dfchrDB,by="CHROM") %>% 
+    group_by(Subgenome) %>% 
+    summarise(sum_whole = sum(Length)) %>%
+    mutate(prop_whole = sum_whole / genomeSize_aabbdd)
+  
+  ### b::目的：保留选择区和 gene 的交集，并且得到交集所在的基因
+  dfintersect_gene <-
+    bt.intersect(dfgff3gene, dfquery) %>% arrange(V1, V2) %>% mutate(Subtract = V3 - V2)
+  
+  dfintersect_gene_bySub <- dfintersect_gene %>% 
+    mutate()
+  
+  ### c::目的：保留选择区和 cds 的交集，并且得到交集所在的基因
+  dfintersect_cds <-
+    bt.intersect(dfgff3cds, dfquery) %>% arrange(V1, V2) %>% mutate(Subtract = V3 - V2)
+  
+  ### @para5 GeneNum
+  dfgeneSelected <- dfintersect_gene %>% group_by(V4) %>% count() %>% distinct(., V4) %>% mutate(Group = Group, TopK = TopK)
+
+  GeneNum <- dfintersect_gene %>% group_by(V4) %>% count() %>% distinct(., V4) %>% nrow()
+  ### @para6 Len_wholegenome
+  Len_wholegenome <- dfwhole$sum_whole
+  ### @para7 Len_Gene
+  Len_Gene <- sum(dfintersect_gene$Subtract)
+  ### @para8 Len_CDS
+  Len_CDS <- sum(dfintersect_cds$Subtract)
+  ### @para9 Prop_whole
+  Prop_whole <- dfwhole$prop_whole
+  ### @para10 Prop_Gene
+  Prop_Gene <- Len_Gene / geneSize
+  ### @para11 Prop_CDS
+  Prop_CDS <- Len_CDS / cdsSize
+  
+  dffinal <-
+    data.frame(
+      Group = Group,
+      TopK = TopK,
+      Threshod = Threshod,
+      SelectiveSweep = SelectiveSweep,
+      GeneNum = GeneNum,
+      Len_wholegenome = Len_wholegenome,
+      Len_Gene = Len_Gene,
+      Len_CDS = Len_CDS,
+      Prop_whole = Prop_whole,
+      Prop_Gene = Prop_Gene,
+      Prop_CDS = Prop_CDS
+    )
+  
+  
+```
 
 
 

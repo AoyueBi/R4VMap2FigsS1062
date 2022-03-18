@@ -30,7 +30,8 @@ library(tidyverse)
 #### ===1=== Dataset one 1
 ## dftotal 
 ```{r}
-dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") 
+dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>% 
+  mutate(Sub=str_sub(Transcript, 9, 9))
 
   # filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
   # mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
@@ -39,7 +40,7 @@ dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz")
 
 ## VMap2.1 - 1:1:1 Triads
 ```{r}
-triadsGeneSet <- read_tsv("/Users/Aoyue/Documents/Data/wheat/gene/homoeologsGene111/triadGenes1.1_V3.txt") %>% 
+triadsGeneSet <- read_tsv("data/021_homoeologsGene111/triadGenes1.1_V3.txt") %>% 
   filter(synteny=="syntenic") %>% 
   select(TriadID,A,B,D) %>% 
   pivot_longer(cols = c(A,B,D),names_to = "Sub",values_to = "Gene") %>% 
@@ -57,7 +58,7 @@ dftotal_triads <- dftotal %>%
 ## Hexaploid/Pseudohexaploid - whole-genome/1:1:1 Triads annotation
 ```{r eval=FALSE, include=FALSE}
 ### 将上述结果重新读入，加到数据库
-dfAAF <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/012_DFE/018_run_AAF/004_merge003/002_AAF_byPloidy.txt.gz") %>%
+dfAAF <- read_tsv("data/015_AAF/002_aaf_byPloidy/002_AAF_byPloidy.txt.gz") %>%
   mutate(ID=str_c(Chr,"-",Pos))
 
 ### ************************* hexaploid ***********************
@@ -69,10 +70,10 @@ df06 <- dfAAF %>%
 dftotal_hexaploid <- dftotal %>%
   filter(ID %in% df06)
 
-write_tsv(dftotal_hexaploid,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_hexaploid_pseudohexaploid/001_geneSNPAnno_hexaploid.txt.gz")
+# write_tsv(dftotal_hexaploid,"data/005_SNPAnnoDB/000_hexaploid_pseudohexaploid/001_geneSNPAnno_hexaploid.txt.gz")
 
 ### dftotal_hexaploid_triads 数据库
-triadsGeneSet <- read_tsv("/Users/Aoyue/Documents/Data/wheat/gene/homoeologsGene111/triadGenes1.1_V3.txt") %>%
+triadsGeneSet <- read_tsv("data/021_homoeologsGene111/triadGenes1.1_V3.txt") %>%
   filter(synteny=="syntenic") %>%
   select(TriadID,A,B,D) %>%
   pivot_longer(cols = c(A,B,D),names_to = "Sub",values_to = "Gene") %>%
@@ -84,7 +85,7 @@ dftotal_hexaploid_triads <- dftotal %>%
   filter(ID %in% df06) %>%
   select(-Gene)
 
-write_tsv(dftotal_hexaploid_triads,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_triads/002_geneSNPAnno_hexaploid_triads.txt.gz")
+# write_tsv(dftotal_hexaploid_triads,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_triads/002_geneSNPAnno_hexaploid_triads.txt.gz")
 
 ### ************************* pseudohexaploid ***********************
 df42 <- dfAAF %>%
@@ -95,10 +96,10 @@ df42 <- dfAAF %>%
 dftotal_pseudohexaploid <- dftotal %>%
   filter(ID %in% df42)
 
-write_tsv(dftotal_pseudohexaploid,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_hexaploid_pseudohexaploid/002_geneSNPAnno_pseudohexaploid.txt.gz")
+# write_tsv(dftotal_pseudohexaploid,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_hexaploid_pseudohexaploid/002_geneSNPAnno_pseudohexaploid.txt.gz")
 
 ### dftotal_hexaploid_triads 数据库
-triadsGeneSet <- read_tsv("/Users/Aoyue/Documents/Data/wheat/gene/homoeologsGene111/triadGenes1.1_V3.txt") %>%
+triadsGeneSet <- read_tsv("data/021_homoeologsGene111/triadGenes1.1_V3.txt") %>%
   filter(synteny=="syntenic") %>%
   select(TriadID,A,B,D) %>%
   pivot_longer(cols = c(A,B,D),names_to = "Sub",values_to = "Gene") %>%
@@ -110,7 +111,7 @@ dftotal_pseudohexaploid_triads <- dftotal %>%
   filter(ID %in% df42) %>%
   select(-Gene)
 
-write_tsv(dftotal_pseudohexaploid_triads,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_triads/003_geneSNPAnno_pseudohexaploid_triads.txt.gz")
+# write_tsv(dftotal_pseudohexaploid_triads,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/006_geneSNPAnnotation_merge/000_triads/003_geneSNPAnno_pseudohexaploid_triads.txt.gz")
 
 ```
 
@@ -127,10 +128,10 @@ write_tsv(dftotal_pseudohexaploid_triads,"/Users/Aoyue/project/wheatVMap2_1000/0
 输入文件夹和输出文件夹的名字保持不变
 ```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 # ### 导入种质数据库,并选取特定的列
-dftaxaDB <- read.delim("/Users/Aoyue/project/wheatVMap2_1000/001_germplasm/021_WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GenomeType)
+dftaxaDB <- read.delim("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GenomeType)
 #
 ### 导入染色体-亚基因组数据库，并选取特定的列
-dfchrDB <- read.delim("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/000_chrDB/chrConvertionRule_byAoyue.txt") %>% select(Chr = ChrID,Subgenome)
+dfchrDB <- read.delim("data/001_TaxaDB/chrConvertionRule_byAoyue.txt") %>% select(Chr = ChrID,Subgenome)
 
 sumDerivedCountPerTaxon <- function(file){
   df <- read_tsv(file,show_col_types = F) %>% 
@@ -163,48 +164,54 @@ inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCoun
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_triads.txt.gz"))
+  bind_rows()
+
+# write_tsv(df,file.path(outDir,"delCount_triads.txt.gz"))
 
 ### 二
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/007_indivi_hexaploid")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_hexaploid.txt.gz"))
+  bind_rows() 
+
+# write_tsv(df,file.path(outDir,"delCount_hexaploid.txt.gz"))
 
 ### 三
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/008_indivi_hexaploid_triads")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_hexaploid_triads.txt.gz"))
+  bind_rows() 
+
+# write_tsv(df,file.path(outDir,"delCount_hexaploid_triads.txt.gz"))
 
 ### 四
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/009_indivi_pseudohexaploid")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_pseudohexaploid.txt.gz"))
+  bind_rows() 
+
+# write_tsv(df,file.path(outDir,"delCount_pseudohexaploid.txt.gz"))
 
 ### 五
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/010_indivi_pseudohexaploid_triads")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_pseudohexaploid_triads.txt.gz"))
+  bind_rows() 
+
+# write_tsv(df,file.path(outDir,"delCount_pseudohexaploid_triads.txt.gz"))
 
 ### 六
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_allIndivi")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount.txt.gz"))
+  bind_rows() 
+
+# write_tsv(df,file.path(outDir,"delCount.txt.gz"))
 
 ```
 
@@ -283,8 +290,8 @@ fun_getDelRatio <- function(filenamefun){
 ### 函数调用
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_merge")
 
-df <- dir(inputDir,pattern = "delCount",full.names = T) %>%
-  map(fun_getDelRatio)
+# df <- dir(inputDir,pattern = "delCount",full.names = T) %>%
+#   map(fun_getDelRatio)
 
 ```
 
@@ -335,48 +342,54 @@ inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCoun
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_triads.txt.gz"))
+  bind_rows() 
+
+# write_tsv(df,file.path(outDir,"delCount_triads.txt.gz"))
 
 ### 二
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/007_indivi_hexaploid")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_hexaploid.txt.gz"))
+  bind_rows()
+
+# write_tsv(df,file.path(outDir,"delCount_hexaploid.txt.gz"))
 
 ### 三
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/008_indivi_hexaploid_triads")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_hexaploid_triads.txt.gz"))
+  bind_rows() 
+
+# write_tsv(df,file.path(outDir,"delCount_hexaploid_triads.txt.gz"))
 
 ### 四
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/009_indivi_pseudohexaploid")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_pseudohexaploid.txt.gz"))
+  bind_rows()
+
+# write_tsv(df,file.path(outDir,"delCount_pseudohexaploid.txt.gz"))
 
 ### 五
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/010_indivi_pseudohexaploid_triads")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount_pseudohexaploid_triads.txt.gz"))
+  bind_rows()
+
+# write_tsv(df,file.path(outDir,"delCount_pseudohexaploid_triads.txt.gz"))
 
 ### 六
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/005_allIndivi")
 outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
 df <- dir(inputDir, full.names = T, pattern = "") %>% 
   map(sumDerivedCountPerTaxon) %>% 
-  bind_rows() %>% 
-  write_tsv(file.path(outDir,"delCount.txt.gz"))
+  bind_rows()
+
+# write_tsv(df,file.path(outDir,"delCount.txt.gz"))
 
 ```
 
@@ -455,8 +468,8 @@ fun_getDelRatio <- function(filenamefun){
 ### 函数调用
 inputDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/005_delCount/011_merge_byABsubDsub")
 
-df <- dir(inputDir,pattern = "delCount",full.names = T) %>%
-  map(fun_getDelRatio)
+# df <- dir(inputDir,pattern = "delCount",full.names = T) %>%
+#   map(fun_getDelRatio)
 
 ```
 

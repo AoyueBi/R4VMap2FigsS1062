@@ -145,9 +145,9 @@ ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 2.57,width = 2.57
 ## LD
 ### Data import
 ```{r}
-table_ploidy <- read.delim("data/figS_LD/LD/001_data/LD.ploid.txt")
-table_subspecies <- read.delim("data/figS_LD/LD/001_data/LD.subspecies.txt")
-table_subgenome <- read.delim("data/figS_LD/LD/001_data/LD.subgenome.txt")
+table_ploidy <- read.delim("data/012_LD/LD.ploid.txt.gz")
+table_subspecies <- read.delim("data/012_LD/LD.subspecies.txt.gz")
+table_subgenome <- read.delim("data/012_LD/LD.subgenome.txt.gz")
 ```
 
 ### only hexaploid by subgenome

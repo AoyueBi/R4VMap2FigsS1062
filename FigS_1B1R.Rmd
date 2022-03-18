@@ -12,6 +12,7 @@ output:
     theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
     highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
     # bibliography: bibliography.json
+runtime: shiny
 ---
 
 ```{r setup, echo =F, message = T, warning = F}
@@ -98,17 +99,19 @@ shinyApp(ui = ui, server = server)
 
 
 ```{r}
-dfChr_point <- read_tsv("data/fromDaxing/1B1R/centromereStartEnd.txt") %>%
+dfChr_point <- read_tsv("data/fromDaxing/1B1R/centromereStartEnd.txt",col_types = list(Chr=col_character())) %>%
   mutate(ChrID=str_sub(Chr,4,5)) %>%
   select(CHROM=ChrID,Mid) %>%
   filter(CHROM %in% c("1A","1B","1D"))
 
 df_pi <- dir("data/fromDaxing/1B1R/002_1B1R/004_popGen/001_pi", full.names = T) %>% 
-  map(~read_tsv(.x) %>% mutate(If1B1R=map_chr(str_split(basename(.x),"_"),1))) %>%
+  map(~read_tsv(.x,col_types = list(CHROM=col_character())) %>% mutate(If1B1R=map_chr(str_split(basename(.x),"_"),1))) %>%
   bind_rows() %>% 
-  left_join(dfChr,by = c("CHROM"="ChrID")) %>% 
+  left_join(dfChr_point,by = c("CHROM")) %>% 
   mutate(IfLongArm=ifelse(((BIN_START+BIN_END)/2)< Mid, "ShortArm", "LongArm")) %>% 
   mutate(IfLongArm=factor(IfLongArm,levels = c("ShortArm","LongArm")))
+
+col_1B1R <- c("#EB2C2C","#377FB8")
 
 q <- df_pi %>% 
   group_by(If1B1R) %>% 

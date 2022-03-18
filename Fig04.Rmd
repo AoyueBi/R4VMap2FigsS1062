@@ -18,7 +18,7 @@ output:
 
 ```{r setup, echo =F, message = T, warning = F}
 library(tidyverse)
-# library(RColorBrewer)
+library(RColorBrewer)
 # library(ggpubr)
 # library(egg)
 ## eval 代码要不要运行
@@ -1979,11 +1979,9 @@ colB <- df_factor$ColorCode
 df_eig <- read_tsv("data/016_mds/hexaploid_mds_eigenvalues.txt")
 
 
-
-
 ### 提取变异解释度并合并数据
-variance1 <-  paste(round(df.pca$eig[1,2],3),"%",sep="")  ##第一个成分
-variance2 <-  paste(round(df.pca$eig[2,2],3),"%",sep="") ##第二个成分
+variance1 <-  paste(round(df_eig[1,2],3),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df_eig[2,2],3),"%",sep="") ##第二个成分
 
 ### start to plot
 p <- df %>% 
@@ -2065,8 +2063,8 @@ df_eig <- read_tsv("data/016_mds/hexaploid_mds_eigenvalues.txt")
 
 
 ### 提取变异解释度并合并数据
-variance1 <-  paste(round(df.pca$eig[1,2],3),"%",sep="")  ##第一个成分
-variance2 <-  paste(round(df.pca$eig[2,2],3),"%",sep="") ##第二个成分
+variance1 <-  paste(round(df_eig[1,2],3),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df_eig[2,2],3),"%",sep="") ##第二个成分
 
 ### start to plot
 p <- df %>% 
@@ -2219,8 +2217,8 @@ df_eig <- read_tsv("data/016_mds/hexaploid_mds_eigenvalues.txt")
 
 
 ### 提取变异解释度并合并数据
-variance1 <-  paste(round(df.pca$eig[1,2],3),"%",sep="")  ##第一个成分
-variance2 <-  paste(round(df.pca$eig[2,2],3),"%",sep="") ##第二个成分
+variance1 <-  paste(round(df_eig[1,2],3),"%",sep="")  ##第一个成分
+variance2 <-  paste(round(df_eig[2,2],3),"%",sep="") ##第二个成分
 
 ### start to plot
 p <- df %>% 

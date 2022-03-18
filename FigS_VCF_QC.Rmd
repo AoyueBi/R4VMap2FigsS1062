@@ -1532,28 +1532,30 @@ print(str_c("biSNP_Num: ",biSNP_Num))
 
 ## SNP density 密度图
 ```{r}
-library(RIdeogram)
-library(dplyr)
-# wheatGff<-"IWGSC_v1.1_HC_20170706.gff3";
-wheatKaryotype<-"data/wheatV1.1_karyotype.txt";
-# data(human_karyotype, package="RIdeogram")
-# data(gene_density, package="RIdeogram")
-# data(Random_RNAs_500, package="RIdeogram")
-# head(human_karyotype)
-# head(gene_density)
-# head(Random_RNAs_500)
-# Random_RNAs_500<-Random_RNAs_500
-# wheatGeneDensity<-GFFex(input = wheatGff, karyotype = wheatKaryotype, feature = "gene", window = 1000000)
-vmap2.1SNPDensity<-read.table("data/vmap2.1_SNP_density.txt", header = T, stringsAsFactors = F)
-# azhurnaya_tissue_breath<-read.table("Azhurnaya_tissue_breadth10MbWindow1MbStep.txt", header = T, stringsAsFactors = F)
-# azhurnaya_tissue_breath<-mutate(azhurnaya_tissue_breath, Color="cccdfe")
-wheatKaryotype<-read.table(wheatKaryotype,header = T,stringsAsFactors = F)
-color<-c("#2787D8","#D2DD14","#F32F0C")
-# color<-c("#16BFFD","#ffcc00","#CB3066")
-# ideogram(karyotype = wheatKaryotype, overlaid = vmap2.1SNPDensity, label = azhurnaya_tissue_breath,label_type = "polygon",Ly = 25, colorset1 = color)
-ideogram(karyotype = wheatKaryotype, overlaid = vmap2.1SNPDensity, colorset1 = color,Lx = 6)
-# convertSVG("chromosome.svg", device = "png",file = "vmap2.1SNPDensity_Azhurnaya_tissue_breadth.png",dpi = 300, width = 6, height = 6)
-convertSVG("chromosome.svg", device = "pdf",file = "vmap2.1SNPDensity111111.pdf",dpi = 300, width = 3.6, height = 3.6*3/4)
+# library(RIdeogram)
+# library(dplyr)
+# # wheatGff<-"IWGSC_v1.1_HC_20170706.gff3";
+# 
+# wheatKaryotype<-"data/022_snpDensity/wheatV1.1_karyotype.txt";
+# # data(human_karyotype, package="RIdeogram")
+# # data(gene_density, package="RIdeogram")
+# # data(Random_RNAs_500, package="RIdeogram")
+# # head(human_karyotype)
+# # head(gene_density)
+# # head(Random_RNAs_500)
+# # Random_RNAs_500<-Random_RNAs_500
+# # wheatGeneDensity<-GFFex(input = wheatGff, karyotype = wheatKaryotype, feature = "gene", window = 1000000)
+# vmap2.1SNPDensity<- read.table("data/022_snpDensity/vmap2.1.posAllele_10000000window_1000000step.txt", header = T, stringsAsFactors = F)
+# 
+# # azhurnaya_tissue_breath<-read.table("Azhurnaya_tissue_breadth10MbWindow1MbStep.txt", header = T, stringsAsFactors = F)
+# # azhurnaya_tissue_breath<-mutate(azhurnaya_tissue_breath, Color="cccdfe")
+# wheatKaryotype<-read.table(wheatKaryotype,header = T,stringsAsFactors = F)
+# color<-c("#2787D8","#D2DD14","#F32F0C")
+# # color<-c("#16BFFD","#ffcc00","#CB3066")
+# # ideogram(karyotype = wheatKaryotype, overlaid = vmap2.1SNPDensity, label = azhurnaya_tissue_breath,label_type = "polygon",Ly = 25, colorset1 = color)
+# ideogram(karyotype = wheatKaryotype, overlaid = vmap2.1SNPDensity, colorset1 = color,Lx = 6)
+# # convertSVG("chromosome.svg", device = "png",file = "vmap2.1SNPDensity_Azhurnaya_tissue_breadth.png",dpi = 300, width = 6, height = 6)
+# convertSVG("chromosome.svg", device = "pdf",file = "vmap2.1SNPDensity111111.pdf",dpi = 300, width = 3.6, height = 3.6*3/4)
 
 ```
 
