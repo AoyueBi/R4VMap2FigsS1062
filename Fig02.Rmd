@@ -2022,7 +2022,7 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
 ```
 
 
-### nonsyn ratio
+## nonsyn ratio
 ```{r}
 df <- read_tsv("data/006_Fig2/genomeScan/004_delVSsynOnChr_windowScanbyRpackage.txt")
 
@@ -2042,6 +2042,37 @@ p <- df %>%
   theme(legend.position = 'none')+
   scale_fill_manual(values = colB)+
   scale_y_continuous(expand = c(0, 0),sec.axis = sec_axis(~./2, name="Recombination rate"))+
+  scale_x_continuous(expand = c(0, 0))+
+  theme(
+    # plot.margin=unit(rep(1,4),'lines'),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
+    ,legend.position = 'none'
+    ,text = element_text(size = 9))
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
+```
+
+## VEP high impact
+```{r}
+df <- read_tsv("data/006_Fig2/genomeScan/004_delVSsynOnChr_windowScanbyRpackage.txt")
+
+# rec <- data.frame(x1=c(0,9,28,50,80), x2=c(9,28,50,80,100), y1=c(-Inf,-Inf,-Inf,-Inf,-Inf), y2=c(Inf,Inf,Inf,Inf,Inf), region=c('R1','R2a','C','R2b','R3'))
+colB <- c("#fffcd4","#1e3c84","#3ab4c4","#3ab4c4","#1e3c84")
+p <- df %>% 
+  ggplot()+
+  # geom_rect(data=rec, mapping=aes(xmin=x1, xmax=x2, ymin=y1, ymax=y2,fill=region))+
+  annotate(geom = "rect", xmin = 28.14,xmax = 53.08, ymin = -Inf, ymax = Inf, fill = "#fffcd4",alpha = 1)+
+  geom_line(mapping=aes(x=df$win_start,y=df$StopGainSynRatio_mean,group=CHROM),col='#F4A460')+
+  stat_smooth(mapping=aes(x=df$win_start,y=df$StopGainSynRatio_mean),col = "#d5311c",method = "loess",formula = y~x,span = 0.04,se=F,size=1) +
+  # geom_point()+
+  geom_line(mapping=aes(x=df$win_start,y=df$RecombinationRate_mean/9,group=CHROM),col='#56B4E9')+
+  stat_smooth(df, mapping=aes(x=df$win_start,y=df$RecombinationRate_mean/9),col = "blue",method = "loess",formula = y~x,span = 0.04,se=F,size=1) +
+    # geom_point(df_centromere,mapping = aes(x=x,y=y),color='black',size=0.5)+
+  xlab("Scale position")+ylab("High impact SNPs/syn SNPs") +
+  theme(legend.position = 'none')+
+  scale_fill_manual(values = colB)+
+  scale_y_continuous(expand = c(0, 0),sec.axis = sec_axis(~.*9, name="Recombination rate"))+
   scale_x_continuous(expand = c(0, 0))+
   theme(
     # plot.margin=unit(rep(1,4),'lines'),

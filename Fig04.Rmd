@@ -2930,5 +2930,111 @@ df <- dfSNPdb_count %>%
 ```
 
 
+#### ============
+## spatstat
+## Spatstat world map
+- 画出7种类型的 spatstat 地图
+```{r}
+### 先构建函数
+fun_plotSpatstat <- function(df,fun_factor){
+  library(raster)
+# detach(package:raster,unload = T)
+library(spatstat)
+library(RColorBrewer)
+
+  choiceA <- fun_factor
+  
+ppp.df <- ppp(df$Longitude, df$Latitude, c(-180, 180), c(-60, 90))
+marks(ppp.df) <- df[, 2] ### load ratio 做为 marks 信息
+# plot(density(ppp.df)) ###画出点的聚集程度 测试
+ppp.df2 <- Smooth(ppp.df) ### 求每个点对应的load值的大小
+ppp.df2.m <- ppp.df2$v  ### 获取矩阵内的密度数据
+###矩阵上下颠倒128 -> 1 ,依次减一
+ppp.df2.m1 <- ppp.df2.m[seq(128, 1, by = -1), ]
+
+### 创建 raster 类，并将密度的结果填充进去
+df.raster <- raster(nrows = 128, ncols = 128, xmn = -180, xmx = 180, ymn = -60, ymx = 90)
+values(df.raster) <- as.vector(t(as.matrix(ppp.df2.m1)))
+plot(df.raster)
+
+world.shp <- shapefile("data/002_spatstat/spatstat/shapefile/TM_WORLD_BORDERS_SIMPL-0.3/TM_WORLD_BORDERS_SIMPL-0.3.shp")
+df.raster.final <- mask(df.raster, world.shp)
+par(mfrow = c(1,1))
+
+# pdf(file = str_c("figs/Fig4/misc",choiceA,"_wholeWorld.pdf"),height = 3,width = 4)
+### whole world
+png(filename = str_c("~/Documents/",choiceA,"_wholemap.png"),units = 'in',height = 4,width = 5.3,res = 300)
+plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xaxt="n",yaxt="n")
+points(df$Longitude, df$Latitude, pch = 16, cex = 0.5,col=rgb(252, 110, 110,90,maxColorValue=255))
+axis(1,at=seq(-150,180,60))
+axis(2,at=seq(-90,90,60))
+dev.off()
+
+### 亚欧大陆和非洲
+png(filename =str_c("~/Documents/",choiceA,"_Eurasia.png"),units = 'in',height = 4,width = 5.3,res = 300)
+# pdf( "~/Documents/test.pdf")
+plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xlim=c(-20,150),ylim=c(-35,62),xaxt="n",yaxt="n")
+points(df$Longitude, df$Latitude, pch = 16, cex = 0.8,col=rgb(252, 110, 110,90,maxColorValue=255))
+axis(1,at=seq(0,150,30))
+axis(2,at=seq(-20,62,20))
+# axis(1,at=seq(0,150,30),labels = c("0","","","","",""))
+# axis(2,at=seq(0,62,20))
+dev.off()
+
+### 美洲和非洲
+png(filename = str_c("~/Documents/",choiceA,"_American.png"),units = 'in',height = 4,width = 5.3,res = 300)
+plot(df.raster.final, col = colorRampPalette(rev(brewer.pal(n = 3, name = "RdBu")))(100),xlim=c(-150,60),ylim=c(-60,62),xaxt="n",yaxt="n")
+points(df$Longitude, df$Latitude, pch = 16, cex = 0.8,col=rgb(252, 110, 110,90,maxColorValue=255))
+axis(1,at=seq(-150,60,30))
+axis(2,at=seq(-60,62,30))
+dev.off()
+}
+
+
+```
+
+### plot
+```{r}
+choiceA <- "Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5"
+
+factorA <- c("Ratio_002_nonsynonymous","Ratio_033_Derived_PolyPhen2_0.5","Ratio_026_Derived_PolyPhen2_probably","Ratio_032_GERP16way_1.5","Ratio_014_GERP16way_2.14_max","Ratio_025_GERP16way_3.1","Ratio_007_VEP")
+
+factorA_label <- c("Nonsynonymous","PPH2","PPH2_Probably","GERP>1.5","GERP>2.14","GERP>3.1","VEP_HighImpact")
+
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz")
+
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  select(Taxa=VcfID,GenomeType,Longitude,Latitude)
+
+set.seed(123)
+df1 <- dfdel %>% right_join(.,dftaxaDB,by="Taxa") %>%
+  filter(GenomeType=="AABBDD") %>%
+  filter(Subgenome=="D") %>%
+  filter(DelCountGroup == "TotalDerivedSNPCount") %>%
+  # filter(Stand_LoadGroup == choiceA) %>%
+  ### filter data
+  filter(Stand_LoadGroup %in% factorA) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorA,labels = factorA_label)) %>% 
+  mutate(Stand_LoadGroup=as.character(Stand_LoadGroup)) %>% 
+  select(-IfSelected,-Group_refobj) %>%
+  select(-c("GenomeType","Subgenome","DelCountGroup")) %>%
+  filter(!is.na(Longitude)) %>%  ### 802个个体 -> 543 个有经纬度信息
+  arrange(Stand_delCount)
+
+df <- df1 %>%
+  mutate(Longitude = Longitude + runif(nrow(df1),0.001,0.005)) %>% ##通过添加随机数，避免重复
+  group_by(Stand_LoadGroup) %>% 
+  group_map(~fun_plotSpatstat(.x,.y))
+  
+### M2
+# q <- ggpubr::ggarrange(plotlist=list(df[[]],df[[]],df[[]],df[[]],
+#                                      df[[]],df[[]],df[[]]),
+#                        labels = as.character(c("")),
+#                        font.label = list(size = 7),
+#                        ncol = 4,nrow = 7)
+# cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+```
 
 
