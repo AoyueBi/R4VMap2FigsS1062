@@ -401,7 +401,7 @@ dfjaccard <- proxy::dist(df, by_rows = F, method = "Jaccard",convert_similaritie
 ### 建立注释数据框
 regionSet <- c("Protein-coding sequqence","Whole-genome")
 Set2 <- c("Homologous sequences similarity-based","Phylogenetic approach-based",
-          "Functional units-based","Local sequence identity and taconomy-based",
+          "Functional units-based","Local sequence identity and taxonomy-based",
           "Protein structure-based")
 
 Methods <- c("SIFT","GERP","SnpEff","VEP","LIST-S2","PhyloP","PPH2")

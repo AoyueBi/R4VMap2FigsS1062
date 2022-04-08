@@ -1592,12 +1592,404 @@ library(bedtoolsr)
 ```
 
 
+####============
+## 不同年代 cultivar 的变化
+### 0.cultivar 年代分布
+```{r}
+df2 <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
+  filter(IfOnVmap2_S643 != 1) %>% 
+  filter(GroupbyContinent=="CL") %>% 
+  filter(Group == "CAAS") %>% 
+  filter(!is.na(ReleasedIntroducedYear)) %>% 
+  mutate(ReleasedIntroducedYear = as.numeric(ReleasedIntroducedYear)) %>%   
+  mutate(bin=cut(ReleasedIntroducedYear,breaks=c(1920,1950,1980,2020))) %>% 
+  mutate(GroupTemp =  str_split_fixed(bin,",",n=2)[,1]) %>% 
+  mutate(GroupTemp =as.numeric(str_sub(GroupTemp,2))) %>% 
+  select(-bin) 
+
+### 用年代和分组IMC MCC 画个图，看看国外引进来的在哪个年代
+p <- df2 %>%
+  group_by(ReleasedIntroducedYear,GroupByOriPublication_Abbre,GroupTemp) %>%
+  count() %>% 
+  ggplot(aes(x=as.character(ReleasedIntroducedYear),y=n,fill=GroupByOriPublication_Abbre))+
+  geom_bar(stat="identity",alpha = 1)+  #,position=position_dodge()
+  geom_text(aes(label=  paste(prettyNum(n,big.mark = ","))),position =  position_stack(),vjust=1.5, size=3,color="black")+
+  labs(y="Count",x="")+
+  guides(fill=guide_legend(title="Group"))+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme(panel.background = element_rect(size = 0.7, colour = 'black',fill = 'white'),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 10),
+        legend.position = c(0.1,0.6))
+
+p
+ggsave(p,filename = "~/Documents/bar_YearAsCharacter.pdf",height = 3,width = 7)
+
+### 用年代和分组IMC MCC 画个图，看看国外引进来的在哪个年代
+p <- df2 %>%
+  group_by(ReleasedIntroducedYear,GroupTemp) %>%
+  count() %>% 
+  ggplot(aes(x=ReleasedIntroducedYear,y=n,fill=ReleasedIntroducedYear))+
+  geom_bar(stat="identity",alpha = 1)+  #,position=position_dodge()
+  geom_text(aes(label=  paste(prettyNum(n,big.mark = ","))),position =  position_stack(),vjust=1.5, size=3,color="black") +
+  labs(y="Count",x="")+
+  scale_fill_distiller(type = "seq", palette = "Spectral", name="Introduced year",direction = 1)+
+  # theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme(panel.background = element_rect(size = 0.7, colour = 'black',fill = 'white'),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 10),
+        legend.position = c(0.1,0.6))
+        
+
+p
+ggsave(p,filename = "~/Documents/bar_YearAsNumeric.pdf",height = 3,width = 7)
+
+### 用年代和分组IMC MCC 画个图，看看国外引进来的在哪个年代
+p <- df2 %>%
+  group_by(GroupTemp) %>% 
+  count() %>% 
+  ggplot(aes(x=as.character(GroupTemp),y=n,fill=GroupTemp))+
+  geom_bar(stat="identity",alpha = 1)+  #,position=position_dodge()
+  geom_text(aes(label=  paste(prettyNum(n,big.mark = ","))),position =  position_stack(),vjust=1.5, size=5,color="orange") +
+  labs(y="Count",x="")+
+  scale_fill_distiller(type = "seq", palette = "BuGn", name="Introduced year",direction = 1)+
+  # theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme(panel.background = element_rect(size = 0.7, colour = 'black',fill = 'white'),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 13),
+        legend.position = c(0.2,0.6))
+        
+
+p
+ggsave(p,filename = "~/Documents/bar_bin.pdf",height = 3,width = 5)
+```
+
+### 1.划分 Bin，del Ratio: cultivar 和 landrace load ratio 变化，区分亚基因组
+```{r}
+dfdelRatio <- read_tsv("data/004_delCount/delRatio.txt.gz")
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GroupbyContinent,ReleasedIntroducedYear,Group) %>% 
+  mutate(ReleasedIntroducedYear = str_replace(ReleasedIntroducedYear,"s",""))
+
+### 有年代信息的cultivar
+df1 <- dfdelRatio %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent == "CL") %>% 
+  filter(!is.na(ReleasedIntroducedYear)) %>% 
+  filter(DelCountGroup=="TotalDerivedSNPCount") %>% 
+  ### 划分 Bin
+  mutate(ReleasedIntroducedYear = as.numeric(ReleasedIntroducedYear)) %>%   
+  # mutate(bin=cut_width(ReleasedIntroducedYear,width = 30,boundary = 0,closed = "left")) %>%
+  mutate(bin=cut(ReleasedIntroducedYear,breaks=c(1920,1960,1980,2000,2020))) 
+  # mutate(binString = str_split_fixed(bin,",",n=2)[,1]) %>% 
+  # mutate(binString =as.numeric(str_sub(binString,2)))
+  # arrange(.,by=binString) 
+
+### LR_EU 及无年代信息的 cultivar
+df2 <- dfdelRatio %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(Group != "CAAS") %>% 
+  filter(GroupbyContinent %in%  c("CL","LR_EU")) %>% 
+  filter(DelCountGroup=="TotalDerivedSNPCount") %>% 
+  ### 划分 Bin
+  mutate(bin=GroupbyContinent) 
+
+### 设置因子顺序及标签
+mygroup <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
+mygrouplabelA <- c("Nonsynonymous","Deleterious","High impact")
+
+mygroup2 <- c("LR_EU","(1.92e+03,1.96e+03]","(1.96e+03,1.98e+03]","(1.98e+03,2e+03]","(2e+03,2.02e+03]","CL")
+mygroup2labelA <- c("LR","1920s-1960s","1960s-1980s","1980s-2000s","2000s-2020s","CL_timeUnknown")
+
+df <- rbind(df1,df2) %>% 
+  filter(Stand_LoadGroup %in% mygroup ) %>% 
+  droplevels() %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = mygroup,labels = mygrouplabelA)) %>% 
+  mutate(bin=factor(bin,levels = mygroup2,labels = mygroup2labelA))
+
+### plot
+library(RColorBrewer)
+# colB <- colorRampPalette(brewer.pal(9,"Reds")[c(3,7,9)])(5)
+colB <- c("#fc6e6e",brewer.pal(9,"Blues")[c(4,6,7,8)],"#9900ff") 
+  
+p <- df %>% 
+  ggplot(aes(x=Subgenome, y= Stand_delCount)) +
+  #### pointrange
+  stat_summary(aes(color=bin),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position=position_dodge(1),geom="pointrange")+
+  stat_summary(aes(group = bin), fun=mean, geom="point", color="white",position = position_dodge(1))+
+  scale_fill_manual(values = colB,name='')+  
+  scale_color_manual(values = colB,name='')+
+  # scale_x_discrete(labels=c("1920s-1950s","1950s-1980s","1980s-2020s"))+
+  labs(x="",y="Mutation load")+
+  facet_wrap(~Stand_LoadGroup,scales = "free")+
+  # theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size=0.4, colour = "black"),
+        # legend.position = 'none',
+        text = element_text(size = 10))
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.5,width = 7)
+```
+
+## 2.划分 Bin，del Count: cultivar 和 landrace load ratio 变化，区分亚基因组
+```{r}
+dfdel <- read_tsv("data/004_delCount/delCount.txt.gz")
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GroupbyContinent,ReleasedIntroducedYear,Group) %>% 
+  mutate(ReleasedIntroducedYear = str_replace(ReleasedIntroducedYear,"s",""))
+
+### 有年代信息的cultivar
+df1 <- dfdel %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent == "CL") %>% 
+  filter(!is.na(ReleasedIntroducedYear)) %>% 
+  ### 划分 Bin
+  mutate(ReleasedIntroducedYear = as.numeric(ReleasedIntroducedYear)) %>%   
+  # mutate(bin=cut_width(ReleasedIntroducedYear,width = 30,boundary = 0,closed = "left")) %>%
+  mutate(bin=cut(ReleasedIntroducedYear,breaks=c(1920,1960,1980,2000,2020))) 
+  # mutate(binString = str_split_fixed(bin,",",n=2)[,1]) %>% 
+  # mutate(binString =as.numeric(str_sub(binString,2)))
+  # arrange(.,by=binString) 
+
+### LR_EU 及无年代信息的 cultivar
+df2 <- dfdel %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(Group != "CAAS") %>% 
+  filter(GroupbyContinent %in%  c("CL","LR_EU")) %>% 
+  ### 划分 Bin
+  mutate(bin=GroupbyContinent) 
+
+### 设置因子顺序及标签
+mygroup <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5","007_VEP")
+mygrouplabelA <- c("Nonsynonymous","Deleterious","High impact")
+
+mygroup2 <- c("LR_EU","(1.92e+03,1.96e+03]","(1.96e+03,1.98e+03]","(1.98e+03,2e+03]","(2e+03,2.02e+03]","CL")
+mygroup2labelA <- c("LR","1920s-1960s","1960s-1980s","1980s-2000s","2000s-2020s","CL_timeUnknown")
+
+df <- rbind(df1,df2) %>% 
+  filter(VariantsGroup %in% mygroup) %>% 
+  droplevels() %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = mygroup,labels = mygrouplabelA)) %>% 
+  mutate(bin=factor(bin,levels = mygroup2,labels = mygroup2labelA))
+
+### plot
+library(RColorBrewer)
+# colB <- colorRampPalette(brewer.pal(9,"Reds")[c(3,7,9)])(5)
+colB <- c("#fc6e6e",brewer.pal(9,"Blues")[c(4,6,7,8)],"#9900ff") 
+  
+p <- df %>% 
+  ggplot(aes(x=Subgenome, y= TotalDerivedSNPCount)) +
+  #### pointrange
+  stat_summary(aes(color=bin),fun.data=mean_sdl,
+               fun.args = list(mult = 1),
+               position=position_dodge(1),geom="pointrange")+
+  stat_summary(aes(group = bin), fun=mean, geom="point", color="white",position = position_dodge(1))+
+  scale_fill_manual(values = colB,name='')+  
+  scale_color_manual(values = colB,name='')+
+  # scale_x_discrete(labels=c("1920s-1950s","1950s-1980s","1980s-2020s"))+
+  labs(x="",y="Derived allele count per individual")+
+  facet_wrap(~VariantsGroup,scales = "free")+
+  # theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size=0.4, colour = "black"),
+        # legend.position = 'none',
+        text = element_text(size = 10))
+p
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.5,width = 7)
+```
 
 
 
 
 
+## 3.whole genome & selection region - ratio
+```{r}
+############################## choice
 
+### 建立画图函数，然后调用画图
+fun_plotDelLoad_Boxplot <- function(para1,Prefix){
+
+### 外部定义变量后，内部函数可以调用，也可以重新命名。因此，choiceA1_top5，choiceA1_top1，choiceA3_wholegenome这3个变量可以不用在这里再次写出
+# choiceA1_top5 <- c("data/023_del_XPCLR/top5/delCount.txt.gz")
+# choiceA2_top1 <- c("data/023_del_XPCLR/top1/delCount.txt.gz")
+# choiceA3_wholegenome <- c("data/004_delCount/delCount.txt.gz")
+
+### 导入种质数据库,并选取特定的列
+dftaxaDB <- read.delim("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GroupbyContinent,ReleasedIntroducedYear) %>% 
+  mutate(ReleasedIntroducedYear = str_replace(ReleasedIntroducedYear,"s",""))
+
+### topK
+if(para1 %in% c(choiceA1_top5,choiceA2_top1)){
+  dfdelRatio <- read.delim(para1) %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(IfSelected==1) %>% select(-IfSelected)
+}else if(para1 %in% c(choiceA3_wholegenome)){
+  dfdelRatio <- read.delim(para1) %>% 
+  left_join(.,dftaxaDB,by="Taxa")
+}
+ 
+mygroup <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
+mygrouplabelA <- c("Nonsynonymous","Deleterious","High impact")
+
+df <- dfdelRatio %>% 
+  filter(GroupbyContinent == "CL") %>% select(-GroupbyContinent) %>%
+  filter(!is.na(ReleasedIntroducedYear)) %>% 
+  filter(DelCountGroup=="TotalDerivedSNPCount") %>%  ###选择该种类型的ratio值
+  #### 可以选择哪一列作为有害突变的计数 ###
+  filter(Stand_LoadGroup %in% mygroup) %>% 
+  mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = mygroup,labels = mygrouplabelA)) %>% 
+  ### 不区分亚基因组
+  group_by(Taxa,ReleasedIntroducedYear,Stand_LoadGroup) %>% 
+  summarise(across(.cols = c(Stand_delCount), .fns = mean)) %>% 
+  ### 划分 Bin
+  mutate(ReleasedIntroducedYear = as.numeric(ReleasedIntroducedYear)) %>%   
+  mutate(bin=cut(ReleasedIntroducedYear,breaks=c(1920,1960,1980,2000,2020))) %>%
+  filter(!is.na(bin))
+
+### plot
+library(RColorBrewer)
+colB <- colorRampPalette(brewer.pal(9,"Reds")[c(3,5,7,9)])(5)
+
+p <- df %>% 
+  ggplot(aes(x=bin, y= Stand_delCount)) +
+  stat_boxplot(geom = "errorbar",width=0.05,position = position_dodge(1))+ # add error bar
+  geom_boxplot(aes(fill=bin),alpha = 0.2,outlier.color = NA) +
+  geom_point(position = position_jitterdodge(0.6),alpha = 0.8,aes(color=bin),size=2)+
+  stat_summary(fun=mean, geom="point", color="yellow",position = position_dodge(0.8),size=2)+ ### 画出平均值
+  scale_fill_manual(values = colB,name='')+
+  scale_color_manual(values = colB,name='')+  
+  scale_x_discrete(labels=c("1920s-1960s","1960s-1980s","1980s-2000s","2000s-2020s"))+
+  labs(x="",y="Mutation load per accession")+
+  facet_wrap(~Stand_LoadGroup,scales = "free",ncol = 1)+
+  theme(strip.background = element_blank())+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 30))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 10))
+p
+# ggsave(p,filename = "~/Documents/test.pdf",height = 6,width = 4)
+
+ggsave(p,filename = str_c("~/Documents/",Prefix,"_delLoad_changeByYears.pdf"),height = 6,width = 4)
+return(p)
+}
+
+
+######  开始调用函数
+choiceA1_top5 <- c("data/023_del_XPCLR/delRatio_top0.05.txt.gz")
+choiceA2_top1 <- c("data/023_del_XPCLR/delRatio_top0.01.txt.gz")
+choiceA3_wholegenome <- c("data/004_delCount/delRatio.txt.gz")
+df1 <- fun_plotDelLoad_Boxplot(choiceA3_wholegenome,"whole_genome")
+df2 <- fun_plotDelLoad_Boxplot(choiceA1_top5,"top5")
+df3 <- fun_plotDelLoad_Boxplot(choiceA2_top1,"top1")
+df1
+df2
+df3
+
+###### 合并所画的图形
+
+### M2
+q <- ggpubr::ggarrange(plotlist=list(df1,df2,df3),
+                       labels = c("Whole-genome","Top 5% of selection regions","Top 1% of selection regions"),
+                       font.label = list(size = 7),
+                       ncol = 3,nrow = 1)
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+
+```
+
+
+## 4.whole genome & selection region - count
+```{r}
+############################## choice
+
+### 建立画图函数，然后调用画图
+fun_plotDelLoad_Boxplot <- function(para1,Prefix){
+
+### 外部定义变量后，内部函数可以调用，也可以重新命名。因此，choiceA1_top5，choiceA1_top1，choiceA3_wholegenome这3个变量可以不用在这里再次写出
+# choiceA1_top5 <- c("data/023_del_XPCLR/top5/delCount.txt.gz")
+# choiceA2_top1 <- c("data/023_del_XPCLR/top1/delCount.txt.gz")
+# choiceA3_wholegenome <- c("data/004_delCount/delCount.txt.gz")
+
+### 导入种质数据库,并选取特定的列
+dftaxaDB <- read.delim("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% select(Taxa=VcfID,GroupbyContinent,IfOnVmap2_S643,ReleasedIntroducedYear) %>% 
+  mutate(ReleasedIntroducedYear = str_replace(ReleasedIntroducedYear,"s",""))
+
+### topK
+if(para1 %in% c(choiceA1_top5,choiceA2_top1)){
+  dfdelCount <- read.delim(para1) %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(IfSelected==1) %>% select(-IfSelected)
+}else if(para1 %in% c(choiceA3_wholegenome)){
+  dfdelCount <- read.delim(para1) %>% 
+  left_join(.,dftaxaDB,by="Taxa")
+}
+ 
+mygroup <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5","007_VEP")
+mygrouplabelA <- c("Nonsynonymous","Deleterious","High impact")
+
+df <- dfdelCount %>% 
+  filter(GroupbyContinent == "CL") %>% 
+  filter(!is.na(ReleasedIntroducedYear)) %>% 
+  #### 可以选择哪一列作为有害突变的计数 ###
+  filter(VariantsGroup %in% mygroup) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = mygroup,labels = mygrouplabelA)) %>% 
+  ### 不区分亚基因组
+  group_by(Taxa,ReleasedIntroducedYear,VariantsGroup) %>% 
+  summarise(across(.cols = c(TotalDerivedSNPCount:SiteCountWithMinDepth), .fns = sum)) %>% 
+  ### 划分 Bin
+  mutate(ReleasedIntroducedYear = as.numeric(ReleasedIntroducedYear)) %>%   
+  mutate(bin=cut(ReleasedIntroducedYear,breaks=c(1920,1960,1980,2000,2020))) %>%
+  filter(!is.na(bin))
+
+### plot
+library(RColorBrewer)
+colB <- colorRampPalette(brewer.pal(9,"Reds")[c(3,5,7,9)])(5)
+
+p <- df %>% 
+  ggplot(aes(x=bin, y= TotalDerivedSNPCount)) +
+  stat_boxplot(geom = "errorbar",width=0.05,position = position_dodge(1))+ # add error bar
+  geom_boxplot(aes(fill=bin),alpha = 0.2,outlier.color = NA) +
+  geom_point(position = position_jitterdodge(0.6),alpha = 0.8,aes(color=bin),size=2)+
+  stat_summary(fun=mean, geom="point", color="yellow",position = position_dodge(0.8),size=2)+ ### 画出平均值
+  scale_fill_manual(values = colB,name='')+
+  scale_color_manual(values = colB,name='')+  
+  scale_x_discrete(labels=c("1920s-1960s","1960s-1980s","1980s-2000s","2000s-2020s"))+
+  labs(x="",y="No. derived SNPs per accession")+
+  facet_wrap(~VariantsGroup,scales = "free",ncol = 1)+
+  theme(strip.background = element_blank())+
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 30))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 10))
+p
+# ggsave(p,filename = "~/Documents/test.pdf",height = 6,width = 4)
+
+ggsave(p,filename = str_c("~/Documents/",Prefix,"_delLoad_changeByYears.pdf"),height = 6,width = 4)
+return(p)
+}
+
+
+######  开始调用函数
+choiceA1_top5 <- c("data/023_del_XPCLR/delCount_top0.05.txt.gz")
+choiceA2_top1 <- c("data/023_del_XPCLR/delCount_top0.01.txt.gz")
+choiceA3_wholegenome <- c("data/004_delCount/delCount.txt.gz")
+df1 <- fun_plotDelLoad_Boxplot(choiceA3_wholegenome,"whole_genome")
+df2 <- fun_plotDelLoad_Boxplot(choiceA1_top5,"top5")
+df3 <- fun_plotDelLoad_Boxplot(choiceA2_top1,"top1")
+df1
+df2
+df3
+
+###### 合并所画的图形
+
+### M2
+q <- ggpubr::ggarrange(plotlist=list(df1,df2,df3),
+                       labels = c("Whole-genome","Top 5% of selection regions","Top 1% of selection regions"),
+                       font.label = list(size = 7),
+                       ncol = 3,nrow = 1)
+cowplot::save_plot(q,filename = "~/Documents/test.pdf",base_height = 7.2,base_width = 7.2)
+```
 
 
 

@@ -623,6 +623,7 @@ df_geneCDSlength <- df_sample %>%
 
 ```
 
+### plot
 ```{r}
 
 colB <- c("#d5311c","#e69f00","#004680")
@@ -652,12 +653,51 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
 
 ```
 
-```{r}
 ### 稀有变异数分布
-
+```{r}
 df_filter %>% 
   ggplot(aes(x=.$RareVariantsCount))+
   geom_histogram()
+```
+### 非同义突变数目分布
+```{r}
+df_highImpact <- dftotal %>% 
+  filter(Impact_VEP=="HIGH") %>% 
+  mutate(LoadGroup="HighImpact")
+
+df1 <- dftotal_withAncestral %>% 
+  select(-IfRefisAnc,CommonOrRare) %>% 
+  bind_rows(df_highImpact) %>% 
+  # filter(LoadGroup=="Nonsynonymous") %>% 
+  group_by(LoadGroup) %>% 
+  count(Transcript)
+  # mutate(bin=cut_width(n,width = 3,boundary = 0)) %>% 
+  # group_by(LoadGroup) %>% 
+  # count(bin) %>% 
+  # mutate(fre=n/sum(n))
+
+colB <- c("#d5311c","darkred","#e69f00","#004680")
+p <- df1 %>% 
+  ggplot(aes(x=n,fill=LoadGroup,color=LoadGroup))+
+  # geom_histogram(aes(y=..ndensity..), alpha=0.5,bins = 15)+
+  geom_histogram(alpha=0.7,bins = 15)+
+  # geom_density(alpha=.2, fill="#FF6666",)+
+  # ggplot(aes(x=bin,y=fre,group=LoadGroup,fill=LoadGroup))+
+  # geom_bar(stat = 'identity',position = "dodge")+
+  labs(x="Number of derived SNPs in one gene", y="Gene number")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(.~LoadGroup, scales = "free")+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 12))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 4,width = 6)
 ```
 
 数目统计
