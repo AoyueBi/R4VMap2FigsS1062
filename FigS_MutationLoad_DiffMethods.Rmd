@@ -1050,13 +1050,18 @@ p <- df2 %>%
   theme(
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7)
-    # ,legend.position = 'none'
-    ,text = element_text(size = 12))
+    ,legend.position = 'none'
+    ,text = element_text(size = 14))
 p
 
-# ggsave(p,filename = "~/Documents/test.pdf",height = 4, width = 7.2)
-ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/polyDFE_method/polyDFE_differentMethods.pdf",height = 4, width = 7.2)
+ggsave(p,filename = "~/Documents/test.pdf",height = 4, width = 4)
 
+# ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/polyDFE_method/polyDFE_differentMethods.pdf",height = 4, width = 7.2)
+
+### 获取 legend
+# library("ggpubr")
+# ggp_legend <- get_legend(p)
+# ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 2)
 
 
 ```
@@ -1143,12 +1148,15 @@ ggplot(aes(x=Group,y=ave,fill=Group))+
   theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
   theme(
     panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
-    ,legend.position = 'none'
-    ,text = element_text(size = 10))
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 14))
 p
 
-ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/polyDFE_method/estimateAlpha_.pdf",height = 3, width = 4)
+# ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/polyDFE_method/estimateAlpha_.pdf",height = 3, width = 4)
+
+### for PPT
+ggsave(p,filename = "~/Documents/test2.pdf",height = 4, width = 4)
 
 ```
 

@@ -1731,7 +1731,7 @@ ggsave(plot = p, "~/Documents/test.pdf", height = 2.22,width = 1.8)
 ```
 
 #### =======================
-## Gene expression
+## 1.Gene expression vs strongly burden
 ```{r}
 df_burden1 <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneBurden.averageIndividualBurden.txt.gz")
 df_expression <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneExpression.averageTPM.txt.gz")
@@ -1801,8 +1801,70 @@ dff <- df_burden1_expression %>%
 ```
 
 
+## 2.Gene expression vs slightly burden
+```{r}
+df_burden1 <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneBurden.averageIndividualBurden.txt.gz")
+df_expression <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneExpression.averageTPM.txt.gz")
 
-## Tissue expression VS mutation burden
+df_burden1_expression <- df_burden1 %>% 
+  left_join(y = df_expression,by = c("geneName"="Gene")) %>% 
+  filter(!is.na(Subgenome))
+
+temp <- df_burden1_expression %>% 
+  # filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  mutate(TPM_mean_log = log2(TPM_mean)) %>% 
+  mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0)) %>% 
+  group_by(SlightlyOrStrongly, Subgenome,bin) %>% 
+  count() %>%   
+  filter(n > 20, !is.na(bin))
+
+colN1 <- brewer.pal(9,"Reds")[c(7)]
+colA <- colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(13)
+colC <- rev(colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(8))
+colN2 <- brewer.pal(9,"Reds")[c(9)]
+
+colB <- c(colN1,colA,colC,colN2)
+# colB <- colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(40)
+# xLabel <- expression(2^{-12},"",2^{-8},"",2^{-4},"",2^{0},"",2^{4},"",2^{8},"")
+# xLabel <- expression("",2^{-12},"","",2^{-9},"","",2^{-6},"","",2^{-3},"","",2^{0},"","",2^{3},"","",2^{6},"","",2^{9})
+xLabel <- expression("",2^{-12},"","",2^{-9},"","",2^{-6},"","",2^{-3},"","",2^{0},"","",2^{3},"","",2^{6},"","",2^{9})
+p <- df_burden1_expression %>% 
+  filter(SlightlyOrStrongly=="SlightlyBurden") %>%
+  mutate(TPM_mean_log = log2(TPM_mean)) %>% 
+  mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0)) %>% 
+  filter(bin %in% temp$bin) %>%
+  ggplot(aes(x=bin, y=mean_burden)) +
+# stat_boxplot(geom = "errorbar",width=0.05,position = position_dodge(1))+ # add error bar
+# geom_boxplot(aes(fill=bin),outlier.shape = NA) +
+# geom_point(position = position_jitter(width = 0.2), size=0.1)+
+# stat_summary(fun=median, geom="point", color="blue",
+#              position = position_dodge(1),
+#              size=0.1)+
+  stat_summary(aes(color=bin),fun.data = mean_se,size=0.2)+
+  scale_fill_manual(values = colB)+
+  # facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  labs(x="TPM", y= "Slightly gene burden")+
+  # scale_y_continuous(trans = "log2",
+  #                    breaks = trans_breaks("log2",function(x) 2^x),
+  #                    labels = trans_format("log2",math_format(2^.x)))+
+  scale_x_discrete(breaks=c("(-12,-11]","(-9,-8]","(-6,-5]","(-3,-2]","(0,1]","(3,4]","(6,7]","(9,10]"),
+                   labels=expression(2^{-12},2^{-9},2^{-6},2^{-3},2^{0},2^{3},2^{6},2^{9}))+
+  scale_x_discrete(labels=xLabel)+
+  scale_color_manual(values = colB)+
+  # coord_cartesian(ylim = c(0,0.04))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 9))
+
+p
+ggsave(plot = p, "~/Documents//Burden1_vs_TPM.pdf",height = 2,width = 2)
+
+```
+
+
+## 3.Tissue expression VS mutation burden
 - caption: Deleterious mutation of genes expressed across tissues.
 conclusion: Deleterious mutations are depleted in genes expressed in grain and anther.
 
@@ -1966,6 +2028,172 @@ p <- df %>%
 
 p
 
+
+```
+
+## 4.Number of tissues vs mutation burden
+```{r}
+### 首先找到每个基因组织表达的宽度
+df_tissueBreath <- read_tsv("data/011_geneExpression/002_tissueBreath/002_Azhurnaya_tissue_breadth_100Kgenet_1TPM_miniVersion.txt")
+
+df_tissueBreath %>% 
+  ggplot(aes(x=ExpressionBreadth))+
+  geom_histogram()+
+  theme_classic()
+
+### 其次找到每个基因的load值
+df_burden1 <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneBurden.averageIndividualBurden.txt.gz")
+
+df_burden1 %>% 
+  ggplot(aes(x= log10(mean_burden)))+
+  facet_wrap(~SlightlyOrStrongly)+
+  geom_histogram()+
+  theme_classic()
+
+### 再次将load和组织表达宽度进行相关性分析
+df_burden1_tissueBreath <- df_burden1 %>% 
+  left_join(y = df_tissueBreath,by = c("geneName"="Gene"))
+
+temp <- df_burden1_tissueBreath %>% 
+  ###手动分割bin
+  # mutate(bin=cut(ExpressionBreadth,breaks = c(0,2,4,6,10,15,20,23))) %>% 
+  mutate(bin=cut_width(ExpressionBreadth,width = 2,boundary = 0)) %>%
+  filter(!is.na(bin)) %>% 
+  group_by(SlightlyOrStrongly,bin) %>% 
+  count() 
+
+### 颜色配置
+colA <- colorRampPalette(brewer.pal(9,"Reds")[c(4,5,6,7,8,9)])(6)
+colC <- rev(colorRampPalette(brewer.pal(9,"Reds")[c(4,5,6,7,8,9)])(5))
+colB <- c(colA,colC)
+
+p <- df_burden1_tissueBreath %>% 
+  filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  # filter(mean_burden!=0,is.finite(mean_burden)) %>%
+  # filter(is.finite(mean_burden)) %>
+  # mutate(bin=cut(ExpressionBreadth,breaks = c(0,2,4,6,10,15,20,23))) %>% 
+  mutate(bin=cut_width(ExpressionBreadth,width = 2,boundary = 0)) %>%
+  filter(!is.na(bin)) %>% 
+  ggplot(aes(x=bin, y=mean_burden,color=bin)) +
+  stat_summary(fun.data = mean_se,size=0.8)+
+  scale_fill_manual(values = colB)+
+  # facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  labs(x="Tissue breadth of gene expression", y= "Strongly mutation load per gene")+
+  scale_x_discrete(breaks=
+                     c("[0,2]","(6,8]","(12,14]","(18,20]"),
+                   labels=c("2","8","14","20"))+
+  scale_color_manual(values = colB)+
+  # coord_cartesian(ylim = c(0,0.09))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 12))
+
+p
+ggsave(plot = p, "~/Documents/strongly_vs_tissueBreath.pdf",height = 3,width = 4)
+
+
+### 颜色配置需要修改一下，根据变化的趋势
+colC <- rev(colorRampPalette(brewer.pal(9,"Reds")[c(4,5,6,7,8,9)])(11))
+colB <- c(colC)
+p <- df_burden1_tissueBreath %>% 
+  filter(SlightlyOrStrongly=="SlightlyBurden") %>%
+  # filter(mean_burden!=0,is.finite(mean_burden)) %>%
+  # filter(is.finite(mean_burden)) %>
+  # mutate(bin=cut(ExpressionBreadth,breaks = c(0,2,4,6,10,15,20,23))) %>% 
+  mutate(bin=cut_width(ExpressionBreadth,width = 2,boundary = 0)) %>%
+  filter(!is.na(bin)) %>% 
+  ggplot(aes(x=bin, y=mean_burden,color=bin)) +
+  stat_summary(fun.data = mean_se,size=0.8)+
+  scale_fill_manual(values = colB)+
+  # facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  labs(x="Tissue breadth of gene expression", y= "Slightly mutation load per gene")+
+  scale_x_discrete(breaks=
+                     c("[0,2]","(6,8]","(12,14]","(18,20]"),
+                   labels=c("2","8","14","20"))+
+  scale_color_manual(values = colB)+
+  # coord_cartesian(ylim = c(0,0.09))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 12))
+
+p
+ggsave(plot = p, "~/Documents/slightly_vs_tissueBreath.pdf",height = 3,width = 4)
+
+
+
+# p <- df_burden1_tissueBreath %>% 
+#   filter(SlightlyOrStrongly=="StronglyBurden") %>%
+#   filter(mean_burden!=0,is.finite(mean_burden)) %>%
+#   # filter(is.finite(mean_burden)) %>% 
+#   # mutate(bin=cut(ExpressionBreadth,breaks = c(0,2,4,6,10,15,20,23))) %>% 
+#   mutate(bin=cut_width(ExpressionBreadth,width = 2,boundary = 0)) %>%
+#   filter(!is.na(bin)) %>% 
+#   ggplot(aes(x=bin, y=mean_burden,color=bin)) +
+# # stat_boxplot(geom = "errorbar",width=0.05,position = position_dodge(1))+ # add error bar
+# # geom_boxplot(aes(fill=bin),outlier.shape = NA) +
+# # geom_point(position = position_jitter(width = 0.2), size=0.1)+
+# # stat_summary(fun=median, geom="point", color="blue",
+# #              position = position_dodge(1),
+# #              size=0.1)+
+#   # stat_summary(fun.data = mean_se,size=0.2)+
+#   geom_violin(aes(fill=bin),position = position_dodge(0.8)) +
+#   stat_summary(fun=mean, geom="point", color="black",position = position_dodge(0.8),size=0.5)+
+#   scale_fill_manual(values = colB)+
+#   # facet_grid(SlightlyOrStrongly~.,scales = "free")+
+#   labs(x="Tissue breadth of gene expression", y= "Strongly mutation load per gene")+
+#   scale_x_discrete(breaks=
+#                      c("[0,2]","(6,8]","(12,14]","(18,20]"),
+#                    labels=c("2","8","14","20"))+
+#   scale_color_manual(values = colB)+
+#   coord_cartesian(ylim = c(0,0.09))+
+#   theme(
+#     panel.background = element_blank(),
+#     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+#     legend.position = 'none',
+#     text = element_text(size = 9))
+# 
+# p
+# ggsave(plot = p, "~/Documents/Burden1_vs_TPM.pdf",height = 2,width = 2)
+
+
+# ### 过滤方式不一样
+# p <- df_burden1_tissueBreath %>% 
+#   filter(SlightlyOrStrongly=="StronglyBurden") %>%
+#   # filter(mean_burden!=0,is.finite(mean_burden)) %>%
+#   filter(is.finite(mean_burden)) %>%
+#   # mutate(bin=cut(ExpressionBreadth,breaks = c(0,2,4,6,10,15,20,23))) %>% 
+#   mutate(bin=cut_width(ExpressionBreadth,width = 2,boundary = 0)) %>%
+#   filter(!is.na(bin)) %>% 
+#   ggplot(aes(x=bin, y=mean_burden,color=bin)) +
+# # stat_boxplot(geom = "errorbar",width=0.05,position = position_dodge(1))+ # add error bar
+# # geom_boxplot(aes(fill=bin),outlier.shape = NA) +
+# # geom_point(position = position_jitter(width = 0.2), size=0.1)+
+# # stat_summary(fun=median, geom="point", color="blue",
+# #              position = position_dodge(1),
+# #              size=0.1)+
+#   # stat_summary(fun.data = mean_se,size=0.2)+
+#   geom_violin(aes(fill=bin),position = position_dodge(0.8)) +
+#   stat_summary(fun=mean, geom="point", color="black",position = position_dodge(0.8),size=0.5)+
+#   scale_fill_manual(values = colB)+
+#   # facet_grid(SlightlyOrStrongly~.,scales = "free")+
+#   labs(x="Tissue breadth of gene expression", y= "Strongly mutation load per gene")+
+#   scale_x_discrete(breaks=
+#                      c("[0,2]","(6,8]","(12,14]","(18,20]"),
+#                    labels=c("2","8","14","20"))+
+#   scale_color_manual(values = colB)+
+#   coord_cartesian(ylim = c(0,0.09))+
+#   theme(
+#     panel.background = element_blank(),
+#     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+#     legend.position = 'none',
+#     text = element_text(size = 9))
+# 
+# p
+# ggsave(plot = p, "~/Documents/Burden1_vs_TPM2.pdf",height = 2,width = 2)
 
 ```
 
@@ -2281,5 +2509,25 @@ q
 
 ggsave(q,filename = "~/Documents/DAF_42.pdf",height = 3.17,width = 3.17)
 
+```
+
+### test
+```{r}
+test <- c("A practical implementation of this notion would be refining gene constraint models to incorporate
+contributions from constrained regulatory elements. This essentially borrows power from extending the
+functional unit of a gene in the context ofthe gene regulatory network. Such an approach would allow
+Constraint modeling for specific tissue/cell types and conditions given the diverse range of epigenomics
+data. Taking enhancer-gene links from brain tissue as a proof-of-principle, a simple logistic regression test
+onconditioning on gene constraint indicated significant contribution from enhancer constraint for predicting
+functionally relevant genes (e.g, targets of Fragile x Mental Retardation Protein (FMRP), Logit P=2.84*10-8
+, Methods). While we acknowledge that the biological consequences of mutations in enhancers are not
+clearly understood and thus natural selection may differ in its interest depending on mechanistic
+consequence, an extended model to incorporate non-coding variation information in a biologically-
+informed way hold the promise to provide a finer characterization of gene function and facilitate a better
+understanding of the molecular mechanisms underiving selection.")
+
+test2 <- str_replace_all(test,"\n"," ")
+
+test2
 ```
 
