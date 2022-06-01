@@ -455,7 +455,7 @@ p <- df %>%
   geom_hline(yintercept = 0, linetype=2, color="grey")+
   stat_summary(geom = "pointrange", fun.data = mean_cl_boot, aes(color=P3), 
                position = position_dodge(0.8))+
-  labs(y="Introgressed VS\nnonintrogressed burden",x="")+
+  labs(y="Introgressed VS\nnonintrogressed burden",x="Subgenome")+
   # scale_fill_brewer(palette = "Set2")+
   # scale_color_brewer(palette = "Set2")+
   scale_fill_manual(values = colB)+
@@ -465,7 +465,7 @@ p <- df %>%
   # coord_cartesian(xlim = c(0,1.0))+
   facet_grid(SlightlyOrStrongly~.)+
   theme(
-    axis.title.x = element_blank(),
+    # axis.title.x = element_blank(),
     strip.background = element_blank(),
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.5),
@@ -473,7 +473,8 @@ p <- df %>%
     text = element_text(size = 9))
 p
 
-ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 2.4)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 2.4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 3.5)
 
 
 dftest <- df %>% 
@@ -563,6 +564,461 @@ p <- df %>%
 p
 ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
   
+```
+#### ------------ load vs PGI vs timing
+- 从这里开始一直运行，后续才能得到 load 和 PGI 以及 inrogression timing 的关系
+## Calculate Relative timing (R script, using Version1)
+
+```{r}
+taxaInfo <- "data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt"
+chrconvention <- "data/001_TaxaDB/chrConvertionRule_byAoyue.txt"
+df_taxaInfo <- read_tsv(taxaInfo,show_col_types = FALSE) %>% 
+  select(VcfID,GroupbyContinent,IntrogressionID)
+
+
+library(tidyverse)
+# args <- commandArgs(trailingOnly = T)
+
+pop2indi_fd_dxy_dir <- "data/fromDaxing/015_introgression_pop2Indi/003_fd_dxy_testData/003_pop2indi_fd_dxy_v1"
+outFile <- ""
+
+# pop2indi_fd_dxy_dir <- "005_fd_dxy_data_LR_EU_AF_AM/"
+
+df_fd_dxy_AB <- dir(pop2indi_fd_dxy_dir,full.names = T) %>% 
+    keep(~str_sub(basename(.x),5,5) %in% c("A","B")) %>% 
+    map(~read_tsv(.x,show_col_types = FALSE,col_types = cols(.default = "n",scaffold="c",DonorPredictedByMindxy="c",
+                                                             P2="c",P3="c")) %>% 
+            mutate(P2=str_c(str_split(basename(.x),"_")[[1]][[3]]))) %>% 
+    bind_rows() %>% 
+    mutate(DonorPredictedByMindxy_fd = ifelse(is.na(fd),"NONE",ifelse(fd > fd_mean & DonorPredictedByMindxy!="NONE", DonorPredictedByMindxy, "NONE"))) %>% 
+    mutate(RelativeTiming_AC=Min_dxy/dxy_FTT_IndianDwarf) %>% 
+    select(scaffold:sites,P2,DonorPredictedByMindxy_fd,mean_dxy_outgroup,Min_dxy,RNDMin,RelativeTiming_AC)
+
+df_fd_dxy_D <- dir(pop2indi_fd_dxy_dir,full.names = T) %>% 
+    keep(~str_sub(basename(.x),5,5) %in% c("D")) %>% 
+    map(~read_tsv(.x,show_col_types = FALSE,col_types = cols(.default = "n",scaffold="c",DonorPredictedByMindxy="c",
+                                                             P2="c",P3="c")) %>% 
+            mutate(P2=str_c(str_split(basename(.x),"_")[[1]][[3]]))) %>% 
+    bind_rows() %>% 
+    mutate(DonorPredictedByMindxy_fd = ifelse(is.na(fd),"NONE",ifelse(fd > fd_mean & DonorPredictedByMindxy!="NONE", DonorPredictedByMindxy, "NONE"))) %>% 
+    mutate(RelativeTiming_AC=Min_dxy/dxy_AT_Indian_dwarf) %>% 
+    select(scaffold:sites,P2,DonorPredictedByMindxy_fd,mean_dxy_outgroup,Min_dxy,RNDMin,RelativeTiming_AC)
+
+df_fd_dxy <- bind_rows(df_fd_dxy_AB, df_fd_dxy_D) 
+
+df <- df_fd_dxy %>% 
+    mutate(IfILS=ifelse(RelativeTiming_AC >= 0.95, 1,0)) %>% 
+    mutate(DonorPredictedByMindxy_fd_ILS=ifelse(DonorPredictedByMindxy_fd!="NONE" & IfILS==0, DonorPredictedByMindxy_fd, "NONE")) %>% 
+    mutate(DonorPredictedByMindxy_fd_ILS=factor(DonorPredictedByMindxy_fd_ILS,levels = c("AT","WE","DE","FTT","NONE"))) %>% 
+    select(scaffold:sites,P2,RelativeTiming_AC,DonorPredictedByMindxy_fd_ILS) %>% 
+    filter(!DonorPredictedByMindxy_fd_ILS %in% c("NONE")) %>% 
+    mutate(Sub=str_sub(scaffold,2,2)) %>% 
+    group_by(P2,DonorPredictedByMindxy_fd_ILS,Sub) %>% 
+    summarise(mean_RelativeTiming_AC=mean(RelativeTiming_AC,na.rm=T),
+              sd=sd(RelativeTiming_AC,na.rm=T),
+              WindowNum=n())
+
+head(df)
+# write_tsv(df, outFile)
+```
+
+### Distribution of Relative timing
+
+```{r}
+df_taxaInfo <- read_tsv(taxaInfo) %>% 
+  select(IntrogressionID,GroupbyContinent)
+
+df1 <- read_tsv("data/fromDaxing/015_introgression_pop2Indi/009_relativingTiming/RelativeTiming_AC_LR_EA_CL.txt.gz") %>% 
+  mutate(P2=str_sub(P2,1,6)) %>% 
+  mutate(P2=str_c(str_sub(P2,1,2),str_sub(P2,3,6),sep = "_")) %>% 
+  left_join(y = df_taxaInfo,by = c("P2"="IntrogressionID"))
+
+df2 <- read_tsv("data/fromDaxing/015_introgression_pop2Indi/009_relativingTiming/RelativeTiming_AC_LR_EU_AF_AM.txt.gz") %>% 
+  mutate(P2=str_c(str_sub(P2,1,2),str_sub(P2,3,6),sep = "_")) %>% 
+  left_join(y = df_taxaInfo,by = c("P2"="IntrogressionID"))
+
+df <- bind_rows(df1,df2)
+dfAB <- df %>% 
+  filter(Sub %in% c("A","B")) %>% 
+  group_by(P2,DonorPredictedByMindxy_fd_ILS) %>% 
+  mutate(proportion=WindowNum/sum(WindowNum),Timing=mean_RelativeTiming_AC*proportion) %>% 
+  summarise(Time=sum(Timing))
+
+dfD <- df %>% 
+  filter(Sub %in% c("D")) %>% 
+  select(P2,DonorPredictedByMindxy_fd_ILS,mean_RelativeTiming_AC) %>% 
+  rename(Time=mean_RelativeTiming_AC)
+  
+dfTiming <- bind_rows(dfAB,dfD) %>% 
+  left_join(y = df_taxaInfo,by = c("P2"="IntrogressionID")) %>% 
+  filter(GroupbyContinent %in% c("LR_EU","LR_EA","CL"))
+
+# factorA <- c("AT","WE","DE","FTT")
+# labelsA <- c("Strangulata","Wild emmer","Domesticated emmer","Free-threshing tetraploids")
+# colB <- c("#87cef9","#ffd702","#7f5701","#016699")
+
+factorA <- c("LR_EU","CL","LR_EA")
+labelsA <- c("Landrace_EU","Cultivar","Landrace_EA")
+colB <- c("#fc6e6e","#9900ff","gray90")
+
+
+## AB
+q <- dfTiming %>% 
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = c("LR_EU","CL","LR_EA"))) %>% 
+  mutate(DonorPredictedByMindxy_fd_ILS=factor(DonorPredictedByMindxy_fd_ILS,levels = c("WE","AT","DE","FTT"))) %>%
+  filter(!DonorPredictedByMindxy_fd_ILS %in% c("AT")) %>%
+  ggplot(aes(x=Time, fill=GroupbyContinent, color=GroupbyContinent))+
+  # geom_histogram(alpha=0.6,position = position_identity())+
+  geom_density(alpha=0.6)+
+  facet_grid(DonorPredictedByMindxy_fd_ILS~.)+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  labs(x="Relative timing of introgression")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        # text = element_text(size = 16),
+        # axis.title.x = element_blank(),
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        # axis.title = element_text(size = 8),
+        # strip.text = element_text(size = 7),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+ggsave("~/Documents/temp.png",q,width = 4,height = 3)
+
+
+## D
+q <- dfTiming %>% 
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = c("LR_EU","CL","LR_EA"))) %>% 
+  mutate(DonorPredictedByMindxy_fd_ILS=factor(DonorPredictedByMindxy_fd_ILS,levels = c("WE","AT","DE","FTT"))) %>%
+  filter(DonorPredictedByMindxy_fd_ILS %in% c("AT")) %>%
+  ggplot(aes(x=Time, fill=GroupbyContinent, color=GroupbyContinent))+
+  # geom_histogram(alpha=0.6,position = position_identity())+
+  geom_density(alpha=0.6)+
+  facet_grid(DonorPredictedByMindxy_fd_ILS~.)+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  labs(x="Relative timing of introgression")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        # text = element_text(size = 16),
+        # axis.title.x = element_blank(),
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        # axis.title = element_text(size = 8),
+        # strip.text = element_text(size = 7),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+
+```
+
+## Introgression time PGI VS mutation burden
+## Scatter burden vs Timing vs PGI
+
+**Burden, WildAncestryPerTaxa, Time** **不区分亚基因组**
+- WE_Burden是AB亚基因组burden之和
+- WE_WildAncestryPerTaxa是AB亚基因组WildAncestryPerTaxa之和
+- WE_Time是AB基因组所有window的均值
+
+### Tidy
+
+```{r}
+taxaInfo <- "data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt"
+chrconvention <- "data/001_TaxaDB/chrConvertionRule_byAoyue.txt"
+df_taxaInfo <- read_tsv(taxaInfo,show_col_types = FALSE) %>% 
+  select(VcfID,GroupbyContinent,IntrogressionID)
+
+genomeSize <- 14066280851
+
+factorA <- c("LR_EU","CL","LR_EA")
+labelsA <- c("Landrace_EU","Cultivar","Landrace_EA")
+colB <- c("#fc6e6e","#9900ff","gray90")
+
+df_chrconvention <- read_tsv(chrconvention,show_col_types = FALSE) %>% select(ChrID,OriChrName) %>% 
+  mutate(Chr=str_remove(OriChrName,"chr"), Sub=str_sub(Chr,2,2)) %>% 
+  select(-OriChrName) 
+
+
+df_Time_PGI <- read_tsv("data/fromDaxing/015_introgression_pop2Indi/007_PGI/PGI.txt.gz") %>% 
+  left_join(y = df_taxaInfo,by = c("P2"="IntrogressionID")) %>% 
+  mutate(Genomesize=genomeSize) %>% 
+  mutate(WildAncestryPerTaxa=Genomesize*PGI/1000000) %>% 
+  group_by(GroupbyContinent,P2,DonorPredictedByMindxy_fd_ILS) %>% 
+  summarise(TotalWildAncestryPerTaxa=sum(WildAncestryPerTaxa)) %>% 
+  filter(!DonorPredictedByMindxy_fd_ILS %in% c("NONE")) %>%
+  # filter(GroupbyContinent %in% c("LR_EU","LR_EA","CL")) %>%
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = factorA)) %>% 
+  left_join(y = dfTiming,by = c("P2","DonorPredictedByMindxy_fd_ILS","GroupbyContinent"))
+
+
+df_Burden_Time_PGI <- dir("data/fromDaxing/015_introgression_pop2Indi/008_fd_burden/002_individualBased/",full.names = T) %>% 
+  map(read_tsv,show_col_types = FALSE) %>% 
+  bind_rows() %>% 
+  left_join(y = df_chrconvention, by = "ChrID") %>% 
+  group_by(Taxa,Donor) %>%
+  summarise(across(starts_with("num"),sum)) %>%
+  mutate(Slightly=(numDerivedInNonsyn+0.5*numHeterInNonsyn)/(numDerivedInSyn+0.5*numHeterInSyn)) %>% 
+  mutate(Strongly=(numDerivedInHGDeleterious+0.5*numHeterInHGDeleterious)/(numDerivedInSyn+0.5*numHeterInSyn)) %>% 
+  select(-starts_with("num")) %>% 
+  pivot_longer(cols = Slightly:Strongly, names_to = "SlightlyOrStrongly", values_to = "Burden") %>% 
+  mutate(Donor=factor(Donor,levels = c("AT","WE","DE","FTT","NONE"))) %>% 
+  left_join(y = df_taxaInfo, by = c("Taxa"="VcfID")) %>% 
+  # ABD_0862 ABD_0863 is NA
+  filter(!is.na(GroupbyContinent)) %>% 
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = c("LR_AM","LR_AF","LR_CSA","LR_WA","LR_EU","CL","LR_EA"))) %>% 
+  # filter(GroupbyContinent  %in% c("LR_EU","LR_EA","CL")) %>% 
+  mutate(Donor=factor(Donor,levels = c("AT","WE","DE","FTT","NONE"))) %>% 
+  left_join(y = df_Time_PGI,by = c("IntrogressionID"="P2","Donor"="DonorPredictedByMindxy_fd_ILS","GroupbyContinent"))
+
+
+```
+
+### Scatter {.tabset}
+
+#### PGI vs Timing
+
+```{r}
+## PGI and timing
+library(scales)
+factorA <- c("AT","WE","DE","FTT")
+labelsA <- c("Strangulata","Wild emmer","Domesticated emmer","Free-threshing tetraploids")
+colB <- c("#87cef9","#ffd702","#7f5701","#016699","grey")
+
+q <- df_Burden_Time_PGI %>% 
+    filter(GroupbyContinent  %in% c("LR_EU","LR_EA","CL")) %>%
+    filter(SlightlyOrStrongly=="Slightly") %>%
+  # filter(!IntrogressionID %in% c("CL_0056","CL_0187","LR_0101","CL_0025","LR_0040","LR_0096")) %>%
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = c("LR_EU","CL","LR_EA"))) %>% 
+  mutate(Donor=factor(Donor,levels = c("AT","WE","DE","FTT","NONE"))) %>% 
+  ggplot(aes(y=TotalWildAncestryPerTaxa,x=Time,label=GroupbyContinent,color=Donor,shape=GroupbyContinent))+
+  geom_point(alpha=0.6)+
+    # facet_grid(.~GroupbyContinent,scales = "free")+
+    scale_y_continuous(name = "Wild ancestry per individual (Mb)",
+                     trans = log10_trans(),
+                     # limits = c(0, 4000),
+                     breaks = c(1,10,100, 1000,10000),
+                     labels = trans_format("log10", math_format(10^.x)))+
+  scale_x_continuous(breaks = c(0.3,0.4,0.5,0.6))+
+    annotation_logticks(sides = "l",short = unit(0.5,units = "mm"),
+                      mid = unit(1,units = "mm"),long = unit(2,units = "mm"))+
+  scale_color_manual(values = colB)+
+  labs(x="Relative timing of introgression")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 9),
+        # axis.title.x = element_blank(),
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        # axis.title = element_text(size = 8),
+        # strip.text = element_text(size = 7),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+# ggsave("~/Documents/temp.png",q,width = 4,height = 3)
+ggsave(q,filename = "~/Documents/test.pdf",height = 2.4,width = 3.5)
+# ggsave(q,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+# ggplotly(q)
+
+q <- df_Burden_Time_PGI %>% 
+    filter(GroupbyContinent  %in% c("LR_EU","LR_EA","CL")) %>%
+  filter(SlightlyOrStrongly=="Slightly") %>%
+  # filter(!IntrogressionID %in% c("CL_0056","CL_0187","LR_0101","CL_0025","LR_0040","LR_0096")) %>%
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = c("LR_EU","CL","LR_EA"))) %>% 
+  mutate(Donor=factor(Donor,levels = c("AT","WE","DE","FTT","NONE"))) %>% 
+  ggplot(aes(y=TotalWildAncestryPerTaxa,x=Time,label=GroupbyContinent,color=Donor,shape=GroupbyContinent))+
+  geom_point(alpha=0.6)+
+  facet_grid(.~GroupbyContinent,scales = "free")+
+  scale_y_continuous(name = "Wild ancestry per individual (Mb)",
+                     trans = log10_trans(),
+                     # limits = c(0, 4000),
+                     breaks = c(1,10,100, 1000,10000),
+                     labels = trans_format("log10", math_format(10^.x)))+
+  scale_x_continuous(breaks = c(0.3,0.4,0.5,0.6))+
+  annotation_logticks(sides = "l",short = unit(0.5,units = "mm"),
+                      mid = unit(1,units = "mm"),long = unit(2,units = "mm"))+
+  scale_color_manual(values = colB)+
+  labs(x="Relative timing of introgression")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        # text = element_text(size = 16),
+        # axis.title.x = element_blank(),
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        # axis.title = element_text(size = 8),
+        # strip.text = element_text(size = 7),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+ggsave("~/Documents/temp.png",q,width = 4,height = 3)
+
+```
+
+
+#### Burden vs PGI
+
+```{r}
+## burden and PGI
+
+factorA <- c("AT","WE","DE","FTT")
+labelsA <- c("Strangulata","Wild emmer","Domesticated emmer","Free-threshing tetraploids")
+colB <- c("#87cef9","#ffd702","#7f5701","#016699","grey")
+
+
+q <- df_Burden_Time_PGI %>% 
+    filter(GroupbyContinent  %in% c("LR_EU","LR_EA","CL")) %>%
+  # filter(SlightlyOrStrongly=="Strongly") %>%
+  # filter(!IntrogressionID %in% c("CL_0056","CL_0187","LR_0101","CL_0025","LR_0040","LR_0096")) %>%
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = c("LR_EU","CL","LR_EA"))) %>% 
+  mutate(Donor=factor(Donor,levels = c("AT","WE","DE","FTT","NONE"))) %>% 
+  ggplot(aes(y=Burden,x=TotalWildAncestryPerTaxa,label=IntrogressionID,color=Donor))+
+  geom_point(alpha=0.4)+
+  # facet_grid(.~GroupbyContinent,scales = "free")+
+  facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  scale_x_continuous(name = "Wild ancestry per individual (Mb)",
+                     trans = log10_trans(), 
+                     # limits = c(0, 4000), 
+                     breaks = c(1,10,100, 1000,10000),
+                     labels = trans_format("log10", math_format(10^.x)))+
+  annotation_logticks(sides = "b",short = unit(0.5,units = "mm"),
+                      mid = unit(1,units = "mm"),long = unit(2,units = "mm"))+
+  # coord_cartesian(clip = "off")+
+  scale_color_manual(values = colB)+
+  labs(y="Mutation burden")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 9),
+        # axis.title.x = element_blank(),
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        # axis.title = element_text(size = 8),
+        # strip.text = element_text(size = 7),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+# ggsave("~/Documents/temp.png",q,width = 4,height = 3)
+ggsave(q,filename = "~/Documents/test.pdf",height = 2.4,width = 3.5)
+# ggsave(q,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+
+q <- df_Burden_Time_PGI %>% 
+    filter(GroupbyContinent  %in% c("LR_EU","LR_EA","CL")) %>%
+  # filter(SlightlyOrStrongly=="Strongly") %>%
+  # filter(!IntrogressionID %in% c("CL_0056","CL_0187","LR_0101","CL_0025","LR_0040","LR_0096")) %>%
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = c("LR_EU","CL","LR_EA"))) %>% 
+  mutate(Donor=factor(Donor,levels = c("AT","WE","DE","FTT","NONE"))) %>% 
+  ggplot(aes(y=Burden,x=TotalWildAncestryPerTaxa,label=IntrogressionID,color=Donor))+
+  geom_point(alpha=0.4)+
+  facet_grid(SlightlyOrStrongly~GroupbyContinent,scales = "free")+
+  # facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  scale_x_continuous(name = "Wild ancestry per individual (Mb)",
+                     trans = log10_trans(), 
+                     # limits = c(0, 4000), 
+                     breaks = c(1,10,100, 1000,10000),
+                     labels = trans_format("log10", math_format(10^.x)))+
+    annotation_logticks(sides = "b",short = unit(0.5,units = "mm"),
+                      mid = unit(1,units = "mm"),long = unit(2,units = "mm"))+
+  # coord_cartesian(clip = "off")+
+  scale_color_manual(values = colB)+
+  labs(y="Mutation burden")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        # text = element_text(size = 16),
+        # axis.title.x = element_blank(),
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        # axis.title = element_text(size = 8),
+        # strip.text = element_text(size = 7),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+
+```
+
+#### Burden vs Timing
+
+```{r}
+## Burden and timing
+q <- df_Burden_Time_PGI %>% 
+    filter(GroupbyContinent  %in% c("LR_EU","LR_EA","CL")) %>%
+  # filter(SlightlyOrStrongly=="Slightly") %>%
+  # filter(!IntrogressionID %in% c("CL_0056","CL_0187","LR_0101","CL_0025","LR_0040","LR_0096")) %>%
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = c("LR_EU","CL","LR_EA"))) %>% 
+  mutate(Donor=factor(Donor,levels = c("AT","WE","DE","FTT","NONE"))) %>% 
+  ggplot(aes(y=Burden,x=Time,label=IntrogressionID,color=Donor))+
+  geom_point(alpha=0.6)+
+  # facet_grid(.~GroupbyContinent,scales = "free")+
+  facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  scale_color_manual(values = colB)+
+  labs(y="Mutation burden",x="Relative timing of introgression")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        text = element_text(size = 9),
+        # axis.title.x = element_blank(),
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        # axis.title = element_text(size = 8),
+        # strip.text = element_text(size = 7),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+ggsave(q,filename = "~/Documents/test.pdf",height = 2.4,width = 3.5)
+
+# ggsave(q,filename = "~/Documents/test.pdf",height = 3,width = 4)
+
+
+q <- df_Burden_Time_PGI %>% 
+    filter(GroupbyContinent  %in% c("LR_EU","LR_EA","CL")) %>%
+  # filter(SlightlyOrStrongly=="Slightly") %>%
+  filter(!IntrogressionID %in% c("CL_0056","CL_0187","LR_0101","CL_0025","LR_0040","LR_0096")) %>%
+  mutate(GroupbyContinent=factor(GroupbyContinent,levels = c("LR_EU","CL","LR_EA"))) %>% 
+  mutate(Donor=factor(Donor,levels = c("AT","WE","DE","FTT","NONE"))) %>% 
+  ggplot(aes(y=Burden,x=Time,label=IntrogressionID,color=Donor))+
+  geom_point(alpha=0.6)+
+  facet_grid(SlightlyOrStrongly~GroupbyContinent,scales = "free")+
+  # facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  scale_color_manual(values = colB)+
+  labs(y="Mutation burden",x="Relative timing of introgression")+
+  theme_classic()+
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        legend.background = element_rect(fill="transparent"),
+        strip.background = element_blank(),
+        axis.line = element_blank(),
+        # text = element_text(size = 16),
+        # axis.title.x = element_blank(),
+        # axis.text.x = element_blank(),
+        # axis.ticks.x = element_blank(),
+        # axis.title = element_text(size = 8),
+        # strip.text = element_text(size = 7),
+        panel.border = element_rect(colour = "black",fill = "transparent"))
+q
+
+ggsave("~/Documents/temp.png",q,width = 4,height = 3)
+
 ```
 
 

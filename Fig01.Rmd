@@ -238,8 +238,76 @@ p
 ggsave(p,filename = "~/Documents/test.pdf",height = 1.6 ,width = 1.76)
 ```
 
-```{r}
+### claculate the r2
 
+```{r}
+df1 <- table_subspecies %>% 
+  filter(Group=="landrace") %>% 
+  filter(meanOfR2 > 0.49, meanOfR2 < 0.5)
+
+
+df2 <- table_subspecies %>% 
+  filter(Group=="cultivar") %>% 
+  filter(meanOfR2 > 0.49, meanOfR2 < 0.5)
+
+
+df3 <- table_subspecies %>% 
+  filter(Group=="wildEmmer") %>% 
+  filter(meanOfR2 > 0.19, meanOfR2 < 0.2)
+
+
+df4 <- table_subspecies %>% 
+  filter(Group=="domesticatedEmmer") %>% 
+  filter(meanOfR2 > 0.49, meanOfR2 < 0.5)
+
+df5 <- table_subspecies %>% 
+  filter(Group=="freeThreshTetraploid") %>% 
+  filter(meanOfR2 > 0.49, meanOfR2 < 0.5)
+
+df6 <- table_subspecies %>% 
+  filter(Group=="tauschii") %>% 
+  filter(meanOfR2 > 0.19, meanOfR2 < 0.2)
+
+
+mean(df1$window_kb)
+mean(df2$window_kb)
+mean(df3$window_kb)
+mean(df4$window_kb)
+mean(df5$window_kb)
+mean(df6$window_kb)
+
+
+```
+
+```{r}
+# unique(table_subspecies$Group)
+factorA <- c("wildEmmer","domesticatedEmmer","freeThreshTetraploid","landrace","cultivar","tauschii")
+labelsA <- c("WE","DE","FTT","LR","CL","AT")
+colB <- c("#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","#87cef9")
+
+p <- table_subspecies %>% 
+  mutate(group=factor(Group,levels=factorA,labels=labelsA)) %>% 
+  group_by(group) %>% 
+  slice_sample(prop = .1) %>%
+  filter(group=="LR") %>% 
+  ggplot(aes(x=window_kb/1000,y=meanOfR2, color=group, fill=group))+
+  # geom_point(alpha=0.05)+
+  # geom_smooth(se = T)+
+  stat_smooth(method = "gam", formula = y ~ s(x,k=110),span = 0.2, size = 1,se=T) +
+  # geom_line(size=0.0001,alpha=0.9)+
+  scale_color_manual(values = colB)+
+  labs(x="Pairwise distance (Mb)", y=expression("Mean"~italic(r)^2))+
+  scale_x_continuous(limits = c(0,20))+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 8))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 1.6 ,width = 1.76)
 ```
 
 

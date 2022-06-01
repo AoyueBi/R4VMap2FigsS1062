@@ -420,7 +420,7 @@ ann_colors <-  list(
                                       "Whole-genome" = colB[2]),
                     MethodsGroup=c("Functional units-based"=colC[1],
                                    "Homologous sequences similarity-based"=colC[2],
-                                   "Local sequence identity and taconomy-based"=colC[3],
+                                   "Local sequence identity and taxonomy-based"=colC[3],
                                    "Protein structure-based"=colC[4],
                                    "Phylogenetic approach-based"=colC[5])
                                    )
