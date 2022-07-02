@@ -31,7 +31,7 @@ library(RColorBrewer)
 
 ```{r}
 dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>%
-  mutate(Sub=str_sub(Transcript, 9, 9))
+  mutate(Sub=str_sub(Transcript, 9, 9)) 
 
   # filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
   # mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
@@ -79,13 +79,17 @@ factor4 <- "Effect_snpEff"
 
 df_variantsType1 <- dftotal %>% group_by(Region) %>% 
   # filter(!is.na(Region)) %>% 
-  summarise(n=n()) %>% 
-  rename(Type=Region)
+  # summarise(n=n()) %>% 
+  rename(Type=Region) %>% 
+  count() %>% 
+  mutate(fre=n/2672838)
 
 df_variantsType2 <- dftotal %>% group_by(Variant_type) %>% 
   filter(!is.na(Variant_type)) %>% 
-  summarise(n=n()) %>% 
-  rename(Type=Variant_type)
+  # summarise(n=n()) %>% 
+  rename(Type=Variant_type) %>% 
+  count() %>% 
+  mutate(fre=n/2672838)
 
 df_variantsType3 <- dftotal %>% group_by(Effect_VEP) %>% 
   filter(!is.na(Effect_VEP)) %>% 
@@ -110,7 +114,9 @@ colB <- brewer.pal(9,"Blues")[c(2,3,4,5,6,7)]
 p <- df_variantsType1 %>% 
 ggplot(aes(x=Type,y=n,fill=Type))+
   geom_bar(stat = 'identity',position = "stack")+
-  geom_text(aes(label=n),size=3,nudge_y = 1)+
+  # geom_text(aes(label=n),size=3,nudge_y = 1)+
+  geom_text(aes(label=paste(n,"\n(",round(fre,4),")",sep = "")),size=3,
+            position = position_dodge(0.9))+
   labs(x="", y="SNP count")+
   scale_fill_brewer(palette = "Set2")+
   # scale_fill_manual(values = colB)+
@@ -125,7 +131,9 @@ p
 p <- df_variantsType2 %>% 
 ggplot(aes(x=Type,y=n,fill=Type))+
   geom_bar(stat = 'identity',position = "stack")+
-  geom_text(aes(label=n),size=3,nudge_y = 1)+
+  # geom_text(aes(label=n),size=3,nudge_y = 1)+
+  geom_text(aes(label=paste(n,"\n(",round(fre,4),")",sep = "")),size=3,
+            position = position_dodge(0.9))+
   labs(x="", y="SNP count")+
   scale_fill_brewer(palette = "Set2")+
   # scale_fill_manual(values = colB)+
@@ -138,6 +146,56 @@ ggplot(aes(x=Type,y=n,fill=Type))+
 p
 
 ```
+
+## 同义非同义区分亚基因组
+
+```{r}
+factor1 <- "Region"
+factor2 <- "Variant_type"
+factor3 <- "Effect_VEP"
+factor4 <- "Effect_snpEff"
+
+df_variantsType1 <- dftotal %>% group_by(Region) %>% 
+  # filter(!is.na(Region)) %>% 
+  summarise(n=n()) %>% 
+  rename(Type=Region)
+
+df_variantsType2 <- dftotal %>% group_by(Variant_type) %>% 
+  filter(!is.na(Variant_type)) %>% 
+  summarise(n=n()) %>% 
+  rename(Type=Variant_type)
+
+
+df_synNonsynbySub <- dftotal %>% 
+  filter(!is.na(Variant_type)) %>% 
+  group_by(Sub) %>% 
+  count(Variant_type) %>% 
+  mutate(fre=n/2672838) %>% 
+  arrange(Variant_type)
+
+
+### *****************************plot***********************************************
+### 只画柱状图 dodge
+p <- df_synNonsynbySub %>%
+ggplot(aes(x=Sub,y=n,fill=Variant_type))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  geom_text(aes(label=paste(n,"\n(",round(fre,4),")",sep = "")),size=3,
+            position = position_dodge(0.9))+
+  # geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,nudge_y = 1)+
+  labs(x="", y="SNP count")+
+  scale_fill_manual(values = brewer.pal(9,"Set2"))+
+  theme_classic()+
+  # theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(
+    # legend.position = "none",
+    plot.margin=unit(rep(1,4),'lines'),
+    axis.line = element_line(size=0.4, colour = "black"),
+    text = element_text(size = 10))
+
+p
+
+```
+
 
 
 
@@ -290,6 +348,69 @@ ggsave(plot = p, "~/Documents/test.pdf", width = 3, height = 5)
 
 ```
 
+### 求平均值、中位数
+```{r}
+df_ave <- dfgerpdis %>% 
+  group_by(GeneFuture) %>%
+  summarise(mean=mean(GERP,na.rm=TRUE))
+  
+```
+
+
+
+
+## GERP bin  by syn nonsyn del proportion
+
+```{r}
+df <- dftotal %>% filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS") %>%
+  # mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(Derived_PolyPhen2_prob = ifelse(is.na(Derived_PolyPhen2_prob),100,Derived_PolyPhen2_prob)) %>% 
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>%
+  filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>% 
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  ### data deal
+  filter(Gerp_16way > 0) %>%
+  # mutate(bin=cut_interval(Gerp_16way,n=10)) %>% 
+  mutate(bin=cut(Gerp_16way,breaks=c(0,0.3,0.6,0.9,1.2,1.49,2.1,2.4,2.7,3,3.3))) %>% 
+  group_by(bin) %>% 
+  count(LoadGroup) %>% 
+  mutate(fre=n/sum(n)) %>% 
+  arrange(desc(bin)) 
+
+dftest <- df %>% 
+  filter(LoadGroup=="Nonsynonymous")
+  
+
+#### facet by sub
+colB <- c("#d5311c","#e69f00","#004680")
+p <- df %>% 
+  ggplot(aes(x=bin,y=fre,group=LoadGroup,color=LoadGroup))+
+  geom_line(aes(linetype=LoadGroup),size=1)+
+  # scale_linetype_manual(values=c("dotdash","dotdash","dotdash"))+
+  # scale_linetype_manual(values=c("dotdash","dotdash","dotdash"))+
+  labs(y="Fraction in each category",x="GERP score")+
+  geom_vline(xintercept = 5,linetype="dashed",color="blue")+
+  scale_color_manual(values = colB)+
+  scale_y_continuous(limits = c(0,1))+
+  scale_x_discrete(labels = c("0","0.3","0.6","0.9","1.2","1.5","2.1","2.4","2.7","3","3.3"))+
+  # coord_cartesian(xlim = c(14,20))+
+  theme_classic()+
+  # theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(plot.margin=unit(rep(1,4),'lines')
+        ,legend.position = "none"
+        ,axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
+
+p
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.36,width = 2.36*4/3)
+
+
+```
+
 #### --------------------
 ## Deleterious count
 ### 1.区分亚基因组
@@ -427,6 +548,60 @@ ggplot(aes(x=LoadGroup,y=n,fill=LoadGroup))+
 p
 
 ggsave(p,filename = "~/Documents/test.pdf",height = 1.725,width = 2.3)
+
+```
+
+### 3.不区分亚基因组- High impact/Del/Nonsyn
+
+```{r}
+### 不区分亚基因组
+### GERP & PPH2 方法定义有害突变
+df_highImpact <- dftotal %>% 
+  filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
+  filter(!is.na(DAF)) %>%
+  filter(Impact_VEP == "HIGH") %>% 
+  count() %>% 
+  add_column(LoadGroup="High impact", .before = "n")
+
+  
+  
+df_del_nonsyn_syn <- dftotal %>% 
+  mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
+  filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
+  filter(!is.na(DAF)) %>%
+  # mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  # mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  filter(!is.na(LoadGroup)) %>% 
+  # filter(Sub=="B") %>%
+  count(LoadGroup) 
+
+df <- df_del_nonsyn_syn %>% 
+  bind_rows(df_highImpact) %>% 
+  mutate(fre=n/sum(n)) %>% 
+  arrange(desc(LoadGroup))
+
+### *****************************plot***********************************************
+colB <- c("darkred","#d5311c","#e69f00","#004680")
+df$LoadGroup <- factor(df$LoadGroup,levels = c("High impact","Deleterious","Nonsynonymous","Synonymous"))
+
+### 只画柱状图 dodge
+p <- df %>%
+ggplot(aes(x=LoadGroup,y=n,fill=LoadGroup))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,
+            position = position_dodge(0.9))+
+  # geom_text(aes(label=paste(n,"\n(",round(fre,2),")",sep = "")),size=3,nudge_y = 1)+
+  labs(x="", y="SNP count")+
+  scale_fill_manual(values = colB)+
+  theme_classic()+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(legend.position = "none",plot.margin=unit(rep(1,4),'lines'),
+          axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
+
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.9,width = 2.7)
 
 ```
 
@@ -577,6 +752,7 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 ## 过滤后，每个基因按照rare的总数进行排序，由低到高，并进行间隔抽样，抽取100个试试看
 
 ### 每个基因含有的rare变异的分布范围
+### 结论：合计有46093个基因含有稀有变异
 df_common_rare <- dftotal_withAncestral %>%
   group_by(Transcript,CommonOrRare) %>% 
   count() %>% 
@@ -585,14 +761,30 @@ df_common_rare <- dftotal_withAncestral %>%
   select(Transcript,RareVariantsCount=n)
 
 print(str_c(nrow(df_common_rare)," genes which has rare SNPs."))
-print(str_c("The range of rare SNPs is ",min(df_common_rare$n)," - ",max(df_common_rare$n)))
+print(str_c("The range of rare SNPs is ",min(df_common_rare$RareVariantsCount)," - ",max(df_common_rare$RareVariantsCount)))
 
+print(str_c("平均每个基因含有稀有变异的数目在",mean(df_common_rare$RareVariantsCount)))
+### "平均每个基因含有稀有变异的数目在6.46545028529278"
 
 df_stage1 <- dftotal_withAncestral %>% 
   group_by(Transcript,CommonOrRare,LoadGroup) %>% 
   count(LoadGroup) %>% 
   mutate(Sub = str_sub(Transcript,9,9)) %>% 
   pivot_wider(names_from = CommonOrRare, values_from  = n,values_fill = 0)
+
+### 在几个基因中鉴定到了有害突变
+df_delGeneNumber <- dftotal_withAncestral %>% 
+  group_by(Transcript,LoadGroup) %>% 
+  count(LoadGroup) %>% 
+  filter(LoadGroup=="Deleterious")
+
+print(str_c(nrow(df_delGeneNumber)," 个基因含有有害突变。","\n","平均每个基因含有有害突变的数目在", mean(df_delGeneNumber$n)))
+
+df_delNoly1delSNP <- df_delGeneNumber %>% 
+  filter(n==1)
+
+print(str_c(nrow(df_delNoly1delSNP)," 个基因只含有1个有害突变。"))
+
 
 df_filter <- df_stage1 %>% 
   group_by(Transcript) %>% 
@@ -646,7 +838,7 @@ p <- ggplot()+
   theme(panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
     legend.position = 'none',
-    text = element_text(size = 9))
+    text = element_text(size = 11))
 p
 # ggsave(p,filename = "figs/Fig2/misc/Gene_MAF_LoadGroup.pdf",height = 3,width = 6)
 ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
@@ -799,7 +991,7 @@ p <- df %>%
       panel.background = element_blank(),
       axis.line = element_line(size=0.4, colour = "black"),
       legend.position = 'none',
-      text = element_text(size = 9))
+      text = element_text(size = 10))
 
 
 p
@@ -859,10 +1051,10 @@ p <- df %>% filter(Group %in% group1) %>%
       panel.background = element_blank(),
       axis.line = element_line(size=0.4, colour = "black"),
       legend.position = 'none',
-      text = element_text(size = 12))
+      text = element_text(size = 10))
 
 p
-ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_count.pdf")),height = 3,width = 4)
+ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_count.pdf")),height = 2.62,width = 3.5)
 }
 
 pfun_count_scale_x <- function(df,maxSampleSize,outname){
@@ -899,10 +1091,11 @@ pfun_count_scale_x <- function(df,maxSampleSize,outname){
       panel.background = element_blank(),
       axis.line = element_line(size=0.4, colour = "black"),
       legend.position = 'none',
-      text = element_text(size = 9))
+      text = element_text(size = 10))
 
 p
-ggsave(p,filename = file.path("figs/Fig_sampleSize2VariantsDiscovery/misc2",str_c(outname,"_count_scale_x.pdf")),height = 2.22,width = 3.6)
+# ggsave(p,filename = file.path("figs/Fig_sampleSize2VariantsDiscovery/misc2",str_c(outname,"_count_scale_x.pdf")),height = 2.22,width = 3.6)
+ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_count_scale_x.pdf")),height = 2.22,width = 3.5)
 }
 
 pfun_count_scale_xy <- function(df,maxSampleSize,outname){
@@ -940,10 +1133,10 @@ p <- df %>% filter(Group %in% group1) %>%
       panel.background = element_blank(),
       axis.line = element_line(size=0.4, colour = "black"),
       legend.position = 'none',
-      text = element_text(size = 12))
+      text = element_text(size = 10))
 
 p
-ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_count_scale_xy.pdf")),height = 3,width = 4)
+ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_count_scale_xy.pdf")),height = 2.62,width = 3.5)
 }
 
 ```
@@ -961,7 +1154,7 @@ pfun_count_scale_x(df,1026,"ABsub")
 df <- read_tsv("data/010_sampleSize2VariantsDiscovery/Dsub.txt")
 
 # pfun_count(df,"Dsub")
-pfun_count_scale_x(df,1026,"Dsub")
+# pfun_count_scale_x(df,1026,"Dsub")
 # pfun_count_scale_xy(df,1026,"Dsub")
 
 ```
@@ -1019,11 +1212,11 @@ p <- df %>%
       panel.background = element_blank(),
       axis.line = element_line(size=0.4, colour = "black"),
       legend.position = 'none',
-      text = element_text(size = 12))
+      text = element_text(size = 10))
 
 
 p
-ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_CDF.pdf")),height = 3,width = 4)
+ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_CDF.pdf")),height = 2.62,width = 3.5)
 }
 
 pfun_CDF_scale_x <- function(df,maxSampleSize,outname){
@@ -1076,11 +1269,11 @@ p <- df %>%
       panel.background = element_blank(),
       axis.line = element_line(size=0.4, colour = "black"),
       legend.position = 'none',
-      text = element_text(size = 16))
+      text = element_text(size = 10))
 
 
 p
-ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_CDF_scale_x.pdf")),height = 3,width = 4)
+ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_CDF_scale_x.pdf")),height = 2.22,width = 3.5)
 }
 
 pfun_CDF_scale_xy <- function(df,maxSampleSize,outname){
@@ -1148,16 +1341,16 @@ ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_CDF_scale_xy.pdf"))
 ```{r}
 # df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/010_sampleSize_to_variantsDiscovery/001_out_bySub/ABsub.txt")
 df <- read_tsv("data/010_sampleSize2VariantsDiscovery/ABsub.txt")
-pfun_CDF(df,"ABsub")
+# pfun_CDF(df,"ABsub")
 pfun_CDF_scale_x(df,1026,"ABsub")
-pfun_CDF_scale_xy(df,1026,"ABsub")
+# pfun_CDF_scale_xy(df,1026,"ABsub")
 
 # df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/010_sampleSize_to_variantsDiscovery/001_out_bySub/Dsub.txt")
 df <- read_tsv("data/010_sampleSize2VariantsDiscovery/Dsub.txt")
 
-pfun_CDF(df,"Dsub")
-pfun_CDF_scale_x(df,1026,"Dsub")
-pfun_CDF_scale_xy(df,1026,"Dsub")
+# pfun_CDF(df,"Dsub")
+# pfun_CDF_scale_x(df,1026,"Dsub")
+# pfun_CDF_scale_xy(df,1026,"Dsub")
 
 ```
 
@@ -1256,10 +1449,10 @@ p <- df %>% filter(Group %in% group1) %>%
       panel.background = element_blank(),
       axis.line = element_line(size=0.4, colour = "black"),
       legend.position = 'none',
-      text = element_text(size = 9))
+      text = element_text(size = 10))
 
 p
-ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_Increasement_scale_x.pdf")),height = 2.22,width = 3.6)
+ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_Increasement_scale_x.pdf")),height = 2.22,width = 3.5)
 }
 
 
@@ -1327,7 +1520,7 @@ pfun_Increasement_scale_x(df,1026,"ABsub")
 df <- read_tsv("data/010_sampleSize2VariantsDiscovery/Dsub.txt")
 
 # pfun_Increasement(df,850,"Dsub")
-pfun_Increasement_scale_x(df,850,"Dsub")
+# pfun_Increasement_scale_x(df,850,"Dsub")
 # pfun_Increasement_scale_xy(df,850,"Dsub")
 ```
 
@@ -1424,10 +1617,10 @@ p <- df %>% filter(Group %in% group1) %>%
       panel.background = element_blank(),
       axis.line = element_line(size=0.4, colour = "black"),
       legend.position = 'none',
-      text = element_text(size = 9))
+      text = element_text(size = 10))
 
 p
-ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_Increasement_CDF_scale_x.pdf")),height = 2.22,width = 3.6)
+ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_Increasement_CDF_scale_x.pdf")),height = 2.22,width = 3.5)
 }
 
 
@@ -1495,7 +1688,7 @@ pfun_Increasement_CDF_scale_x(df,1026,"ABsub")
 df <- read_tsv("data/010_sampleSize2VariantsDiscovery/Dsub.txt")
 
 # pfun_Increasement_CDF(df,850,"Dsub")
-pfun_Increasement_CDF_scale_x(df,850,"Dsub")
+# pfun_Increasement_CDF_scale_x(df,850,"Dsub")
 # pfun_Increasement_CDF_scale_xy(df,850,"Dsub")
 ``` 
 
@@ -1781,6 +1974,74 @@ p <- df_burden1_expression %>%
                    labels=expression(2^{-12},2^{-9},2^{-6},2^{-3},2^{0},2^{3},2^{6},2^{9}))+
   # scale_x_discrete(labels=xLabel)+
   scale_color_manual(values = colB)+
+  coord_cartesian(ylim = c(0,0.04))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 9))
+
+p
+ggsave(plot = p, "~/Documents//Burden1_vs_TPM.pdf",height = 2,width = 2)
+
+```
+
+## P相关性系数
+```{r}
+df_burden1 <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneBurden.averageIndividualBurden.txt.gz")
+df_expression <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneExpression.averageTPM.txt.gz")
+
+df_burden1_expression <- df_burden1 %>% 
+  left_join(y = df_expression,by = c("geneName"="Gene")) %>% 
+  filter(!is.na(Subgenome))
+
+temp <- df_burden1_expression %>% 
+  # filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  mutate(TPM_mean_log = log2(TPM_mean)) %>% 
+  mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0)) %>% 
+  group_by(SlightlyOrStrongly, Subgenome,bin) %>% 
+  count() %>%   
+  filter(n > 20, !is.na(bin))
+
+colN1 <- brewer.pal(9,"Reds")[c(7)]
+colA <- colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(13)
+colC <- rev(colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(8))
+colN2 <- brewer.pal(9,"Reds")[c(9)]
+
+colB <- c(colN1,colA,colC,colN2)
+# colB <- colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(40)
+# xLabel <- expression(2^{-12},"",2^{-8},"",2^{-4},"",2^{0},"",2^{4},"",2^{8},"")
+# xLabel <- expression("",2^{-12},"","",2^{-9},"","",2^{-6},"","",2^{-3},"","",2^{0},"","",2^{3},"","",2^{6},"","",2^{9})
+xLabel <- expression("",2^{-12},"","",2^{-9},"","",2^{-6},"","",2^{-3},"","",2^{0},"","",2^{3},"","",2^{6},"","",2^{9})
+p <- df_burden1_expression %>% 
+  filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  mutate(TPM_mean_log = log2(TPM_mean)) %>%
+  filter(TPM_mean_log > 4) %>% 
+  filter(mean_burden < 0.5) %>% 
+  # mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0)) %>% 
+  # filter(bin %in% temp$bin) %>%
+  ggplot(aes(x=TPM_mean_log, y=mean_burden)) +
+# stat_boxplot(geom = "errorbar",width=0.05,position = position_dodge(1))+ # add error bar
+# geom_boxplot(aes(fill=bin),outlier.shape = NA) +
+# geom_point(position = position_jitter(width = 0.2), size=0.1)+
+# stat_summary(fun=median, geom="point", color="blue",
+#              position = position_dodge(1),
+#              size=0.1)+
+  # stat_summary(aes(color=bin),fun.data = mean_se,size=0.2)+
+  geom_point(aplha=0.3,size=2,color="red")+
+  stat_cor(
+    aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")),
+    label.x.npc = 0.3,label.y.npc = 0.01,size= 2)+
+  # scale_fill_manual(values = colB)+
+  # facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  labs(x="TPM", y= "Gene burden")+
+  # scale_y_continuous(trans = "log2",
+  #                    breaks = trans_breaks("log2",function(x) 2^x),
+  #                    labels = trans_format("log2",math_format(2^.x)))+
+  # scale_x_discrete(breaks=c("(-12,-11]","(-9,-8]","(-6,-5]","(-3,-2]","(0,1]","(3,4]","(6,7]","(9,10]"),
+                   # labels=expression(2^{-12},2^{-9},2^{-6},2^{-3},2^{0},2^{3},2^{6},2^{9}))+
+  # scale_x_discrete(labels=xLabel)+
+  # scale_color_manual(values = colB)+
   coord_cartesian(ylim = c(0,0.04))+
   theme(
     panel.background = element_blank(),
@@ -2468,7 +2729,7 @@ q <- df06 %>%
       ,panel.background = element_blank()
       ,axis.line = element_line(size=0.3, colour = "black")
       ,legend.position = 'none'
-      ,text = element_text(size = 9))
+      ,text = element_text(size = 11))
 q
 
 ggsave(q,filename = "~/Documents/DAF_06.pdf",height = 3.17,width = 3.17)
@@ -2504,10 +2765,63 @@ q <- df42 %>%
       ,panel.background = element_blank()
       ,axis.line = element_line(size=0.3, colour = "black")
       ,legend.position = 'none'
-      ,text = element_text(size = 9))
+      ,text = element_text(size = 11))
 q
 
 ggsave(q,filename = "~/Documents/DAF_42.pdf",height = 3.17,width = 3.17)
+
+```
+
+### 显著性检验
+colnames(df)
+ [1] "ID"                           "Chr"                         
+ [3] "Pos"                          "Ref"                         
+ [5] "Alt"                          "Major"                       
+ [7] "Minor"                        "Maf"                         
+ [9] "Transcript"                   "Ancestral"                   
+[11] "DAF"                          "Gerp"                        
+[13] "Region"                       "Variant_type"                
+[15] "Alt_SIFT"                     "Ref_SIFT"                    
+[17] "Derived_SIFT"                 "Effect_VEP"                  
+[19] "Impact_VEP"                   "Effect_snpEff"               
+[21] "Impact_snpEff"                "Rank_Total"                  
+[23] "Gerp_16way"                   "AMINO_POS"                   
+[25] "UniProtKB_AC"                 "LIST_S2"                     
+[27] "PhyloP"                       "Amino_Size"                  
+[29] "PhyloP_RefMask"               "AlleleAge_J"                 
+[31] "AlleleAge_M"                  "AlleleAge_R"                 
+[33] "Alt_PolyPhen2_prediction"     "Alt_PolyPhen2_class"         
+[35] "Alt_PolyPhen2_prob"           "Ref_PolyPhen2_prediction"    
+[37] "Ref_PolyPhen2_class"          "Ref_PolyPhen2_prob"          
+[39] "Derived_PolyPhen2_prediction" "Derived_PolyPhen2_class"     
+[41] "Derived_PolyPhen2_prob"       "Sub"                         
+[43] "LoadGroup"                    "AAF_AABB_DD"                 
+[45] "AAF_AABBDD"                   "DAF_42"                      
+[47] "DAF_06"                      
+```{r}
+df_sig06 <- df %>% 
+  select(LoadGroup, DAF_06, Sub) %>% 
+  filter(!is.na(DAF_06), DAF_06 < 0.05)
+
+df_sig06$Sub <- as.factor(df_sig06$Sub)
+df_sig06$LoadGroup <- as.factor(df_sig06$LoadGroup)
+
+df_sig06_Asub <- df_sig06 %>% filter(Sub=="A")
+df_sig06_Bsub <- df_sig06 %>% filter(Sub=="B")
+df_sig06_Dsub <- df_sig06 %>% filter(Sub=="D")
+
+pairwise.wilcox.test(df_sig06_Asub$DAF_06,df_sig06_Asub$LoadGroup,p.adjust.method = "BH")
+print("***************A sub completed**************************")
+
+pairwise.wilcox.test(df_sig06_Bsub$DAF_06,df_sig06_Bsub$LoadGroup,p.adjust.method = "BH")
+print("***************B sub completed**************************")
+
+pairwise.wilcox.test(df_sig06_Dsub$DAF_06,df_sig06_Dsub$LoadGroup,p.adjust.method = "BH")
+print("***************D sub completed**************************")
+
+pairwise.wilcox.test(df_sig06$DAF_06,df_sig06$LoadGroup,p.adjust.method = "BH")
+print("*************** no Sub completed*********************")
+
 
 ```
 

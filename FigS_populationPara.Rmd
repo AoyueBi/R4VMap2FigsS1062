@@ -179,6 +179,105 @@ ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 2.8,width = 1.5)
 
 ```
 
+
+### *p不同倍性  横版
+```{r}
+df <- df1 %>% 
+  mutate(Group2=ifelse(Group %in% c("LR_EA","LR_EU"),"LR",Group)) %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  mutate(MergedSub=ifelse(Sub=="D","D","AB")) %>% 
+  group_by(Group2,MergedSub) %>% 
+  summarise(N=n(),PI_mean=mean(PI),PI_median=median(PI),PI_sd=sd(PI),PI_se=PI_sd/sqrt(N))
+
+factorA <- c("AT","WE","DE","FTT","LR","CL")
+# df$Group2 <- factor(df$Group2,levels =rev(factorA))
+df$Group2 <- factor(df$Group2,levels =factorA)
+
+p <- df %>% 
+  ggplot()+
+  # ggplot(aes(x=Group2,y=PI_mean,ymin=PI_mean-PI_se,ymax=PI_mean+PI_se))+
+  # geom_hline(yintercept = 0,linetype="dashed")+
+  # geom_pointrange(aes(color=Sub,fatten = 2))+
+  geom_segment(aes(x=Group2, xend=Group2, y=0, yend=PI_mean*1000,color=Group2),size=0.3)+
+  geom_point(aes(x=Group2,y= PI_mean*1000,color=Group2), size=2, alpha=0.95) +
+  # scale_color_manual(values = rev(c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")))+
+  scale_color_manual(values = c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff"))+
+  labs(y = expression(italic(theta)[pi]~"("~10^-3~")"),x="")+
+  facet_grid(.~MergedSub,scales = "free")+
+theme_classic()+
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 12))+
+  theme(strip.background = element_blank(),strip.text = element_blank())
+
+  p
+
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4,width = 4)
+
+### 不同亚基因组
+df <- df1 %>% 
+  mutate(Group2=ifelse(Group %in% c("LR_EA","LR_EU"),"LR",Group)) %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  group_by(Group2,Sub) %>% 
+  summarise(N=n(),PI_mean=mean(PI),PI_median=median(PI),PI_sd=sd(PI),PI_se=PI_sd/sqrt(N))
+
+factorA <- c("AT","WE","DE","FTT","LR","CL")
+# df$Group2 <- factor(df$Group2,levels =rev(factorA))
+df$Group2 <- factor(df$Group2,levels =factorA)
+
+p <- df %>% 
+  ggplot()+
+  # ggplot(aes(x=Group2,y=PI_mean,ymin=PI_mean-PI_se,ymax=PI_mean+PI_se))+
+  # geom_hline(yintercept = 0,linetype="dashed")+
+  # geom_pointrange(aes(color=Sub,fatten = 2))+
+  geom_segment(aes(x=Group2, xend=Group2, y=0, yend=PI_mean*1000,color=Group2),size=0.5)+
+  geom_point(aes(x=Group2,y= PI_mean*1000,color=Group2), size=3, alpha=0.95) +
+  # scale_color_manual(values = rev(c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")))+
+  scale_color_manual(values = c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff"))+
+  labs(y = expression(italic(theta)[pi]~"("~10^-3~")"),x="")+
+  facet_grid(.~Sub,scales = "free")+
+theme_classic()+
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 12))+
+  theme(strip.background = element_blank(),strip.text = element_blank())
+
+  p
+
+ggsave(p,filename = "/Users/Aoyue/Documents/test2.pdf",height = 3,width = 5)
+
+
+p <- df %>% 
+  ggplot()+
+  # ggplot(aes(x=Group2,y=PI_mean,ymin=PI_mean-PI_se,ymax=PI_mean+PI_se))+
+  # geom_hline(yintercept = 0,linetype="dashed")+
+  # geom_pointrange(aes(color=Sub,fatten = 2))+
+  geom_segment(aes(x=Group2, xend=Group2, y=0, yend=PI_mean*1000,color=Group2),size=0.5)+
+  geom_point(aes(x=Group2,y= PI_mean*1000,color=Group2), size=3, alpha=0.95) +
+  # scale_color_manual(values = rev(c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")))+
+  scale_color_manual(values = c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff"))+
+  labs(y = expression(italic(theta)[pi]~"("~10^-3~")"),x="")+
+  facet_grid(.~Sub,scales = "free")+
+theme_classic()+
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    text = element_text(size = 12))+
+  theme(strip.background = element_blank(),strip.text = element_blank())
+
+  p
+
+ggsave(p,filename = "/Users/Aoyue/Documents/test3.pdf",height = 2,width = 6.2)
+
+```
+
+
+
 ### *p LR不同亚洲
 ```{r}
 ### 求每个亚基因组的平均值、标准差

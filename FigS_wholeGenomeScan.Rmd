@@ -1,0 +1,624 @@
+---
+title: "Data analysis"
+author: "Aoyue Bi, Daxing Xu"
+date: "`r Sys.Date()`"
+output: 
+  html_document: # html_notebook, html_document
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
+    # bibliography: bibliography.json
+---
+
+
+# FigS
+
+```{r setup, echo =T, message = T, warning = F}
+library(tidyverse)
+# library(RColorBrewer)
+library(ggpubr)
+# library(egg)
+## eval 代码要不要运行
+## echo 代码要不要输出
+## include 图要不要输出
+## warning 警告要不要输出
+## message 默认Bin等信息要不要输出
+```
+
+
+##  SNP distribution on the whole genome
+```{r}
+df <- read_tsv("data/018_wholeGenomeScan/vmap2.1.posAllele_10000000window_1000000step.txt.gz")
+
+max(df$Count)
+min(df$Count)
+
+# ## 写出 circos
+# dfout <- df %>% 
+#   mutate(BIN_START=)
+# write_tsv(dfout,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/006_input_circos/001_snpDensity.txt",col_names = F)
+
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+p <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  ggplot(aes(x=BIN_START/1000000, y=Count/10000))+
+  geom_line(aes(color=Sub),alpha = 0.95,size=0.2)+
+  geom_area(alpha=0.8,aes(fill=Sub)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(data = tibble(CHROM = unique(df$CHROM)),
+            aes(label = CHROM, x=median(df$BIN_START/1000000), y= 3/40000 *max(df$Count)), 
+            size=2.5)+
+  labs(x="Physical position (Mb)", y = "SNP count on the whole-genome (x10000)")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(~ CHROM,ncol = 3,strip.position = "right",scales = "free_y")+
+  scale_y_continuous(limits = c(0,30))+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    strip.text = element_blank(),
+    text = element_text(size = 9))
+
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height =7.2*0.618, width = 7.2)
+ggsave(p,filename = "~/Documents/test.pdf",height =3.6, width = 7.2)
+
+```
+
+## 计数 on the whole genome
+```{r}
+df <- read_tsv("data/018_wholeGenomeScan/vmap2.1.posAllele_10000000window_1000000step.txt.gz")
+
+df_ave <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  group_by(Sub) %>% 
+  summarise(ave=mean(Count))
+
+max(df$Count)
+min(df$Count)
+
+
+
+```
+
+
+
+##  SNP distribution on the gene region
+```{r}
+df <- read_tsv("data/018_wholeGenomeScan/003_gene_SNP_10000000window_1000000step.txt.gz")
+
+max(df$Count)
+min(df$Count)
+
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+# ### 写出 circos
+# dfout <- df %>% select(CHROM,BIN_START,BIN_END,Count)
+# write_tsv(dfout,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/006_input_circos/002_gene_snpDensity.txt",col_names = F)
+
+p <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  ggplot(aes(x=BIN_START/1000000, y=Count))+
+  geom_line(aes(color=Sub),alpha = 0.95,size=0.2)+
+  geom_area(alpha=0.8,aes(fill=Sub)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(data = tibble(CHROM = unique(df$CHROM)),
+            aes(label = CHROM, x=median(df$BIN_START/1000000), y= 3/4 *max(df$Count)), 
+            size=2.5)+
+  labs(x="Physical position (Mb)", y = "SNP count on the gene region")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(~ CHROM,ncol = 3,strip.position = "right",scales = "free_y")+
+  scale_y_continuous(limits = c(0,9000),breaks = c(0,2500,5000,7500))+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    strip.text = element_blank(),
+    text = element_text(size = 9))
+
+p
+
+# ggsave(p,filename = "~/Documents/SNPcount_geneRegion.pdf",height =7.2*0.618, width = 7.2)
+ggsave(p,filename = "~/Documents/SNPcount_geneRegion.pdf",height =3.6, width = 7.2)
+
+
+# df %>% ggplot(aes(x=df$Count))+
+#   geom_histogram()
+#   facet_wrap(~CHROM,ncol = 3)
+```
+
+
+
+## GERP
+```{r}
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/002_GERP/007_merge006/GERP_more0_10000000window_1000000step.txt.gz") %>% 
+#   filter(!is.na(Ave), is.finite(Ave))
+
+df <- read_tsv("data/018_wholeGenomeScan/GERP_10000000window_1000000step.txt.gz") %>% 
+  filter(!is.na(Ave), is.finite(Ave))
+
+max(df$Ave)
+min(df$Ave)
+
+# dfout <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/002_GERP/009_merge008/GERP_10000000window_1000000step.txt.gz") %>% 
+#   filter(!is.na(Ave), is.finite(Ave)) %>% 
+#   filter(Ave <= 0.08)
+# 
+# ### 写出 circos
+# dfout <- dfout %>% select(CHROM,BIN_START,BIN_END,Ave) %>% 
+#   mutate(Ave=format(Ave,scientific = FALSE)) %>% 
+#   mutate(Ave=str_replace_all(Ave," ",""))
+# 
+# write_tsv(dfout,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/006_input_circos/003_GERP.txt",col_names = F)
+
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+p <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  ggplot(aes(x=BIN_START/1000000, y=Ave))+
+  geom_line(aes(color=Sub),alpha = 0.95,size=0.2)+
+  geom_area(alpha=0.8,aes(fill=Sub)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(data = tibble(CHROM = unique(df$CHROM)),
+            aes(label = CHROM, x=median(df$BIN_START/1000000), 
+                y=0.06
+                # y= 3/4 *max(df$Ave)
+                ), 
+            size=2.5)+
+  labs(x="Physical position (Mb)", y = "GERP score")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(~ CHROM,ncol = 3,strip.position = "right",scales = "free_y")+
+  # scale_y_continuous(limits = c(0.4,1.05))+
+  scale_y_continuous(breaks = c(0,0.03,0.06,0.09))+
+  coord_cartesian(ylim = c(0,0.1))+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    strip.text = element_blank(),
+    text = element_text(size = 9))
+
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height =7.2*0.618, width = 7.2)
+ggsave(p,filename = "~/Documents/GERP_wholeGenomeScan.pdf",height =3.6, width = 7.2)
+
+```
+
+## PPH2
+```{r}
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/002_GERP/007_merge006/GERP_more0_10000000window_1000000step.txt.gz") %>% 
+#   filter(!is.na(Ave), is.finite(Ave))
+
+df <- read_tsv("data/018_wholeGenomeScan/003_PPH2_10000000window_1000000step.txt.gz") %>% 
+  filter(!is.na(Ave), is.finite(Ave))
+
+max(df$Ave)
+min(df$Ave)
+
+# ### 写出 circos
+# dfout <- df %>% select(CHROM,BIN_START,BIN_END,Ave) %>% 
+#   mutate(Ave=format(Ave,scientific = FALSE)) %>% 
+#   mutate(Ave=str_replace_all(Ave," ",""))
+# 
+# write_tsv(dfout,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/006_input_circos/004_PPH2.txt",col_names = F)
+
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+p <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  ggplot(aes(x=BIN_START/1000000, y=Ave))+
+  geom_line(aes(color=Sub),alpha = 0.95,size=0.2)+
+  geom_area(alpha=0.8,aes(fill=Sub)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(data = tibble(CHROM = unique(df$CHROM)),
+            aes(label = CHROM, x=median(df$BIN_START/1000000), 
+                y=0.6
+                # y= 3/4 *max(df$Ave)
+                ), 
+            size=2.5)+
+  labs(x="Physical position (Mb)", y = "PPH2 score")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(~ CHROM,ncol = 3,strip.position = "right",scales = "free_y")+
+  # scale_y_continuous(limits = c(0.4,1.05))+
+  scale_y_continuous(breaks = c(0,0.3,0.6,0.9))+
+  coord_cartesian(ylim = c(0,1))+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    strip.text = element_blank(),
+    text = element_text(size = 9))
+
+p
+
+# ggsave(p,filename = "~/Documents/test.pdf",height =7.2*0.618, width = 7.2)
+ggsave(p,filename = "~/Documents/PPH2_wholeGenomeScan.pdf",height =3.6, width = 7.2)
+
+```
+
+
+#### ============
+## Whole genome scan
+### DelSynRatio
+```{r}
+df <- read_tsv("data/006_Fig2/genomeScan/003_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt") %>%
+  filter(!is.na(DelSynRatio))
+
+
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/009_genomeScan_delvcSyn/002/001_delVSsynOnChr_20000000window5000000step_addEffectiveCDSLength.txt") %>%
+# filter(!is.na(DelSynRatio),is.finite(DelSynRatio))
+# 
+# max(df$DelSynRatio)
+# min(df$DelSynRatio)
+# 
+# # ### 写出 circos
+# dfout <- df %>%
+#   filter(!is.na(DelSynRatio), is.finite(DelSynRatio)) %>%
+#   filter(DelSynRatio <= 1.3)
+# 
+# dfout <- dfout %>% select(CHROM,BIN_START,BIN_END,DelSynRatio) %>%
+#   mutate(DelSynRatio=format(DelSynRatio,scientific = FALSE)) %>%
+#   mutate(DelSynRatio=str_replace_all(DelSynRatio," ",""))
+# 
+# write_tsv(dfout,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/006_input_circos/005_DelSynRatio.txt",col_names = F)
+
+
+
+
+#### 设置每条染色体的点
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+p <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  ggplot(aes(x=BIN_START/1000000, y=DelSynRatio))+
+  geom_line(aes(color=Sub),alpha = 0.95,size=0.2)+
+  geom_area(alpha=0.8,aes(fill=Sub)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(data = tibble(CHROM = unique(df$CHROM)),
+            aes(label = CHROM, x=median(df$BIN_START/1000000),
+          # y= 3/4 *max(df$DelSynRatio) 
+            y=1.5
+            ),
+            size=2.5)+
+  labs(x="Physical position (Mb)", y = "DelRatio")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(~ CHROM,ncol = 3,strip.position = "right",scales = "free_y")+
+  # scale_y_continuous(limits = c(0,4))+
+  coord_cartesian(ylim = c(0,2))+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    strip.text = element_blank(),
+    text = element_text(size = 9))
+p
+
+ggsave(p,filename = "~/Documents/01-DelSynRatio.pdf",height =7.2*9/16, width = 7.2)
+# ggsave(p,filename = "~/Documents/test2.pdf",height = 18, width = 33,units = "cm")
+
+```
+
+### NonsynSynRatio
+```{r}
+
+df <- read_tsv("data/006_Fig2/genomeScan/003_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt") %>% 
+  filter(!is.na(NonsynSynRatio)) %>% 
+  filter(is.finite(NonsynSynRatio))
+
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/009_genomeScan_delvcSyn/002/001_delVSsynOnChr_20000000window5000000step_addEffectiveCDSLength.txt") %>%
+# filter(!is.na(NonsynSynRatio)) %>% 
+#   filter(is.finite(NonsynSynRatio))
+# 
+# ### 0-4
+# max(df$NonsynSynRatio)
+# min(df$NonsynSynRatio)
+# 
+# # ### 写出 circos
+# dfout <- df %>%
+#   filter(!is.na(NonsynSynRatio), is.finite(NonsynSynRatio)) %>%
+#   filter(NonsynSynRatio <= 3)
+# 
+# dfout <- dfout %>% select(CHROM,BIN_START,BIN_END,NonsynSynRatio) %>%
+#   mutate(NonsynSynRatio=format(NonsynSynRatio,scientific = FALSE)) %>%
+#   mutate(NonsynSynRatio=str_replace_all(NonsynSynRatio," ",""))
+# 
+# write_tsv(dfout,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/006_input_circos/006_NonsynSynRatio.txt",col_names = F)
+
+
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/009_genomeScan_delvcSyn/002/001_delVSsynOnChr_20000000window5000000step_addEffectiveCDSLength.txt") %>% 
+  # filter(!is.na(DelSynRatio))
+#### 设置每条染色体的点
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+p <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  ggplot(aes(x=BIN_START/1000000, y=NonsynSynRatio))+
+  geom_line(aes(color=Sub),alpha = 0.95,size=0.2)+
+  geom_area(alpha=0.8,aes(fill=Sub)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(data = tibble(CHROM = unique(df$CHROM)),
+            aes(label = CHROM, x=median(df$BIN_START/1000000),
+          # y= 3/4 *max(df$DelSynRatio) 
+            y=3
+            ),
+            size=2.5)+
+  labs(x="Physical position (Mb)", y = "NonsynSynRatio")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(~ CHROM,ncol = 3,strip.position = "right",scales = "free_y")+
+  # scale_y_continuous(limits = c(0,4))+
+  scale_y_continuous(breaks = c(0,2,4))+
+  coord_cartesian(ylim = c(0,4))+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    strip.text = element_blank(),
+    text = element_text(size = 9))
+p
+
+ggsave(p,filename = "~/Documents/02-NonsynSynRatio.pdf",height =7.2*9/16, width = 7.2)
+# ggsave(p,filename = "~/Documents/test2.pdf",height = 18, width = 33,units = "cm")
+```
+
+
+### DelFre
+```{r}
+
+df <- read_tsv("data/006_Fig2/genomeScan/003_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt") %>% 
+  filter(!is.na(DelFre)) %>% 
+  filter(is.finite(DelFre))
+
+### 0-4
+max(df$DelFre)
+min(df$DelFre)
+
+# ### 写出 circos
+# dfout <- df %>%
+#   filter(!is.na(DelFre), is.finite(DelFre)) %>% 
+#   filter(DelFre != 0)
+# 
+# dfout <- dfout %>% select(CHROM,BIN_START,BIN_END,DelFre) %>%
+#   mutate(DelFre=format(DelFre,scientific = FALSE)) %>%
+#   mutate(DelFre=str_replace_all(DelFre," ",""))
+# 
+# write_tsv(dfout,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/006_input_circos/007_DelFre.txt",col_names = F)
+
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/009_genomeScan_delvcSyn/002/001_delVSsynOnChr_20000000window5000000step_addEffectiveCDSLength.txt") %>% 
+  # filter(!is.na(DelSynRatio))
+#### 设置每条染色体的点
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+p <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  ggplot(aes(x=BIN_START/1000000, y=DelFre))+
+  geom_line(aes(color=Sub),alpha = 0.95,size=0.2)+
+  geom_area(alpha=0.8,aes(fill=Sub)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(data = tibble(CHROM = unique(df$CHROM)),
+            aes(label = CHROM, x=median(df$BIN_START/1000000),
+          # y= 3/4 *max(df$DelSynRatio) 
+            y=0.0015
+            ),
+            size=2.5)+
+  labs(x="Physical position (Mb)", y = "DelFre")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(~ CHROM,ncol = 3,strip.position = "right",scales = "free_y")+
+  # scale_y_continuous(limits = c(0,4))+
+  scale_y_continuous(breaks = c(0,0.001,0.002))+
+  coord_cartesian(ylim = c(0,0.0025))+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    strip.text = element_blank(),
+    text = element_text(size = 9))
+p
+
+ggsave(p,filename = "~/Documents/03-DelFre.pdf",height =7.2*9/16, width = 7.2)
+# ggsave(p,filename = "~/Documents/test2.pdf",height = 18, width = 33,units = "cm")
+```
+
+
+### NonsynFre
+```{r}
+
+df <- read_tsv("data/006_Fig2/genomeScan/003_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt") %>% 
+  filter(!is.na(NonsynFre)) %>% 
+  filter(is.finite(NonsynFre))
+
+### 0-4
+max(df$NonsynFre)
+min(df$NonsynFre)
+
+
+# # ### 写出 circos
+# dfout <- df %>%
+#   filter(!is.na(NonsynFre), is.finite(NonsynFre)) %>%
+#   filter(NonsynFre != 0)
+# 
+# dfout <- dfout %>% select(CHROM,BIN_START,BIN_END,NonsynFre) %>%
+#   mutate(NonsynFre=format(NonsynFre,scientific = FALSE)) %>%
+#   mutate(NonsynFre=str_replace_all(NonsynFre," ",""))
+# 
+# write_tsv(dfout,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/006_input_circos/008_NonsynFre.txt",col_names = F)
+
+
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/009_genomeScan_delvcSyn/002/001_delVSsynOnChr_20000000window5000000step_addEffectiveCDSLength.txt") %>% 
+  # filter(!is.na(DelSynRatio))
+#### 设置每条染色体的点
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+p <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  ggplot(aes(x=BIN_START/1000000, y=NonsynFre))+
+  geom_line(aes(color=Sub),alpha = 0.95,size=0.2)+
+  geom_area(alpha=0.8,aes(fill=Sub)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(data = tibble(CHROM = unique(df$CHROM)),
+            aes(label = CHROM, x=median(df$BIN_START/1000000),
+          # y= 3/4 *max(df$DelSynRatio) 
+            y=0.006
+            ),
+            size=2.5)+
+  labs(x="Physical position (Mb)", y = "NonsynFre")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(~ CHROM,ncol = 3,strip.position = "right",scales = "free_y")+
+  # scale_y_continuous(limits = c(0,4))+
+  scale_y_continuous(breaks = c(0,0.004,0.008))+
+  coord_cartesian(ylim = c(0,0.009))+
+  
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    strip.text = element_blank(),
+    text = element_text(size = 9))
+p
+
+ggsave(p,filename = "~/Documents/04-NonsynFre.pdf",height =7.2*9/16, width = 7.2)
+# ggsave(p,filename = "~/Documents/test2.pdf",height = 18, width = 33,units = "cm")
+```
+
+
+
+### SynFre
+```{r}
+
+df <- read_tsv("data/006_Fig2/genomeScan/003_delVSsynOnChr_10000000window1000000step_addEffectiveCDSLength_addRecom.txt") %>% 
+  filter(!is.na(SynFre)) %>% 
+  filter(is.finite(SynFre))
+
+### 0-4
+max(df$SynFre)
+min(df$SynFre)
+
+
+# # # ### 写出 circos
+# dfout <- df %>%
+#   filter(!is.na(SynFre), is.finite(SynFre)) %>%
+#   filter(SynFre != 0)
+# 
+# dfout <- dfout %>% select(CHROM,BIN_START,BIN_END,SynFre) %>%
+#   mutate(SynFre=format(SynFre,scientific = FALSE)) %>%
+#   mutate(SynFre=str_replace_all(SynFre," ",""))
+# 
+# write_tsv(dfout,"/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/019_circos/006_input_circos/009_SynFre.txt",col_names = F)
+
+
+# df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/004_annoDB/009_genomeScan_delvcSyn/002/001_delVSsynOnChr_20000000window5000000step_addEffectiveCDSLength.txt") %>% 
+  # filter(!is.na(DelSynRatio))
+#### 设置每条染色体的点
+data1 <- data.frame(CHROM = paste(1:7,rep("A",7),sep = ""),x=c(213,327,319,266,254,286,362),y=rep(0,7))
+data2 <- data.frame(CHROM = paste(1:7,rep("B",7),sep = ""),x=c(241,348,347,304,201,325,309),y=rep(0,7))
+data3 <- data.frame(CHROM = paste(1:7,rep("D",7),sep = ""),x=c(170,268,240,185,187,215,339),y=rep(0,7))
+data <- rbind(data1,data2,data3)
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+p <- df %>% 
+  mutate(Sub=str_sub(CHROM,2,2)) %>% 
+  ggplot(aes(x=BIN_START/1000000, y=SynFre))+
+  geom_line(aes(color=Sub),alpha = 0.95,size=0.2)+
+  geom_area(alpha=0.8,aes(fill=Sub)) +
+  geom_point(aes(x,y),color = "blue",size=1,data = data)+
+  geom_text(data = tibble(CHROM = unique(df$CHROM)),
+            aes(label = CHROM, x=median(df$BIN_START/1000000),
+          # y= 3/4 *max(df$DelSynRatio) 
+            y=0.005
+            ),
+            size=2.5)+
+  labs(x="Physical position (Mb)", y = "SynFre")+
+  scale_fill_manual(values = colB)+
+  scale_color_manual(values = colB)+
+  facet_wrap(~ CHROM,ncol = 3,strip.position = "right",scales = "free_y")+
+  # scale_y_continuous(limits = c(0,4))+
+  scale_y_continuous(breaks = c(0,0.004,0.008))+
+  coord_cartesian(ylim = c(0,0.009))+
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+    strip.text = element_blank(),
+    text = element_text(size = 9))
+p
+
+ggsave(p,filename = "~/Documents/05-SynFre.pdf",height =7.2*9/16, width = 7.2)
+# ggsave(p,filename = "~/Documents/test2.pdf",height = 18, width = 33,units = "cm")
+```
+
+
+#### =============
+## 运行 circos
+circos -conf circosByAoyue.conf -outputdir ./
+
+
+
+
+ 
+
+
+

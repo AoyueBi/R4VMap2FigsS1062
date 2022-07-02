@@ -1130,6 +1130,407 @@ p
 
 ```
 
+## Del/Nonsyn proportion 只有加性模型
+```{r}
+plot_delVsNonsyn <- function(filenamefun){
+  ### 先处理del文件
+# dfdel <- read_tsv("data/004_delCount/delCount.txt.gz") 
+dfdel <- read_tsv(filenamefun)
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5")
+labelsB <- c("Nonsynonymous","Deleterious")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>%
+  select(-c("IfSelected","Group_refobj","SiteCountWithMinDepth","HeterDerivedSNPCount")) %>% 
+  pivot_longer(cols = c(TotalDerivedSNPCount,HomoDerivedSNPCount,),names_to = "DelCountGroup",values_to = "Count") %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC)) %>% 
+  pivot_wider(names_from =VariantsGroup,values_from = Count) %>% 
+  mutate(Proportion_delVsNonsyn = Deleterious/Nonsynonymous)
+  
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray70")
+
+p <- df %>%
+  filter(DelCountGroup=="Additive") %>% 
+  ggplot(aes(x=Subgenome,y=Proportion_delVsNonsyn,fill=GroupbyContinent))+
+  ylab("Proportion of derived\ndel SNPs/nonsyn SNPs ")+xlab("")+
+    ### boxplot2
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.2),alpha = 0.3,aes(color=GroupbyContinent),size=0.03)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+    ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  # facet_grid(Stand_LoadGroup~DelCountGroup,scales = "free")+
+  # facet_wrap(~DelCountGroup,scales = "free", ncol = 2,
+  #            strip.position = c("top"))+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+        ### 添加 legend
+    legend.key = element_blank(),
+    # legend.position = "bottom",
+    strip.background = element_rect(color = "white",fill = "gray90"),
+    text = element_text(size = 12))+
+  guides(color=guide_legend(ncol=7))
+
+p
+
+outDir <- c("~/figs/FigS_delCount/misc")
+
+outDir <- c("~/Documents/")
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],"_DelVsNonsynProportion.pdf")),height = 3,width = 5)
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+}
+
+p <- plot_delVsNonsyn("data/004_delCount/delCount.txt.gz")
+p
+
+p <- plot_delVsNonsyn("data/004_delCount/delCount_triads.txt.gz")
+p
+
+```
+
+### 毕业论文：计算比例和显著性
+```{r}
+### 先处理del文件
+dfdel <- read_tsv("data/004_delCount/delCount.txt.gz") 
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+factorB <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5")
+labelsB <- c("Nonsynonymous","Deleterious")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>%
+  select(-c("IfSelected","Group_refobj","SiteCountWithMinDepth","HeterDerivedSNPCount")) %>% 
+  pivot_longer(cols = c(TotalDerivedSNPCount,HomoDerivedSNPCount,),names_to = "DelCountGroup",values_to = "Count") %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC)) %>% 
+  pivot_wider(names_from =VariantsGroup,values_from = Count) %>% 
+  mutate(Proportion_delVsNonsyn = Deleterious/Nonsynonymous)
+  
+colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray70")
+
+p <- df %>%
+  filter(DelCountGroup=="Additive") %>% 
+  ggplot(aes(x=Subgenome,y=Proportion_delVsNonsyn,fill=GroupbyContinent))+
+  ylab("Proportion of derived\ndel SNPs/nonsyn SNPs ")+xlab("")+
+    ### boxplot2
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.2),alpha = 0.3,aes(color=GroupbyContinent),size=0.03)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+    ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  # facet_grid(Stand_LoadGroup~DelCountGroup,scales = "free")+
+  # facet_wrap(~DelCountGroup,scales = "free", ncol = 2,
+  #            strip.position = c("top"))+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    legend.position = 'none',
+        ### 添加 legend
+    legend.key = element_blank(),
+    # legend.position = "bottom",
+    strip.background = element_rect(color = "white",fill = "gray90"),
+    text = element_text(size = 12))+
+  guides(color=guide_legend(ncol=7))
+
+p
+
+outDir <- c("~/figs/FigS_delCount/misc")
+
+outDir <- c("~/Documents/")
+ggsave(p,filename = file.path(outDir,str_c("_DelVsNonsynProportion.pdf")),height = 3,width = 5)
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+
+```
+
+### 求平均值，差值以及显著性
+
+```{r}
+dfdf <- df %>% 
+  select(Taxa,Subgenome,DelCountGroup,GenomeType,GroupbyContinent,Proportion_delVsNonsyn) %>% 
+  filter(DelCountGroup=="Additive") %>% 
+  select(-DelCountGroup)
+
+```
+
+
+#### 1.先计算平均值 标准差
+
+```{r}
+### 
+df <- dfdf %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
+  group_by(Subgenome,GroupbyContinent) %>% 
+  summarise(n=n(),mean=mean(Proportion_delVsNonsyn),median=median(Proportion_delVsNonsyn),max=max(Proportion_delVsNonsyn),min=min(Proportion_delVsNonsyn),sd=sd(Proportion_delVsNonsyn), se = sd/sqrt(n)) %>%
+  ### 为数据框加上一个行号
+  ungroup %>% 
+  mutate(id=row_number()) %>% 
+  relocate(id,.after = GroupbyContinent) %>% 
+  relocate(mean,.before = n)  
+  
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+
+```
+
+#### 2.写一个小函数，专门计算升高降低百分比
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,4],df[2,4])
+aochangePercent(df[7,4],df[8,4])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[2,4],df[3,4])
+aochangePercent(df[8,4],df[9,4])
+print("******************************")
+## ftt-lr_eu
+print("ftt - lr_eu")
+aochangePercent(df[3,4],df[4,4])
+aochangePercent(df[9,4],df[10,4])
+print("******************************")
+
+
+## ae-lr_eu cl lr_ea
+print("ae - lr_eu cl lr_ea")
+aochangePercent(df[13,4],df[14,4])
+aochangePercent(df[13,4],df[15,4])
+aochangePercent(df[13,4],df[16,4])
+print("******************************")
+
+## we - lr_eu
+print("we -lr_eu")
+aochangePercent(df[1,4],df[4,4])
+aochangePercent(df[7,4],df[10,4])
+print("******************************")
+
+
+## we - cl
+print("we -cl")
+aochangePercent(df[1,4],df[5,4])
+aochangePercent(df[7,4],df[11,4])
+print("******************************")
+
+
+## we - lr_ea
+print("we -lr_ea")
+aochangePercent(df[1,4],df[6,4])
+aochangePercent(df[7,4],df[12,4])
+print("******************************")
+
+
+## lr_eu - cl
+print("lr_eu - cl")
+aochangePercent(df[4,4],df[5,4])
+aochangePercent(df[10,4],df[11,4])
+aochangePercent(df[14,4],df[15,4])
+## lr_eu - lr_ea
+print("lr_eu - lr_ea")
+aochangePercent(df[4,4],df[6,4])
+aochangePercent(df[10,4],df[12,4])
+aochangePercent(df[14,4],df[16,4])
+print("******************************")
+
+```
+
+[1] "we -de"
+[1] "before 0.110274889097367 \n after 0.113433102963909 out 0.0286394653614571"
+[1] "before 0.10907784022195 \n after 0.107504610335759 out -0.0144230018030143"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.113433102963909 \n after 0.112240904789702 out -0.010510143362528"
+[1] "before 0.107504610335759 \n after 0.105884359084882 out -0.0150714582920439"
+[1] "******************************"
+[1] "ftt - lr_eu"
+[1] "before 0.112240904789702 \n after 0.112942306989543 out 0.00624907827636503"
+[1] "before 0.105884359084882 \n after 0.104956802537975 out -0.0087600902996732"
+[1] "******************************"
+[1] "ae - lr_eu cl lr_ea"
+[1] "before 0.0956786461309788 \n after 0.100832087525355 out 0.0538619807320531"
+[1] "before 0.0956786461309788 \n after 0.10115083276315 out 0.0571933953233436"
+[1] "before 0.0956786461309788 \n after 0.100814936514826 out 0.0536827243229975"
+[1] "******************************"
+[1] "we -lr_eu"
+[1] "before 0.110274889097367 \n after 0.112942306989543 out 0.0241888059376888"
+[1] "before 0.10907784022195 \n after 0.104956802537975 out -0.0377807048213377"
+[1] "******************************"
+[1] "we -cl"
+[1] "before 0.110274889097367 \n after 0.113555634458721 out 0.029750611296993"
+[1] "before 0.10907784022195 \n after 0.106125100596754 out -0.0270700228312906"
+[1] "******************************"
+[1] "we -lr_ea"
+[1] "before 0.110274889097367 \n after 0.112022730023882 out 0.01584985431245"
+[1] "before 0.10907784022195 \n after 0.103613587275236 out -0.0500949866223512"
+[1] "******************************"
+[1] "lr_eu - cl"
+[1] "before 0.112942306989543 \n after 0.113555634458721 out 0.00543044927562177"
+[1] "before 0.104956802537975 \n after 0.106125100596754 out 0.0111312276148633"
+[1] "before 0.100832087525355 \n after 0.10115083276315 out 0.00316114885269551"
+[1] "lr_eu - lr_ea"
+[1] "before 0.112942306989543 \n after 0.112022730023882 out -0.0081420062169144"
+[1] "before 0.104956802537975 \n after 0.103613587275236 out -0.012797791379487"
+[1] "before 0.100832087525355 \n after 0.100814936514826 out -0.000170094767942049"
+[1] "******************************"
+
+
+#### 3.显著性检验
+                
+```{r}
+### 再检验 strongly load
+
+df <- dfdf %>% 
+  filter(Subgenome == "A") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Proportion_delVsNonsyn,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+
+  ### ************** B sub
+  df <- dfdf %>% 
+  filter(Subgenome == "B") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Proportion_delVsNonsyn,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+    ### ************** D sub
+  df <- dfdf %>% 
+  filter(Subgenome == "D") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Proportion_delVsNonsyn,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+### 将最终结果存储在下边，方便查看
+```
+
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Proportion_delVsNonsyn and df$GroupbyContinent 
+
+      WE      DE      FTT     LR_EU   CL     
+DE    3.6e-13 -       -       -       -      
+FTT   4.8e-05 0.00616 -       -       -      
+LR_EU 4.4e-12 0.11059 0.07967 -       -      
+CL    < 2e-16 0.64798 0.00072 0.00547 -      
+LR_EA 1.6e-06 6.9e-06 0.59200 0.00015 3.6e-13
+
+P value adjustment method: BH 
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Proportion_delVsNonsyn and df$GroupbyContinent 
+
+      WE      DE      FTT     LR_EU   CL     
+DE    1.6e-05 -       -       -       -      
+FTT   1.5e-13 5.3e-06 -       -       -      
+LR_EU < 2e-16 < 2e-16 0.0018  -       -      
+CL    3.5e-15 2.6e-06 0.4499  2.5e-07 -      
+LR_EA < 2e-16 < 2e-16 5.8e-11 2.6e-11 < 2e-16
+
+P value adjustment method: BH 
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Proportion_delVsNonsyn and df$GroupbyContinent 
+
+      AT     LR_EU CL   
+LR_EU <2e-16 -     -    
+CL    <2e-16 0.058 -    
+LR_EA <2e-16 0.922 0.020
+
+P value adjustment method: BH 
+
+
+
+#### 1. 根据倍性来计算平均值、标准差
+
+```{r}
+### 
+df_ave_mutationLoad <- dfdf %>% 
+  group_by(GenomeType, Subgenome) %>% 
+  summarise(mean=mean(Proportion_delVsNonsyn))
+
+df_ave_mutationLoad
+
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("AABB - DD")
+aochangePercent(df_ave_mutationLoad[1,3],df_ave_mutationLoad[3,3])
+print("******************************")
+```
+
+
 #### ====== 附件 2
 ## hexaploid Whole genome / Triads
 ## Del count

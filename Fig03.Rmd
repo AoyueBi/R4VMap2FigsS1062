@@ -63,9 +63,12 @@ p <- df %>%
   ylab("Mutation burden")+xlab("")+
   ### volin
   geom_violin(position = position_dodge(0.8),alpha=0.8,width=2) +
-  geom_boxplot(position = position_dodge(0.8), width=0.01, color="white", alpha=0.2,outlier.color = NA) +
-  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
-  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  # geom_boxplot(position = position_dodge(0.8), width=0.01, color="white", alpha=0.2,outlier.color = NA) +
+  geom_boxplot(position = position_dodge(0.8), width=0.2, color="white",
+                lwd=0.2, ###调节box的线条粗细
+               alpha=0.2,outlier.color = NA) +  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.15)+
+  # stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
 
   ### boxplot
   # geom_boxplot(position = position_dodge(0.8),outlier.color = NA, alpha = 0.8) +
@@ -84,33 +87,721 @@ p <- df %>%
   theme(
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.4)
-    ,legend.position = 'none'
-    ,text = element_text(size = 9))
+    # ,legend.position = 'none'
+    ,text = element_text(size = 12))
 p
 
-# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
-ggsave(p,filename = "figs/Fig3/misc/whole_load.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 5)
+# ggsave(p,filename = "figs/Fig3/misc/whole_load.pdf",height = 3,width = 4)
+
+### get legend
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 2)
 ```
-### significance test - slightly
+
+
+
+
+### *！显著性检验 nonsynonymous
 - 在分析显著性差异前，先将数据框赋予一个新的变量，存储下来。
 ```{r}
 dfdf <- df
 ```
-- 先计算平均值 标准差之类的
+
+### 求六倍体亚基因组突变负荷的均值
+```{r}
+df_ave_mutationLoad <- dfdf %>% 
+  group_by(Subgenome,GenomeType, Stand_LoadGroup) %>% 
+  summarise(mean=mean(Stand_delCount))
+
+df_ave_mutationLoad
+```
+
+#### 1.先计算平均值 标准差之类的
 ```{r}
 ### 平均数，标准差，方差等统计
   
-df <- df %>% 
+df <- dfdf %>% 
   filter(Stand_LoadGroup == "Nonsynonymous") %>% 
   mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
   group_by(Subgenome,GroupbyContinent) %>% 
-summarise(n=n(),mean=mean(Stand_delCount),median=median(Stand_delCount),max=max(Stand_delCount),min=min(Stand_delCount),sd=sd(Stand_delCount), se = sd/sqrt(n))
+summarise(n=n(),mean=mean(Stand_delCount),median=median(Stand_delCount),max=max(Stand_delCount),min=min(Stand_delCount),sd=sd(Stand_delCount), se = sd/sqrt(n)) %>% 
+  ### 为数据框加上一个行号
+  ungroup %>% 
+  mutate(id=row_number()) %>% 
+  relocate(id,.after = GroupbyContinent) %>% 
+  relocate(mean,.before = n)
 
 
 df
 write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
 
+
+
 ```
+
+#### 2.写一个小函数，专门计算升高降低百分比
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,4],df[2,4])
+aochangePercent(df[7,4],df[8,4])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[2,4],df[3,4])
+aochangePercent(df[8,4],df[9,4])
+print("******************************")
+## ftt-lr_eu
+print("ftt - lr_eu")
+aochangePercent(df[3,4],df[4,4])
+aochangePercent(df[9,4],df[10,4])
+print("******************************")
+## ae-lr_eu cl lr_ea
+print("ae - lr_eu cl lr_ea")
+aochangePercent(df[13,4],df[14,4])
+aochangePercent(df[13,4],df[15,4])
+aochangePercent(df[13,4],df[16,4])
+print("******************************")
+## lr_eu - cl
+print("lr_eu - cl")
+aochangePercent(df[4,4],df[5,4])
+aochangePercent(df[10,4],df[11,4])
+aochangePercent(df[14,4],df[15,4])
+## lr_eu - lr_ea
+print("lr_eu - lr_ea")
+aochangePercent(df[4,4],df[6,4])
+aochangePercent(df[10,4],df[12,4])
+aochangePercent(df[14,4],df[16,4])
+print("******************************")
+
+```
+[1] "we -de"
+[1] "before 0.823689315191681 \n after 0.828781520401876 out 0.00618219165439815"
+[1] "before 0.747479099423756 \n after 0.751070594198122 out 0.00480480962897143"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.828781520401876 \n after 0.825297132659683 out -0.00420422953024223"
+[1] "before 0.751070594198122 \n after 0.75282539292127 out 0.00233639652078369"
+[1] "******************************"
+[1] "ftt - lr_eu"
+[1] "before 0.825297132659683 \n after 0.829414645816221 out 0.00498912814984454"
+[1] "before 0.75282539292127 \n after 0.745761747417329 out -0.00938284703247111"
+[1] "******************************"
+[1] "ae - lr_eu cl lr_ea"
+[1] "before 0.790304233630642 \n after 0.811286037203311 out 0.0265490208451479"
+[1] "before 0.790304233630642 \n after 0.811762753030456 out 0.0271522263030698"
+[1] "before 0.790304233630642 \n after 0.811550511456706 out 0.02688366950593"
+[1] "******************************"
+[1] "lr_eu - cl"
+[1] "before 0.829414645816221 \n after 0.829154673300759 out -0.000313440951126173"
+[1] "before 0.745761747417329 \n after 0.749658880085458 out 0.00522570738124463"
+[1] "before 0.811286037203311 \n after 0.811762753030456 out 0.00058760511741107"
+[1] "lr_eu - lr_ea"
+[1] "before 0.829414645816221 \n after 0.829480080951301 out 7.88931512234021e-05"
+[1] "before 0.745761747417329 \n after 0.74440363031215 out -0.00182111392798463"
+[1] "before 0.811286037203311 \n after 0.811550511456706 out 0.000325993843437309"
+[1] "******************************"
+
+#### 3.正态分布检验和同质性检验
+```{r}
+### 先检验 slightly load
+
+df <- dfdf %>% 
+  filter(Stand_LoadGroup == "Nonsynonymous") %>% 
+  filter(Subgenome == "A") %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 检验 A亚基因组中各个亚群是否为正态分布
+factor1 <- levels(df$GroupbyContinent)
+for (i in factor1){
+  p <- with(df, shapiro.test(Stand_delCount[GroupbyContinent == i]))
+  print(paste(p[2],i))
+}
+
+
+#### 再检验各组数据是否具有同质性,这里只进行不同倍性的同质性检验
+dfhomogeneity <- dfdf %>% 
+  filter(Stand_LoadGroup == "Nonsynonymous") %>% 
+  filter(Subgenome == "A") %>% 
+  filter(GenomeType == "AABB" | GenomeType == "AABBDD")
+res.ftest <- var.test(Stand_delCount ~ GenomeType, data = dfhomogeneity)
+res.ftest
+
+dfhomogeneity <- dfdf %>% 
+  filter(Stand_LoadGroup == "Nonsynonymous") %>% 
+  filter(Subgenome == "D") %>% 
+  filter(GenomeType == "DD" | GenomeType == "AABBDD")
+res.ftest <- var.test(Stand_delCount ~ GenomeType, data = dfhomogeneity)
+res.ftest
+
+### 结论： 有显著性差别，不来自同一整体
+
+### 因为其个数都大于30，可以用t检验
+```
+
+#### 4.显著性检验
+```{r}
+### 先检验 slightly load
+  ### ************** A sub
+df <- dfdf %>% filter(Stand_LoadGroup == "Nonsynonymous") %>% 
+  filter(Subgenome == "A") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Stand_delCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+
+  ### ************** B sub
+  df <- dfdf %>% filter(Stand_LoadGroup == "Nonsynonymous") %>% 
+  filter(Subgenome == "B") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Stand_delCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+    ### ************** D sub
+  df <- dfdf %>% filter(Stand_LoadGroup == "Nonsynonymous") %>% 
+  filter(Subgenome == "D") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Stand_delCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+### 将最终结果存储在下边，方便查看
+```
+
+- A sub 的两两比较 slightly
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Stand_delCount and df$GroupbyContinent 
+
+      WE      DE    FTT   LR_EU CL   
+DE    0.001   -     -     -     -    
+FTT   0.603   0.058 -     -     -    
+LR_EU 8.0e-05 0.677 0.018 -     -    
+CL    4.1e-05 0.765 0.018 0.769 -    
+LR_EA 3.1e-05 0.640 0.014 0.930 0.651
+
+P value adjustment method: BH
+
+- ***************************************
+- B sub 的两两比较  slightly
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Stand_delCount and df$GroupbyContinent 
+
+      WE      DE      FTT     LR_EU   CL     
+DE    0.00443 -       -       -       -      
+FTT   0.00027 0.11342 -       -       -      
+LR_EU 0.12833 1.3e-09 3.4e-09 -       -      
+CL    0.05741 0.05741 0.00351 1.1e-08 -      
+LR_EA 0.00734 1.0e-14 7.1e-12 0.03294 < 2e-16
+
+P value adjustment method: BH 
+
+- ***************************************
+- D sub 的两两比较  slightly
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Stand_delCount and df$GroupbyContinent 
+
+      AT      LR_EU CL  
+LR_EU 1.5e-15 -     -   
+CL    1.5e-15 0.48  -   
+LR_EA 1.5e-15 0.61  0.61
+
+P value adjustment method: BH 
+
+
+### *！显著性检验 Deleterious
+- 在分析显著性差异前，先将数据框赋予一个新的变量，存储下来。
+```{r}
+dfdf <- df
+```
+#### 1.先计算平均值 标准差之类的
+```{r}
+### 平均数，标准差，方差等统计
+  
+df <- dfdf %>% 
+  filter(Stand_LoadGroup == "Deleterious") %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
+  group_by(Subgenome,GroupbyContinent) %>% 
+summarise(n=n(),mean=mean(Stand_delCount),median=median(Stand_delCount),max=max(Stand_delCount),min=min(Stand_delCount),sd=sd(Stand_delCount), se = sd/sqrt(n)) %>% 
+  ### 为数据框加上一个行号
+  ungroup %>% 
+  mutate(id=row_number()) %>% 
+  relocate(id,.after = GroupbyContinent) %>% 
+  relocate(mean,.before = n)
+
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+
+
+
+```
+
+### 求六倍体亚基因组突变负荷的均值
+```{r}
+df_ave_mutationLoad <- dfdf %>% 
+  filter(Stand_LoadGroup=="Deleterious") %>% 
+  group_by(GenomeType, Stand_LoadGroup) %>% 
+  summarise(mean=mean(Stand_delCount))
+
+df_ave_mutationLoad
+
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("AABB - DD")
+aochangePercent(df_ave_mutationLoad[1,3],df_ave_mutationLoad[3,3])
+print("******************************")
+```
+
+
+#### 2.写一个小函数，专门计算升高降低百分比
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,4],df[2,4])
+aochangePercent(df[7,4],df[8,4])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[2,4],df[3,4])
+aochangePercent(df[8,4],df[9,4])
+print("******************************")
+## ftt-lr_eu
+print("ftt - lr_eu")
+aochangePercent(df[3,4],df[4,4])
+aochangePercent(df[9,4],df[10,4])
+print("******************************")
+## ae-lr_eu cl lr_ea
+print("ae - lr_eu cl lr_ea")
+aochangePercent(df[13,4],df[14,4])
+aochangePercent(df[13,4],df[15,4])
+aochangePercent(df[13,4],df[16,4])
+print("******************************")
+## lr_eu - cl
+print("lr_eu - cl")
+aochangePercent(df[4,4],df[5,4])
+aochangePercent(df[10,4],df[11,4])
+aochangePercent(df[14,4],df[15,4])
+## lr_eu - lr_ea
+print("lr_eu - lr_ea")
+aochangePercent(df[4,4],df[6,4])
+aochangePercent(df[10,4],df[12,4])
+aochangePercent(df[14,4],df[16,4])
+print("******************************")
+
+```
+[1] "we -de"
+[1] "before 0.0908550905233067 \n after 0.094014408031045 out 0.0347731479825877"
+[1] "before 0.0815522541853451 \n after 0.0807457269330525 out -0.00988969906901194"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.094014408031045 \n after 0.0926389755499388 out -0.0146300179931153"
+[1] "before 0.0807457269330525 \n after 0.0797135387778713 out -0.0127831923048637"
+[1] "******************************"
+[1] "ftt - lr_eu"
+[1] "before 0.0926389755499388 \n after 0.0936783866530534 out 0.011220019402679"
+[1] "before 0.0797135387778713 \n after 0.0782731025090795 out -0.0180701583554789"
+[1] "******************************"
+[1] "ae - lr_eu cl lr_ea"
+[1] "before 0.0756236944627057 \n after 0.0818045555100843 out 0.0817318049758429"
+[1] "before 0.0756236944627057 \n after 0.0821116875782117 out 0.0857931255752855"
+[1] "before 0.0756236944627057 \n after 0.0818179481296709 out 0.0819089005234984"
+[1] "******************************"
+[1] "lr_eu - cl"
+[1] "before 0.0936783866530534 \n after 0.0941582161720334 out 0.00512209417906781"
+[1] "before 0.0782731025090795 \n after 0.079570539003144 out 0.0165757642469073"
+[1] "before 0.0818045555100843 \n after 0.0821116875782117 out 0.00375446167040755"
+[1] "lr_eu - lr_ea"
+[1] "before 0.0936783866530534 \n after 0.09292348129595 out -0.00805847948576665"
+[1] "before 0.0782731025090795 \n after 0.077133318004367 out -0.0145616369886495"
+[1] "before 0.0818045555100843 \n after 0.0818179481296709 out 0.000163714838410854"
+[1] "******************************"
+
+#### 3.正态分布检验和同质性检验
+```{r}
+### 先检验 slightly load
+
+df <- dfdf %>% 
+  filter(Stand_LoadGroup == "Deleterious") %>% 
+  filter(Subgenome == "A") %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 检验 A亚基因组中各个亚群是否为正态分布
+factor1 <- levels(df$GroupbyContinent)
+for (i in factor1){
+  p <- with(df, shapiro.test(Stand_delCount[GroupbyContinent == i]))
+  print(paste(p[2],i))
+}
+
+
+#### 再检验各组数据是否具有同质性,这里只进行不同倍性的同质性检验
+dfhomogeneity <- dfdf %>% 
+  filter(Stand_LoadGroup == "Deleterious") %>% 
+  filter(Subgenome == "A") %>% 
+  filter(GenomeType == "AABB" | GenomeType == "AABBDD")
+res.ftest <- var.test(Stand_delCount ~ GenomeType, data = dfhomogeneity)
+res.ftest
+
+dfhomogeneity <- dfdf %>% 
+  filter(Stand_LoadGroup == "Deleterious") %>% 
+  filter(Subgenome == "D") %>% 
+  filter(GenomeType == "DD" | GenomeType == "AABBDD")
+res.ftest <- var.test(Stand_delCount ~ GenomeType, data = dfhomogeneity)
+res.ftest
+
+### 结论： 有显著性差别，不来自同一整体
+
+### 因为其个数都大于30，可以用t检验
+```
+
+#### 4.显著性检验
+```{r}
+### 再检验 strongly load
+
+df <- dfdf %>% filter(Stand_LoadGroup == "Deleterious") %>% 
+  filter(Subgenome == "A") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Stand_delCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+
+  ### ************** B sub
+  df <- dfdf %>% filter(Stand_LoadGroup == "Deleterious") %>% 
+  filter(Subgenome == "B") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Stand_delCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+    ### ************** D sub
+  df <- dfdf %>% filter(Stand_LoadGroup == "Deleterious") %>% 
+  filter(Subgenome == "D") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Stand_delCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+### 将最终结果存储在下边，方便查看
+```
+
+
+### *！显著性检验 High impact
+- 在分析显著性差异前，先将数据框赋予一个新的变量，存储下来。
+```{r}
+dfdf <- df
+```
+#### 1.先计算平均值 标准差之类的
+```{r}
+### 平均数，标准差，方差等统计
+  
+df <- dfdf %>% 
+  filter(Stand_LoadGroup == "High impact") %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
+  group_by(Subgenome,GroupbyContinent) %>% 
+summarise(n=n(),mean=mean(Stand_delCount),median=median(Stand_delCount),max=max(Stand_delCount),min=min(Stand_delCount),sd=sd(Stand_delCount), se = sd/sqrt(n)) %>% 
+  ### 为数据框加上一个行号
+  ungroup %>% 
+  mutate(id=row_number()) %>% 
+  relocate(id,.after = GroupbyContinent) %>% 
+  relocate(mean,.before = n)
+
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+
+
+
+```
+
+### 求六倍体亚基因组突变负荷的均值
+```{r}
+df_ave_mutationLoad <- dfdf %>% 
+  filter(Stand_LoadGroup=="High impact") %>% 
+  group_by(GenomeType, Stand_LoadGroup) %>% 
+  summarise(mean=mean(Stand_delCount))
+
+df_ave_mutationLoad
+
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("AABB - DD")
+aochangePercent(df_ave_mutationLoad[1,3],df_ave_mutationLoad[3,3])
+print("******************************")
+```
+
+
+#### 2.写一个小函数，专门计算升高降低百分比
+```{r}
+### 写一个小函数，专门计算升高降低百分比
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## we - de
+print("we -de")
+aochangePercent(df[1,4],df[2,4])
+aochangePercent(df[7,4],df[8,4])
+print("******************************")
+## de-ftt
+print("de -ftt")
+aochangePercent(df[2,4],df[3,4])
+aochangePercent(df[8,4],df[9,4])
+print("******************************")
+## ftt-lr_eu
+print("ftt - lr_eu")
+aochangePercent(df[3,4],df[4,4])
+aochangePercent(df[9,4],df[10,4])
+print("******************************")
+## ae-lr_eu cl lr_ea
+print("ae - lr_eu cl lr_ea")
+aochangePercent(df[13,4],df[14,4])
+aochangePercent(df[13,4],df[15,4])
+aochangePercent(df[13,4],df[16,4])
+print("******************************")
+## lr_eu - cl
+print("lr_eu - cl")
+aochangePercent(df[4,4],df[5,4])
+aochangePercent(df[10,4],df[11,4])
+aochangePercent(df[14,4],df[15,4])
+## lr_eu - lr_ea
+print("lr_eu - lr_ea")
+aochangePercent(df[4,4],df[6,4])
+aochangePercent(df[10,4],df[12,4])
+aochangePercent(df[14,4],df[16,4])
+print("******************************")
+
+```
+[1] "we -de"
+[1] "before 0.0156743807247154 \n after 0.0145735966540833 out -0.0702282335720177"
+[1] "before 0.0121845611753524 \n after 0.0116592793531028 out -0.043110442361445"
+[1] "******************************"
+[1] "de -ftt"
+[1] "before 0.0145735966540833 \n after 0.0146838286234365 out 0.00756381365352542"
+[1] "before 0.0116592793531028 \n after 0.0117577844411589 out 0.00844864292833312"
+[1] "******************************"
+[1] "ftt - lr_eu"
+[1] "before 0.0146838286234365 \n after 0.0139760167149071 out -0.0482034983301021"
+[1] "before 0.0117577844411589 \n after 0.0106316958287079 out -0.0957738779858082"
+[1] "******************************"
+[1] "ae - lr_eu cl lr_ea"
+[1] "before 0.0119451271339075 \n after 0.0113120986563776 out -0.052994704069153"
+[1] "before 0.0119451271339075 \n after 0.0115741681830399 out -0.0310552534693894"
+[1] "before 0.0119451271339075 \n after 0.0116515381701452 out -0.0245781363790545"
+[1] "******************************"
+[1] "lr_eu - cl"
+[1] "before 0.0139760167149071 \n after 0.0139085673019989 out -0.00482608273044301"
+[1] "before 0.0106316958287079 \n after 0.0109144700398256 out 0.0265972819081376"
+[1] "before 0.0113120986563776 \n after 0.0115741681830399 out 0.023167188920732"
+[1] "lr_eu - lr_ea"
+[1] "before 0.0139760167149071 \n after 0.0130999981539277 out -0.0626801311739285"
+[1] "before 0.0106316958287079 \n after 0.010548266337176 out -0.00784724214049229"
+[1] "before 0.0113120986563776 \n after 0.0116515381701452 out 0.0300067674512494"
+[1] "******************************"
+
+#### 3.正态分布检验和同质性检验
+```{r}
+### 先检验 slightly load
+
+df <- dfdf %>% 
+  filter(Stand_LoadGroup == "High impact") %>% 
+  filter(Subgenome == "A") %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 检验 A亚基因组中各个亚群是否为正态分布
+factor1 <- levels(df$GroupbyContinent)
+for (i in factor1){
+  p <- with(df, shapiro.test(Stand_delCount[GroupbyContinent == i]))
+  print(paste(p[2],i))
+}
+
+
+#### 再检验各组数据是否具有同质性,这里只进行不同倍性的同质性检验
+dfhomogeneity <- dfdf %>% 
+  filter(Stand_LoadGroup == "High impact") %>% 
+  filter(Subgenome == "A") %>% 
+  filter(GenomeType == "AABB" | GenomeType == "AABBDD")
+res.ftest <- var.test(Stand_delCount ~ GenomeType, data = dfhomogeneity)
+res.ftest
+
+dfhomogeneity <- dfdf %>% 
+  filter(Stand_LoadGroup == "High impact") %>% 
+  filter(Subgenome == "D") %>% 
+  filter(GenomeType == "DD" | GenomeType == "AABBDD")
+res.ftest <- var.test(Stand_delCount ~ GenomeType, data = dfhomogeneity)
+res.ftest
+
+### 结论： 有显著性差别，不来自同一整体
+
+### 因为其个数都大于30，可以用t检验
+```
+[1] "0.00293826133074987 WE"
+[1] "0.237271564834943 DE"
+[1] "0.0132178713200821 FTT"
+[1] "0.934000460463813 LR_EU"
+[1] "1.18935349900269e-05 CL"
+[1] "0.000164430891960339 LR_EA"
+
+	F test to compare two variances
+
+data:  Stand_delCount by GenomeType
+F = 2.0808, num df = 192, denom df = 407, p-value = 8.665e-10
+alternative hypothesis: true ratio of variances is not equal to 1
+95 percent confidence interval:
+ 1.640292 2.668161
+sample estimates:
+ratio of variances 
+          2.080804 
+
+
+	F test to compare two variances
+
+data:  Stand_delCount by GenomeType
+F = 0.35394, num df = 407, denom df = 35, p-value = 1.021e-06
+alternative hypothesis: true ratio of variances is not equal to 1
+95 percent confidence interval:
+ 0.2049301 0.5513441
+sample estimates:
+ratio of variances 
+         0.3539367 
+
+#### 4.显著性检验
+```{r}
+### 再检验 strongly load
+
+df <- dfdf %>% filter(Stand_LoadGroup == "High impact") %>% 
+  filter(Subgenome == "A") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Stand_delCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+
+  ### ************** B sub
+  df <- dfdf %>% filter(Stand_LoadGroup == "High impact") %>% 
+  filter(Subgenome == "B") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Stand_delCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+    ### ************** D sub
+  df <- dfdf %>% filter(Stand_LoadGroup == "High impact") %>% 
+  filter(Subgenome == "D") %>%  #### 这里可以切换亚基因组
+  mutate(GroupbyContinent = factor(GroupbyContinent))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$Stand_delCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH")
+  p
+  
+### 将最终结果存储在下边，方便查看
+```
+
+Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Stand_delCount and df$GroupbyContinent 
+
+      WE      DE      FTT     LR_EU   CL     
+DE    8.6e-14 -       -       -       -      
+FTT   2.1e-09 0.45    -       -       -      
+LR_EU < 2e-16 1.0e-06 1.3e-06 -       -      
+CL    < 2e-16 2.3e-09 3.1e-08 0.44    -      
+LR_EA < 2e-16 < 2e-16 < 2e-16 < 2e-16 < 2e-16
+
+P value adjustment method: BH 
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Stand_delCount and df$GroupbyContinent 
+
+      WE      DE      FTT     LR_EU   CL     
+DE    1.1e-07 -       -       -       -      
+FTT   0.00049 0.38974 -       -       -      
+LR_EU < 2e-16 < 2e-16 4.6e-16 -       -      
+CL    < 2e-16 3.4e-16 2.0e-11 3.3e-05 -      
+LR_EA < 2e-16 < 2e-16 < 2e-16 0.23699 1.7e-08
+
+P value adjustment method: BH 
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$Stand_delCount and df$GroupbyContinent 
+
+      AT      LR_EU   CL   
+LR_EU 1.0e-05 -       -    
+CL    0.004   1.0e-05 -    
+LR_EA 0.019   2.1e-07 0.070
+
+P value adjustment method: BH 
 
 
 ## Del count
@@ -260,11 +951,11 @@ p <- df %>%
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7)
     ,legend.position = 'none'
-    ,text = element_text(size = 12))
+    ,text = element_text(size = 10))
 p
 
 # ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
-ggsave(p,filename = "~/Documents/test.pdf",height =6,width = 6)
+ggsave(p,filename = "~/Documents/test.pdf",height =3,width = 3)
 
 ```
 
@@ -314,6 +1005,625 @@ p
 # ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 2.4)
 ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 3)
 
+```
+
+### ！显著性检验
+
+- 在分析显著性差异前，先将数据框赋予一个新的变量，存储下来。
+```{r}
+dfdf <- df
+```
+
+#### 1.先计算平均值 标准差之类的
+
+```{r}
+### 平均数，标准差，方差等统计
+  df <- dfdf %>% 
+  select(Taxa,Subgenome,VariantsGroup,Group_refobj,
+         TotalDerivedSNPCount,GenomeType,GroupbyContinent) %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
+  group_by(VariantsGroup,Group_refobj,Subgenome,GroupbyContinent) %>% 
+summarise(n=n(),mean=mean(TotalDerivedSNPCount),median=median(TotalDerivedSNPCount),max=max(TotalDerivedSNPCount),min=min(TotalDerivedSNPCount),sd=sd(TotalDerivedSNPCount), se = sd/sqrt(n)) %>% 
+  ### 为数据框加上一个行号
+  ungroup %>% 
+  mutate(id=row_number()) %>% 
+  relocate(id,.after = GroupbyContinent) %>% 
+  relocate(mean,.before = n)
+
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
+
+#### 注意：该数据框用于下文计算升高降低比例使用，不要随意改动！！！
+
+```
+
+#### 2.写一个小函数，专门计算升高降低百分比
+
+```{r}
+aochangePercent <- function(before, after){
+  out <-  (after-before)/before
+  print(paste("before",before,"\n","after",after,"out",out))
+    return(out)
+}
+
+## Nonsynonymous
+print("************* Nonsynonymous *********start")
+### we-de
+print("we -de")
+aochangePercent(df[1,6],df[2,6])
+aochangePercent(df[3,6],df[4,6])
+
+### de-durum
+print("de-durum")
+aochangePercent(df[5,6],df[6,6])
+aochangePercent(df[7,6],df[8,6])
+
+### lr-cul
+print("lr-cul")
+aochangePercent(df[9,6],df[10,6])
+aochangePercent(df[11,6],df[12,6])
+aochangePercent(df[13,6],df[14,6])
+print("************* Nonsynonymous *********end")
+
+
+
+## Deleterious
+print("************* Deleterious *********start")
+### we-de
+print("we -de")
+aochangePercent(df[15,6],df[16,6])
+aochangePercent(df[17,6],df[18,6])
+
+### de-durum
+print("de-durum")
+aochangePercent(df[19,6],df[20,6])
+aochangePercent(df[21,6],df[22,6])
+
+### lr-cul
+print("lr-cul")
+aochangePercent(df[23,6],df[24,6])
+aochangePercent(df[25,6],df[26,6])
+aochangePercent(df[27,6],df[28,6])
+print("************* Deleterious *********end")
+
+
+## High impact
+print("************* High impact *********start")
+### we-de
+print("we -de")
+aochangePercent(df[29,6],df[30,6])
+aochangePercent(df[31,6],df[32,6])
+
+### de-durum
+print("de-durum")
+aochangePercent(df[33,6],df[34,6])
+aochangePercent(df[35,6],df[36,6])
+
+### lr-cul
+print("lr-cul")
+aochangePercent(df[37,6],df[38,6])
+aochangePercent(df[39,6],df[40,6])
+aochangePercent(df[41,6],df[42,6])
+print("************* High impact *********end")
+```
+
+[1] "************* Nonsynonymous *********start"
+[1] "we -de"
+[1] "before 331.445054945055 \n after 320.153846153846 out -0.0340666080930989"
+[1] "before 236.978021978022 \n after 230.951923076923 out -0.0254289357755623"
+[1] "de-durum"
+[1] "before 347.576923076923 \n after 319.527777777778 out -0.0806991012258248"
+[1] "before 259.788461538462 \n after 238.5 out -0.0819453697534977"
+[1] "lr-cul"
+[1] "before 294.646551724138 \n after 290.103603603604 out -0.0154182972580232"
+[1] "before 244.362068965517 \n after 247.873873873874 out 0.0143713176239811"
+[1] "before 274.931034482759 \n after 268.824324324324 out -0.0222117891125792"
+[1] "************* Nonsynonymous *********end"
+[1] "************* Deleterious *********start"
+[1] "we -de"
+[1] "before 44.4725274725275 \n after 42.5673076923077 out -0.0428403755868545"
+[1] "before 35.8516483516484 \n after 40.3173076923077 out 0.12455938697318"
+[1] "de-durum"
+[1] "before 46.3076923076923 \n after 43.8055555555556 out -0.054032853451458"
+[1] "before 36.625 \n after 31.4166666666667 out -0.142207053469852"
+[1] "lr-cul"
+[1] "before 45.8965517241379 \n after 44.9864864864865 out -0.0198286190021727"
+[1] "before 34.9051724137931 \n after 36.3738738738739 out 0.042076900313502"
+[1] "before 38.198275862069 \n after 36.981981981982 out -0.0318415910832973"
+[1] "************* Deleterious *********end"
+[1] "************* High impact *********start"
+[1] "we -de"
+[1] "before 5.03846153846154 \n after 4.64423076923077 out -0.0782442748091603"
+[1] "before 3.22527472527473 \n after 2.71153846153846 out -0.159284497444634"
+[1] "de-durum"
+[1] "before 1.68269230769231 \n after 1.66666666666667 out -0.00952380952380949"
+[1] "before 3.31730769230769 \n after 2.86111111111111 out -0.137520128824477"
+[1] "lr-cul"
+[1] "before 2.54310344827586 \n after 3.4009009009009 out 0.337303405100015"
+[1] "before 2.08620689655172 \n after 2.63513513513514 out 0.26312262675899"
+[1] "before 6.56896551724138 \n after 6.26126126126126 out -0.0468421177082593"
+[1] "************* High impact *********end"
+
+#### 3.显著性检验
+
+```{r}
+# p <- dfdf %>% 
+#   filter(Subgenome != "D") %>% 
+#   mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
+#   group_by(VariantsGroup,Group_refobj,Subgenome) %>% 
+#   group_map(~{pairwise.t.test(.x$TotalDerivedSNPCount,.x$GroupbyContinent
+#                                  ,paired = F,pool.sd = FALSE
+#                                  ,var.equal=F,p.adjust.method = "BH")
+#     
+#     })
+         
+### 第一步：由于自己技术有限，不能在数据框分组中套用显著性检验函数，故一一进行检验
+### 需要进行21次显著性检验
+
+### ***********************第二步：单次测试 成功
+# df <- dfdf %>% 
+#   filter(VariantsGroup=="Nonsynonymous") %>% 
+#   filter(Group_refobj=="wede") %>% 
+#   filter(Subgenome=="A")
+# 
+# #### 两两比较，默认是 two.side
+# p <- pairwise.t.test(df$TotalDerivedSNPCount,df$GroupbyContinent
+#                        ,paired = F,pool.sd = FALSE
+#                        ,var.equal = F
+#                        ,p.adjust.method = "BH")
+# p
+ 
+### ***********************第三步：函数测试 成功
+fun_getSig <- function(df){
+  p <- pairwise.t.test(df$TotalDerivedSNPCount,df$GroupbyContinent
+                       ,paired = F,pool.sd = FALSE
+                       ,var.equal = F
+                       ,p.adjust.method = "BH") 
+  p
+
+}
+
+# df <- dfdf %>% 
+#   filter(VariantsGroup=="Nonsynonymous") %>% 
+#   filter(Group_refobj=="wede") %>% 
+#   filter(Subgenome=="A") %>% 
+#   fun_getSig
+  
+#################### wede
+### ***********************函数调用，正式运行
+### 1
+print("Nonsynonymous ---- wede ---- A")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Nonsynonymous") %>% 
+  filter(Group_refobj=="wede") %>% 
+  filter(Subgenome=="A") %>% 
+  fun_getSig
+df
+
+### 2
+print("Nonsynonymous ---- wede ---- B")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Nonsynonymous") %>% 
+  filter(Group_refobj=="wede") %>% 
+  filter(Subgenome=="B") %>% 
+  fun_getSig
+df
+
+### 3
+print("Deleterious ---- wede ---- A")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Deleterious") %>% 
+  filter(Group_refobj=="wede") %>% 
+  filter(Subgenome=="A") %>% 
+  fun_getSig
+df
+
+### 4
+print("Deleterious ---- wede ---- B")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Deleterious") %>% 
+  filter(Group_refobj=="wede") %>% 
+  filter(Subgenome=="B") %>% 
+  fun_getSig
+df
+
+### 5
+print("High impact ---- wede ---- A")
+df <- dfdf %>% 
+  filter(VariantsGroup=="High impact") %>% 
+  filter(Group_refobj=="wede") %>% 
+  filter(Subgenome=="A") %>% 
+  fun_getSig
+df
+
+### 6
+print("High impact ---- wede ---- B")
+df <- dfdf %>% 
+  filter(VariantsGroup=="High impact") %>% 
+  filter(Group_refobj=="wede") %>% 
+  filter(Subgenome=="B") %>% 
+  fun_getSig
+df
+
+#################### dedurum
+  ### ***********************函数调用，正式运行
+### 7
+print("Nonsynonymous ---- dedurum ---- A")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Nonsynonymous") %>% 
+  filter(Group_refobj=="dedurum") %>% 
+  filter(Subgenome=="A") %>% 
+  fun_getSig
+df
+
+### 8
+print("Nonsynonymous ---- dedurum ---- B")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Nonsynonymous") %>% 
+  filter(Group_refobj=="dedurum") %>% 
+  filter(Subgenome=="B") %>% 
+  fun_getSig
+df
+
+### 9
+print("Deleterious ---- dedurum ---- A")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Deleterious") %>% 
+  filter(Group_refobj=="dedurum") %>% 
+  filter(Subgenome=="A") %>% 
+  fun_getSig
+df
+
+### 10
+print("Deleterious ---- dedurum ---- B")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Deleterious") %>% 
+  filter(Group_refobj=="dedurum") %>% 
+  filter(Subgenome=="B") %>% 
+  fun_getSig
+df
+
+### 11
+print("High impact ---- dedurum ---- A")
+df <- dfdf %>% 
+  filter(VariantsGroup=="High impact") %>% 
+  filter(Group_refobj=="dedurum") %>% 
+  filter(Subgenome=="A") %>% 
+  fun_getSig
+df
+
+### 12
+print("High impact ---- dedurum ---- B")
+df <- dfdf %>% 
+  filter(VariantsGroup=="High impact") %>% 
+  filter(Group_refobj=="dedurum") %>% 
+  filter(Subgenome=="B") %>% 
+  fun_getSig
+df
+
+#################### lrcul
+  ### ***********************函数调用，正式运行
+### 13
+print("Nonsynonymous ---- lrcul ---- A")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Nonsynonymous") %>% 
+  filter(Group_refobj=="lrcul") %>% 
+  filter(Subgenome=="A") %>% 
+  fun_getSig
+df
+
+### 14
+print("Nonsynonymous ---- lrcul ---- B")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Nonsynonymous") %>% 
+  filter(Group_refobj=="lrcul") %>% 
+  filter(Subgenome=="B") %>% 
+  fun_getSig
+df
+
+### 15
+print("Nonsynonymous ---- lrcul ---- D")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Nonsynonymous") %>% 
+  filter(Group_refobj=="lrcul") %>% 
+  filter(Subgenome=="D") %>% 
+  fun_getSig
+df
+
+### 16
+print("Deleterious ---- lrcul ---- A")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Deleterious") %>% 
+  filter(Group_refobj=="lrcul") %>% 
+  filter(Subgenome=="A") %>% 
+  fun_getSig
+df
+
+### 17
+print("Deleterious ---- lrcul ---- B")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Deleterious") %>% 
+  filter(Group_refobj=="lrcul") %>% 
+  filter(Subgenome=="B") %>% 
+  fun_getSig
+df
+
+### 18
+print("Deleterious ---- lrcul ---- D")
+df <- dfdf %>% 
+  filter(VariantsGroup=="Deleterious") %>% 
+  filter(Group_refobj=="lrcul") %>% 
+  filter(Subgenome=="D") %>% 
+  fun_getSig
+df
+
+
+### 19
+print("High impact ---- lrcul ---- A")
+df <- dfdf %>% 
+  filter(VariantsGroup=="High impact") %>% 
+  filter(Group_refobj=="lrcul") %>% 
+  filter(Subgenome=="A") %>% 
+  fun_getSig
+df
+
+### 20
+print("High impact ---- lrcul ---- B")
+df <- dfdf %>% 
+  filter(VariantsGroup=="High impact") %>% 
+  filter(Group_refobj=="lrcul") %>% 
+  filter(Subgenome=="B") %>% 
+  fun_getSig
+df
+
+### 21
+print("High impact ---- lrcul ---- D")
+df <- dfdf %>% 
+  filter(VariantsGroup=="High impact") %>% 
+  filter(Group_refobj=="lrcul") %>% 
+  filter(Subgenome=="D") %>% 
+  fun_getSig
+df
+
+```
+
+
+
+[1] "Nonsynonymous ---- wede ---- A"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   WE   
+DE 0.041
+
+P value adjustment method: BH 
+[1] "Nonsynonymous ---- wede ---- B"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   WE  
+DE 0.12
+
+P value adjustment method: BH 
+[1] "Deleterious ---- wede ---- A"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   WE   
+DE 0.026
+
+P value adjustment method: BH 
+[1] "Deleterious ---- wede ---- B"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   WE     
+DE 3.5e-07
+
+P value adjustment method: BH 
+
+[1] "High impact ---- wede ---- A"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   WE   
+DE 0.045
+
+P value adjustment method: BH 
+[1] "High impact ---- wede ---- B"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   WE    
+DE 0.0015
+
+P value adjustment method: BH 
+[1] "Nonsynonymous ---- dedurum ---- A"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+    DE   
+FTT 0.021
+
+P value adjustment method: BH 
+[1] "Nonsynonymous ---- dedurum ---- B"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+    DE   
+FTT 0.019
+
+P value adjustment method: BH 
+
+[1] "Deleterious ---- dedurum ---- A"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+    DE  
+FTT 0.17
+
+P value adjustment method: BH 
+[1] "Deleterious ---- dedurum ---- B"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+    DE     
+FTT 0.00032
+
+P value adjustment method: BH 
+[1] "High impact ---- dedurum ---- A"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+    DE  
+FTT 0.95
+
+P value adjustment method: BH 
+[1] "High impact ---- dedurum ---- B"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+    DE   
+FTT 0.028
+
+P value adjustment method: BH 
+
+[1] "Nonsynonymous ---- lrcul ---- A"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   LR_EU
+CL 0.04 
+
+P value adjustment method: BH 
+[1] "Nonsynonymous ---- lrcul ---- B"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   LR_EU
+CL 0.083
+
+P value adjustment method: BH 
+[1] "Nonsynonymous ---- lrcul ---- D"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   LR_EU  
+CL 0.00086
+
+P value adjustment method: BH 
+[1] "Deleterious ---- lrcul ---- A"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   LR_EU
+CL 0.094
+
+P value adjustment method: BH 
+
+[1] "Deleterious ---- lrcul ---- B"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   LR_EU
+CL 0.014
+
+P value adjustment method: BH 
+[1] "Deleterious ---- lrcul ---- D"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   LR_EU  
+CL 0.00052
+
+P value adjustment method: BH 
+[1] "High impact ---- lrcul ---- A"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   LR_EU
+CL 1e-13
+
+P value adjustment method: BH 
+[1] "High impact ---- lrcul ---- B"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   LR_EU  
+CL 0.00023
+
+P value adjustment method: BH 
+
+[1] "High impact ---- lrcul ---- D"
+
+	Pairwise comparisons using t tests with non-pooled SD 
+
+data:  df$TotalDerivedSNPCount and df$GroupbyContinent 
+
+   LR_EU
+CL 0.028
+
+P value adjustment method: BH 
+
+#### 4.其他类型的平均值统计
+```{r}
+### 平均数，标准差，方差等统计
+  df <- dfdf %>% 
+  select(Taxa,Subgenome,VariantsGroup,Group_refobj,
+         TotalDerivedSNPCount,GenomeType,GroupbyContinent) %>% 
+  mutate(GroupbyContinent = factor(GroupbyContinent)) %>% 
+  group_by(VariantsGroup,Group_refobj,GroupbyContinent) %>% 
+summarise(n=n(),mean=mean(TotalDerivedSNPCount),median=median(TotalDerivedSNPCount),max=max(TotalDerivedSNPCount),min=min(TotalDerivedSNPCount),sd=sd(TotalDerivedSNPCount), se = sd/sqrt(n)) %>% 
+  ### 为数据框加上一个行号
+  ungroup %>% 
+  mutate(id=row_number()) %>% 
+  relocate(id,.after = GroupbyContinent) %>% 
+  relocate(mean,.before = n)
+
+
+df
+write.table(df,file="/Users/Aoyue/Documents/value.txt",quote=F,col.name=T,row.names=F,sep = "\t") 
 ```
 
 
@@ -2251,6 +3561,26 @@ p <- df %>%
 p
 ggsave(p,filename = "~/Documents/test.pdf",height = 2.5,width = 7)
 ```
+
+
+### 求平均值
+colnames(df)
+ [1] "Taxa"                   "Subgenome"              "VariantsGroup"          "IfSelected"            
+ [5] "Group_refobj"           "TotalDerivedSNPCount"   "HomoDerivedSNPCount"    "HeterDerivedSNPCount"  
+ [9] "SiteCountWithMinDepth"  "GroupbyContinent"       "ReleasedIntroducedYear" "Group"       
+[13] "bin" 
+```{r}
+df_ave <- df %>% 
+  filter(bin !="LR") %>% 
+  group_by(VariantsGroup,Subgenome) %>% 
+  summarise(mean = mean(TotalDerivedSNPCount))
+
+df_ave2 <- df_ave %>% 
+  group_by(VariantsGroup) %>% 
+  summarise(sum = sum(mean))
+
+```
+
 
 
 

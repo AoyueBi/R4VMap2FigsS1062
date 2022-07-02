@@ -621,6 +621,7 @@ df$Subspecies_by6_TreeValidated <- factor(df$Subspecies_by6_TreeValidated,levels
 # write.table(dfV1,file="data/002_pca/ibs.txt",quote=F,col.name=T,row.names=F,sep = "\t")
 
 ```
+
 ```{r}
 colB <- c("#ffd702","#fc6e6e","#87cef9")
 
@@ -936,9 +937,17 @@ theme(
 p
 
 # ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
-ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 1.8)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 1.8)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 2.4)
 
 mean(df2$HeterozygousProportion)
+
+df_ave <- df %>% 
+  group_by(GenomeType) %>% 
+  summarise(ave=mean(HeterozygousProportion))
+
+df_ave
+  
  
 ```
 
@@ -969,14 +978,15 @@ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
       ,panel.background = element_blank()
       ,axis.line = element_line(size=0.4, colour = "black")
       ,legend.position = 'none'
-      ,text = element_text(size = 12))+
+      ,text = element_text(size = 10))+
   theme(strip.background = element_rect(size = 0.4))+
   # theme(strip.text = element_blank())+
   theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))
 
 p
 
-ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 5.2)
 ```
 ## Miss by site histgram
 ```{r}
@@ -1002,13 +1012,13 @@ p <- df %>%
       ,panel.background = element_blank()
       ,axis.line = element_line(size=0.4, colour = "black")
       ,legend.position = 'none'
-      ,text = element_text(size = 12))+
+      ,text = element_text(size = 10))+
   theme(strip.background = element_rect(size = 0.4))+
   theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))
 
 p
-
-ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.6)
 ```
 
 ## Heter by site histgram
@@ -1035,13 +1045,14 @@ p <- df %>%
       ,panel.background = element_blank()
       ,axis.line = element_line(size=0.4, colour = "black")
       ,legend.position = 'none'
-      ,text = element_text(size = 12))+
+      ,text = element_text(size = 10))+
   theme(strip.background = element_rect(size = 0.4))+
   theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))
 
 p
 
-ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.6)
 
 ```
 ## MAF by site
@@ -1117,6 +1128,14 @@ p2 <- ggMarginal(p, type="density",groupColour = TRUE, groupFill = TRUE)
 p2
 # ggsave(p2,filename = "~/Documents/test.pdf",height = 3.2,width = 3.2)
 ggsave(p2,filename = "~/Documents/test.pdf",height = 4,width = 4)
+
+### 求均值
+
+df_ave <- df %>% 
+  group_by(GenomeType) %>% 
+  summarise(ave = mean(AverageDepth))
+
+df_ave
 ```
 
 ## Depth by site by subgenome- scatterPlot
@@ -1241,7 +1260,7 @@ length(fsList)
 cnt <- 0
 dflog <- NULL
 for (i in fsList) {
-  df <- read.delim(file.path(inputDir,i))
+  df <- read.delim(file.path(inputDir,i))n
   chr <- str_sub(i,4,6)
   dfout <- df %>% mutate(Total = MafMore005 + MAFLess005) ### data operate
   cnt <- cnt+nrow(dfout)
@@ -1529,6 +1548,30 @@ biSNP_Num <- sum(df$BiallelicSNP_Num)
 print(str_c("biSNP_Num: ",biSNP_Num))
 ```
 
+
+## 1A 1B 1D 每条染色体的数目
+```{r}
+df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/data/017_VMap2_SNPcount/001_VMap2_SNP_count.txt") %>% 
+  mutate(Sub=str_sub(Chr,5))
+
+### 求每一列的和
+df_sum <- df %>% 
+  group_by(Chr) %>% 
+  summarise(across(.cols = c(TotalVariants:Delection_Num,Gene_Region), .fns = sum)) 
+
+df_sum
+
+write_tsv(df_sum,file = "data/017_VMap2_SNPcount/002_VMap2_SNP_count_byChr.txt")
+#### 计算所有染色体之和的计数
+df_sum2 <- df %>% 
+  summarise(across(.cols = c(TotalVariants:Delection_Num,Gene_Region), .fns = sum)) 
+
+df_sum2
+
+biSNP_Num <- sum(df$BiallelicSNP_Num)
+
+print(str_c("biSNP_Num: ",biSNP_Num))
+```
 
 ## SNP density 密度图
 ```{r}

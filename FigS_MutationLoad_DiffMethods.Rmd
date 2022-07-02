@@ -99,6 +99,16 @@ ggsave(p,filename = "figs/FigS_MutationLoad_DiffMethods/misc2/distribution.pdf",
 
 ```
 
+### 求平均值
+```{r}
+df_ave <- df %>% 
+  group_by(Variant_type,Method) %>% 
+  summarise(mean=mean(Score), median=median(Score))
+
+df_ave
+```
+
+
 #### ====
 ## 相关性分析
 ```{r}
@@ -117,6 +127,7 @@ p
 
 ## Diff methods
 ```{r}
+library(tidyverse)
 dftotal_mini <- dftotal %>% 
   filter(HaveAncestralState==1) %>%
   filter(!is.na(DAF)) %>% 
