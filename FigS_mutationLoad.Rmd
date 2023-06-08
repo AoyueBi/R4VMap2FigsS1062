@@ -1140,6 +1140,8 @@ dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
   select(Taxa=VcfID,GenomeType,GroupbyContinent)
 
 factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+labelsA <- c("Ae. tauschii", "Wild emmer","Domesticated emmer","Free-threshing tetraploids","Landrace_European","Cultivar","Landrace_EastAsian")
+
 factorB <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5")
 labelsB <- c("Nonsynonymous","Deleterious")
 factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
@@ -1152,7 +1154,7 @@ df <- dfdel %>%
   filter(GroupbyContinent %in% factorA) %>% 
   filter(VariantsGroup %in% factorB) %>% 
   droplevels() %>% 
-  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA,labels = labelsA)) %>% 
   mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB)) %>% 
   mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC)) %>% 
   pivot_wider(names_from =VariantsGroup,values_from = Count) %>% 
@@ -1182,14 +1184,15 @@ p <- df %>%
   theme_classic()+
   theme(panel.grid = element_blank(),
     panel.background = element_blank(),
-    axis.line = element_line(size=0.3, colour = "black"),
-    legend.position = 'none',
+    axis.line = element_line(size=0.5, colour = "black"),
+    # legend.position = 'none',
         ### 添加 legend
     legend.key = element_blank(),
-    # legend.position = "bottom",
+    legend.position = "bottom",
     strip.background = element_rect(color = "white",fill = "gray90"),
-    text = element_text(size = 12))+
-  guides(color=guide_legend(ncol=7))
+    text = element_text(size = 18))
+  ### 列数设置
+  # guides(color=guide_legend(ncol=7))
 
 p
 
@@ -1197,6 +1200,10 @@ outDir <- c("~/figs/FigS_delCount/misc")
 
 outDir <- c("~/Documents/")
 ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],"_DelVsNonsynProportion.pdf")),height = 3,width = 5)
+
+### 保存成图片
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],"_DelVsNonsynProportion.png")),height = 14,width = 26,units = "cm")
+
 
 library("ggpubr")
 ggp_legend <- get_legend(p)
@@ -1797,7 +1804,92 @@ p
 
 
 
+## Del/Nonsyn proportion 只有加性模型
 
+```{r}
+plot_delVsNonsyn <- function(filenamefun){
+  ### 先处理del文件
+# dfdel <- read_tsv("data/004_delCount/delCount.txt.gz") 
+dfdel <- read_tsv(filenamefun,show_col_types = FALSE)
+dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% 
+  select(Taxa=VcfID,GenomeType,GroupbyContinent)
+
+factorA <- c("LR_EU","CL","LR_EA")
+labelsA <- c("Landrace_European","Cultivar","Landrace_EastAsian")
+factorB <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5")
+labelsB <- c("Nonsynonymous","Deleterious")
+factorC <- c("TotalDerivedSNPCount","HomoDerivedSNPCount")
+labelsC <- c("Additive","Recessive")
+
+df <- dfdel %>%
+  select(-c("IfSelected","Group_refobj","SiteCountWithMinDepth","HeterDerivedSNPCount")) %>% 
+  pivot_longer(cols = c(TotalDerivedSNPCount,HomoDerivedSNPCount,),names_to = "DelCountGroup",values_to = "Count") %>% 
+  left_join(.,dftaxaDB,by="Taxa") %>% 
+  filter(GroupbyContinent %in% factorA) %>% 
+  filter(VariantsGroup %in% factorB) %>% 
+  droplevels() %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA,labels = labelsA)) %>% 
+  mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB)) %>% 
+  mutate(DelCountGroup=factor(DelCountGroup,levels = factorC,labels = labelsC)) %>% 
+  pivot_wider(names_from =VariantsGroup,values_from = Count) %>% 
+  mutate(Proportion_delVsNonsyn = Deleterious/Nonsynonymous)
+  
+colB <- c("#fc6e6e","#9900ff","gray70")
+
+p <- df %>%
+  filter(DelCountGroup=="Additive") %>% 
+  ggplot(aes(x=Subgenome,y=Proportion_delVsNonsyn,fill=GroupbyContinent))+
+  ylab("Proportion of derived\ndel SNPs/nonsyn SNPs ")+xlab("")+
+    ### boxplot2
+  geom_boxplot(position = position_dodge(0.8),outlier.color = 'white',alpha=0.5,outlier.size = 0.5)+
+  geom_point(position = position_jitterdodge(0.2),alpha = 0.3,aes(color=GroupbyContinent),size=0.03)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.5)+
+  geom_vline(xintercept = c(1.5,2.5),color = "gray", linetype="dashed")+
+    ### pointrange
+  # stat_summary(aes(color=GroupbyContinent),fun.data=mean_sdl,position = position_dodge(0.8),geom="pointrange",size=0.3)+
+  
+### other para
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  # facet_grid(Stand_LoadGroup~DelCountGroup,scales = "free")+
+  # facet_wrap(~DelCountGroup,scales = "free", ncol = 2,
+  #            strip.position = c("top"))+
+  # ggtitle("Del total count under all genes in vmap 2.1-2021") +
+  theme_classic()+
+  theme(panel.grid = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size=0.3, colour = "black"),
+    # legend.position = 'none',
+    ### 添加 legend
+    legend.key = element_blank(),
+    legend.position = "bottom",
+    strip.background = element_rect(color = "white",fill = "gray90"),
+    text = element_text(size = 12))+
+  guides(color=guide_legend(ncol=3))
+
+p
+
+outDir <- c("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R4VMap2FigsS1062/figs/FigS_delCount/misc")
+outDir <- c("~/Documents/")
+
+ggsave(p,filename = file.path(outDir,str_c(str_split_fixed(basename(filenamefun),".txt",2)[,1],"_DelVsNonsynProportion.pdf")),height = 3,width = 5)
+
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 1,width = 5)
+
+return(p)
+}
+
+p <- plot_delVsNonsyn("data/004_delCount/delCount_hexaploid.txt.gz")
+p
+
+p <- plot_delVsNonsyn("data/004_delCount/delCount_hexaploid_triads.txt.gz")
+p
+
+
+```
 
 
 

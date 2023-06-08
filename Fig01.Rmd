@@ -160,7 +160,7 @@ p <- table_subgenome %>%
   filter(Ploidy == "AABBDD") %>%
   slice_sample(prop = .1) %>%
   ggplot(aes(x=window_kb/1000,y=meanOfR2, color=Sub, fill=Sub))+
-  geom_point(alpha=0.05)+
+  # geom_point(alpha=0.05)+
   # geom_smooth()+
   stat_smooth(method = "gam", formula = y ~ s(x,k=110),span = 0.2, size = 1,se=T) +
   scale_color_manual(values = colB)+
@@ -173,7 +173,9 @@ p <- table_subgenome %>%
 
 p
 
-ggsave(p,filename = "~/Documents/test.pdf",height = 1.6 ,width = 1.76)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.4 ,width = 3.23)
+
+# ggsave(p,filename = "~/Documents/test.pdf",height = 1.6 ,width = 1.76)
 ```
 ### claculate the r2
 ```{r}
@@ -235,7 +237,9 @@ p <- table_subspecies %>%
 
 p
 
-ggsave(p,filename = "~/Documents/test.pdf",height = 1.6 ,width = 1.76)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 1.6 ,width = 1.76)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.4 ,width = 3.23)
+
 ```
 
 ### claculate the r2

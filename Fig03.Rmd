@@ -40,6 +40,8 @@ dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
   select(Taxa=VcfID,GenomeType,GroupbyContinent)
 
 factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+labelsA <- c("Ae. tauschii", "Wild emmer","Domesticated emmer","Free-threshing tetraploids","Landrace_European","Cultivar","Landrace_EastAsian")
+
 factorB <- c("Ratio_002_nonsynonymous","Ratio_031_GERP16way_1.5andDerived_PolyPhen2_0.5","Ratio_007_VEP")
 labelsB <- c("Nonsynonymous","Deleterious","High impact")
 
@@ -49,7 +51,7 @@ df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>%
   filter(GroupbyContinent %in% factorA) %>% 
   filter(Stand_LoadGroup %in% factorB) %>% 
   droplevels() %>% 
-  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA,labels = labelsA)) %>% 
   mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB))
 
 colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray80")
@@ -88,11 +90,12 @@ p <- df %>%
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.4)
     # ,legend.position = 'none'
-    ,text = element_text(size = 12))
+    ,text = element_text(size = 20))
 p
 
 ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 5)
 # ggsave(p,filename = "figs/Fig3/misc/whole_load.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/test.png",height = 16,width = 18,units = "cm")
 
 ### get legend
 library("ggpubr")
@@ -100,6 +103,43 @@ ggp_legend <- get_legend(p)
 ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 2)
 ```
 
+### plot 分成3个图
+```{r}
+p <- df %>%
+  ggplot(aes(x=Subgenome,y=Stand_delCount,fill=GroupbyContinent))+
+  ylab("Mutation burden")+xlab("")+
+  ### volin
+  geom_violin(position = position_dodge(1),
+              alpha=0.8,
+              lwd=0.25, ###调节小提琴周围的线条粗细
+              # violinwidth=10,
+              width=2) +
+  geom_boxplot(position = position_dodge(1), 
+               width=0.4, color="white",
+               lwd=0.2, ###调节box的线条粗细
+               alpha=0.2,outlier.color = NA) +
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(1),size=0.1)+
+  scale_color_manual(values = colB,name='')+
+  scale_fill_manual(values = colB,name='')+
+  # facet_grid(Stand_LoadGroup~.,scales = "free")+
+  facet_wrap(~Stand_LoadGroup,scales = "free", ncol = 3)+
+  theme(strip.background = element_blank())+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    # legend.position = 'none',
+    legend.position = 'bottom',
+    text = element_text(size = 18))
+p
+
+ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 7.2)
+ggsave(p,filename = "~/Documents/test.png",height = 12,width = 32,units = "cm")
+
+### get legend
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 2)
+```
 
 
 
@@ -970,10 +1010,13 @@ dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
 factorA <- c("002_nonsynonymous","031_GERP16way_1.5andDerived_PolyPhen2_0.5","007_VEP")
 labelsA <- c("Nonsynonymous","Deleterious","High impact")
 
+labelsB <- c("Wild emmer","Domesticated emmer", "Durum","Landrace","Cultivar")
+
 df <- dfdelcount %>% left_join(.,dftaxaDB,by="Taxa") %>% 
   filter(VariantsGroup %in% factorA)
 
-df$GroupbyContinent <- factor(df$GroupbyContinent, levels = c("WE","DE","FTT","LR_EU","CL"))
+df$GroupbyContinent <- factor(df$GroupbyContinent, levels = c("WE","DE","FTT","LR_EU","CL"),
+                              labels = labelsB)
 colB <- c("#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff")
 df$VariantsGroup <- factor(df$VariantsGroup,levels = factorA, labels = labelsA)
 df$Group_refobj <- factor(df$Group_refobj, levels = c("wede","dedurum","lrcul"))
@@ -996,14 +1039,20 @@ p <- df %>%
         strip.text = element_text(size=6))+
   theme(
     panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.5)
-    ,legend.position = 'none'
-    ,text = element_text(size = 9))
+    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    # legend.position = 'none',
+    legend.position = 'bottom',legend.title = element_blank(),legend.key = element_blank(),
+    text = element_text(size = 9))
 p
 
 # ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 # ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 2.4)
-ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 3)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 3)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.8,width = 2.8)
+
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 7.2)
 
 ```
 
@@ -1778,13 +1827,14 @@ p <- df %>%
     # axis.title.x = element_blank(),
     strip.background = element_blank(),
     panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.5),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
     legend.position = 'none',
     text = element_text(size = 9))
 p
 
 # ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 2.4)
-ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 3.5)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 3.5)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.38,width = 3.59)
 
 
 dftest <- df %>% 

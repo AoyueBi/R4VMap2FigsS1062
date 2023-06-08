@@ -53,17 +53,6 @@ dftotal_withAncestral <- dftotal %>%
 ### 特别注意，这里根据MAF进行分组，按照维基百科的定义
 ### 2个filter 5个mutate 1个filter
 
-
-df <- dftotal %>% 
-  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS")%>%
-  filter(!is.na(Ancestral),Ancestral == Ref | Ancestral == Alt) %>%
-  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
-  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
-  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
-  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
-  mutate(CommonOrRare = if_else(Maf <= 0.05, "Rare","Common")) %>% 
-  filter(!is.na(LoadGroup)) %>% 
-  filter(Ref_PolyPhen2_prob==Alt_PolyPhen2_prob)
 ```
 
 #### =====================
@@ -225,6 +214,7 @@ df2 <- dftotal %>% group_by(Variant_type) %>%
 df3 <- dftotal %>% 
   filter(Impact_VEP=="HIGH") %>%
   filter(str_detect(Effect_VEP,"splice_")) %>% 
+  # filter(!is.na(Ancestral),Ancestral==Ref|Ancestral==Alt) %>%
   count() %>% 
   mutate(Type="Essential splice") %>% 
   relocate(Type,.before = n)
@@ -399,14 +389,16 @@ p <- df %>%
   # coord_cartesian(xlim = c(14,20))+
   theme_classic()+
   # theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
-  theme(plot.margin=unit(rep(1,4),'lines')
-        ,legend.position = "none"
-        ,axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
+  theme(plot.margin=unit(rep(1,4),'lines'),
+        # legend.position = "none",
+        legend.position = c(0.8,0.8),
+        axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))
 
 p
 # ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 # ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
-ggsave(p,filename = "~/Documents/test.pdf",height = 2.36,width = 2.36*4/3)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.36,width = 2.36*4/3)
+ggsave(p,filename = "~/Documents/test.pdf",height = 6.81,width = 9.5, units = "cm")
 
 
 ```
@@ -733,11 +725,12 @@ p <- df_geneCategory2_num %>%
   labs(y="Gene count",x="")+
   # theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))+
   theme(panel.background = element_rect(size = 0.7, colour = 'black',fill = 'white'),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 12)
-        ,legend.position = 'none'
+        # ,legend.position = 'none'
         )
 
 p
 ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/p.pdf",height = 6.33,width = 7.82,units = "cm")
 
 
 ```
@@ -1011,6 +1004,10 @@ pfun_CDF_scale_x(df,1026,"ABsub")
 df <- read_tsv("data/010_sampleSize2VariantsDiscovery/Dsub.txt")
 pfun_CDF_scale_x(df,1026,"Dsub")
 
+dftest <- df %>% 
+  group_by(TaxaNum,Group) %>% 
+  summarise(mean=mean(ObservedCount))
+
 ```
 
 
@@ -1058,6 +1055,7 @@ ggsave(p,filename = file.path("~/Documents/",str_c(outname,"_count.pdf")),height
 }
 
 pfun_count_scale_x <- function(df,maxSampleSize,outname){
+  
   group1 <- c("Deleterious","Nonsynonymous","Synonymous")
   colB <- c("#d5311c","#e69f00","#004680")
   p <- df %>% filter(Group %in% group1) %>% 
@@ -1792,6 +1790,7 @@ ggsave(plot = q, "~/Documents/temp.pdf", width = 6, height = 4)
 
 ```
 
+### plot
 ```{r}
 q <- dfAlleleAge %>% 
   group_by(Sub,LoadGroup) %>% 
@@ -1864,6 +1863,8 @@ p
 ggsave(p, filename = "~/Documents/test.pdf", height = 2.22, width = 3.6)
 
 ```
+
+
 ### D: Del proportion on diff allele age 
 ```{r}
 dabins <- c(0,1,2,4,8,16,32, 64, 128)
@@ -1906,22 +1907,84 @@ df <- dfAlleleAge %>%
 
 p <- df %>% 
   ggplot(aes(x=bin, y=fre, color=LoadGroup,group=LoadGroup))+
-  geom_point()+
-  geom_line()+
+  geom_point(size=3)+
+  geom_line(size=1)+
   scale_color_manual(values = col)+
   scale_x_discrete(label=dabins)+
-  labs(x="Derived allele age (Ka)",y="Deleterious SNPs (%)") +
+  # labs(x="Derived allele age (Ka)",y="Deleterious SNPs (%)") +
+  labs(x="Derived allele age (Ka)",y="Proportion of SNPs (%)") +
   theme(
     panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
     legend.position = 'none',
     text = element_text(size = 9))
 
 p
 
-ggsave(plot = p, "~/Documents/test.pdf", height = 2.22,width = 1.8)
+# ggsave(plot = p, "~/Documents/test.pdf", height = 2.22,width = 1.8)
+# ggsave(plot = p, "~/Documents/test.pdf", height = 2.9,width = 2.4)
+ggsave(plot = p, "~/Documents/test.pdf", height = 2.38,width = 3.59)
 
 ```
+
+### E: barplot: allele age in different types
+```{r}
+
+dfave <- dfAlleleAge %>% 
+  select(Sub,LoadGroup,AlleleAge_J) %>% 
+  group_by(LoadGroup,Sub) %>% 
+  summarise(ave=mean(AlleleAge_J),sd=sd(AlleleAge_J),N=n(),se=sd/sqrt(N))
+
+sum <- sum(dfave$N)
+
+dfsum <- dfave %>% 
+  group_by(LoadGroup) %>% 
+  summarise(sum=sum(N))
+
+#### 合计有 22220个位点能够计算出时间的信息，
+#### 其中syn有10963个位点, nonsyn有9622个位点, del有1635个位点。
+
+p <- dfave %>% 
+  ggplot(aes(x=Sub,y=ave/1000,fill=LoadGroup))+
+  geom_bar(stat = "identity",position = position_dodge(),alpha=0.9)+
+  geom_errorbar(aes(ymin=(ave-se)/1000,ymax=(ave+se)/1000),width=0.2,color="black",
+                position = position_dodge(.9))+
+  scale_fill_manual(values = c("#004680","#e69f00","#d5311c"))+
+  labs(x="", y="Average mutation age (x1,000)")+
+  theme_classic()
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4),
+    # legend.position = 'none',
+    legend.title = 'Variant type',
+    text = element_text(size = 10))
+
+
+p 
+
+ggsave(plot = p, "~/Documents/test.pdf", height = 3,width = 5)
+
+```
+
+### 显著性检验
+```{r}
+### 再检验 strongly load
+
+df <- dfAlleleAge %>% 
+  select(Sub,LoadGroup,AlleleAge_J) %>% 
+  mutate(LoadGroup = factor(LoadGroup))
+
+df$LoadGroup <- factor(df$LoadGroup,levels = c("Deleterious","Nonsynonymous","Synonymous"))
+
+#### 两两比较，默认是 two.side
+  p <- pairwise.t.test(df$AlleleAge_J,df$LoadGroup,
+                       paired = F,pool.sd = FALSE,
+                       var.equal = F,
+                       p.adjust.method = "BH")
+  p
+```
+
+
 
 #### =======================
 ## 1.Gene expression vs strongly burden
@@ -1979,10 +2042,280 @@ p <- df_burden1_expression %>%
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7),
     legend.position = 'none',
-    text = element_text(size = 9))
+    text = element_text(size = 14))
 
 p
 ggsave(plot = p, "~/Documents//Burden1_vs_TPM.pdf",height = 2,width = 2)
+ggsave(p,filename = "~/Documents/p.pdf",height = 6.33,width = 7.82,units = "cm")
+
+```
+
+
+## 1.去除异常值：Gene expression vs strongly burden
+```{r}
+df_burden1 <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneBurden.averageIndividualBurden.txt.gz")
+df_expression <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneExpression.averageTPM.txt.gz")
+
+df_burden1_expression <- df_burden1 %>% 
+  left_join(y = df_expression,by = c("geneName"="Gene")) %>% 
+  filter(!is.na(Subgenome))
+
+temp <- df_burden1_expression %>% 
+  # filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  mutate(TPM_mean_log = log2(TPM_mean)) %>% 
+  mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0)) %>% 
+  group_by(SlightlyOrStrongly, Subgenome,bin) %>% 
+  count() %>%   
+  filter(n > 20, !is.na(bin))
+
+# colN1 <- brewer.pal(9,"Reds")[c(7)]
+colA <- colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(13)
+colC <- rev(colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(8))
+# colN2 <- brewer.pal(9,"Reds")[c(9)]
+
+colB <- c(colN1,colA,colC,colN2)
+xLabel <- expression("",2^{-12},"","",2^{-9},"","",2^{-6},"","",2^{-3},"","",2^{0},"","",2^{3},"","",2^{6},"","",2^{9})
+p <- df_burden1_expression %>% 
+  filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  mutate(TPM_mean_log = log2(TPM_mean)) %>% 
+  mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0)) %>% 
+  filter(bin %in% temp$bin) %>%
+  ggplot(aes(x=bin, y=mean_burden)) +
+# stat_boxplot(geom = "errorbar",width=0.05,position = position_dodge(1))+ # add error bar
+# geom_boxplot(aes(fill=bin),outlier.shape = NA) +
+# geom_point(position = position_jitter(width = 0.2), size=0.1)+
+# stat_summary(fun=median, geom="point", color="blue",
+#              position = position_dodge(1),
+#              size=0.1)+
+  stat_summary(aes(color=bin),fun.data = mean_se,size=0.2)+
+  scale_fill_manual(values = colB)+
+  # facet_grid(SlightlyOrStrongly~.,scales = "free")+
+  labs(x="TPM", y= "Gene burden")+
+  # scale_y_continuous(trans = "log2",
+  #                    breaks = trans_breaks("log2",function(x) 2^x),
+  #                    labels = trans_format("log2",math_format(2^.x)))+
+  scale_x_discrete(breaks=c("(-12,-11]","(-9,-8]","(-6,-5]","(-3,-2]","(0,1]","(3,4]","(6,7]","(9,10]"),
+                   labels=expression(2^{-12},2^{-9},2^{-6},2^{-3},2^{0},2^{3},2^{6},2^{9}))+
+  # scale_x_discrete(labels=xLabel)+
+  scale_color_manual(values = colB)+
+  coord_cartesian(ylim = c(0,0.02))+
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    legend.position = 'none',
+    text = element_text(size = 10.38))
+
+p
+# ggsave(plot = p, "~/Documents/Burden1_vs_TPM.pdf",height = 2,width = 2)
+ggsave(plot = p, "~/Documents/Burden1_vs_TPM.pdf",height = 2.14,width = 2.35)
+
+```
+
+### 每个 bin 的基因数量
+```{r}
+df_burden1 <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneBurden.averageIndividualBurden.txt.gz")
+df_expression <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneExpression.averageTPM.txt.gz")
+
+df_burden1_expression <- df_burden1 %>% 
+  left_join(y = df_expression,by = c("geneName"="Gene")) %>% 
+  filter(!is.na(Subgenome)) %>% 
+  mutate(TPM_mean_log = log2(TPM_mean)) %>% 
+  mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0))
+
+temp <- df_burden1_expression %>% 
+  # filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  # group_by(SlightlyOrStrongly, Subgenome,bin) %>% 
+  group_by(SlightlyOrStrongly,bin) %>% 
+  count() %>%   
+  filter(n > 20, !is.na(bin))
+
+colN1 <- brewer.pal(9,"Reds")[c(7)]
+colA <- colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(13)
+colC <- rev(colorRampPalette(brewer.pal(9,"Reds")[c(2,4,5,6,7,8,9)])(8))
+colN2 <- brewer.pal(9,"Reds")[c(9)]
+colB <- c(colN1,colA,colC,colN2)
+
+xLabel <- expression("",2^{-12},"","",2^{-9},"","",2^{-6},"","",2^{-3},"","",2^{0},"","",2^{3},"","",2^{6},"","",2^{9})
+
+p <- temp %>% 
+  filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  ggplot(aes(x=bin, y=n)) +
+  geom_bar(stat = 'identity',position = "dodge")+
+  theme_classic()
+  # theme_void()
+  
+p
+ggsave(plot = p, "~/Documents//Burden1_vs_TPM.pdf",height = 2,width = 2)
+ggsave(p,filename = "~/Documents/p.pdf",height = 6.33,width = 7.82,units = "cm")
+```
+
+
+## 1.2 新加内容：哪些功能类型的基因突变负荷较低？哪些功能类型的基因突变负荷较高？
+答：从GO富集分析的结果来看，
+```{r}
+df_burden1 <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneBurden.averageIndividualBurden.txt.gz")
+df_expression <- read_tsv("data/fromDaxing/Burden_Expression/004_burdenMean_vs_expression/GeneExpression.averageTPM.txt.gz")
+
+df_burden1_expression <- df_burden1 %>% 
+  left_join(y = df_expression,by = c("geneName"="Gene")) %>% 
+  filter(!is.na(Subgenome))
+
+temp <- df_burden1_expression %>% 
+  mutate(TPM_mean_log = log2(TPM_mean)) %>% 
+  mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0)) %>% 
+  group_by(SlightlyOrStrongly, Subgenome,bin) %>% 
+  count() %>%   
+  filter(n > 20, !is.na(bin))
+
+df_geneWithHighExpression <- df_burden1_expression %>% 
+  filter(SlightlyOrStrongly=="StronglyBurden") %>%
+  mutate(TPM_mean_log = log2(TPM_mean)) %>% 
+  mutate(bin=cut_width(TPM_mean_log,width = 1,boundary = 0)) %>% 
+  filter(bin %in% temp$bin) %>% 
+  ### 当TPM_mean_log > 6时，检测到 1506 个基因是高表达的
+  ### 当TPM_mean_log > 8时，检测到 203 个基因是高表达的
+  ### 当TPM_mean_log > 7且小于9时，检测到 552 个基因是高表达的
+  ### 当TPM_mean_log > 9时，检测到 60 个基因是高表达的，这60个基因的负荷有点高，需要去掉的
+  # filter(TPM_mean_log > 8,TPM_mean_log < 9) %>%
+  # filter(TPM_mean_log > 7, TPM_mean_log < 9) %>%
+  filter(TPM_mean_log > 0, TPM_mean_log < 1) %>%
+  select(geneName)
+
+```
+
+
+### p
+```{r}
+##第一步：准备基因列表文件
+### 库文件df2,获取高表达基因的最长转录本
+df2 <- read_tsv("data/006_Fig2/wheat_v1.1_nonoverlap_addPos.txt") %>%
+  select(Gene,Transcript=Longest_transcript)
+  
+### gene -> transcript -> version01G
+df3 <- df_geneWithHighExpression %>% 
+  left_join(df2,by=c("geneName" = "Gene")) %>% 
+  select(Transcript) %>% 
+  mutate(Transcript_version01=str_replace(Transcript,"02G","01G")) %>% 
+  select(Transcript_version01)
+
+### get gene list and write out
+outfileHighExpress <- "data/006_Fig2/geneList/geneList_withHighExpress.txt"
+write_tsv(df3,outfileHighExpress,col_names = F)
+
+##第二步：开始GO分析画图
+library("clusterProfiler")
+library(RColorBrewer)
+library(tidyverse)
+### ①导入基因列表
+gene <- read.table(outfileHighExpress,header = F,sep="\t")
+gene <- as.factor(gene$V1)
+# head(gene)
+
+### ②导入注释文件
+term2gene <- read.table("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/019_popGen/104_XPCLR/007_GO/001_input/TERM2GENE_v1__HCgenes_v1.0_repr.TEcleaned.txt",header=F,sep="\t")
+term2name <- read.table("/Users/Aoyue/project/wheatVMapII/003_dataAnalysis/005_vcf/019_popGen/104_XPCLR/007_GO/001_input/TERM2name_v1__HCgenes_v1.0_repr.TEcleaned.txt",header=F,sep="\t")
+head(term2gene)
+head(term2name)
+
+### ③富集分析
+x <- enricher(gene,TERM2GENE=term2gene,TERM2NAME=term2name,pvalueCutoff = 0.05, pAdjustMethod = "BH", qvalueCutoff = 0.05)
+# x <- enricher(gene,TERM2GENE=term2gene,TERM2NAME=term2name,pvalueCutoff = 1, pAdjustMethod = "BH", qvalueCutoff = 1)
+
+### ④绘制条形图-软件包自带的，不能省略这一步。一定要看一下结果，再做自己的图
+barplot(x)+ scale_fill_gradient(low="#7acdc9",high="#d59b4f")
+barplot(x,showCategory = 15)
+dotplot(x)+ scale_color_gradient(low="#7acdc9",high="#d59b4f")
+
+### ⑤输出结果，自行画图
+# library(topGO)
+# plotGOgraph(x)
+# 设置结果输出文件
+ouf <- c("data/006_Fig2/geneList/GO/001_GO_geneList_withHighExpress.txt")
+write.csv(x,str_replace(ouf,".txt",".csv"),row.names =FALSE)
+write_tsv(as_tibble(x),path = ouf)
+
+### ⑥自定义画图，可自行美化及分析
+dataFile <- ouf
+df <- read_tsv(dataFile) %>%
+  arrange(p.adjust) ###重点，这里按照显著性排序的！！！
+
+df$Description <- factor(df$Description,levels = df$Description)
+########################## 自定义画图 气泡图
+# 
+# p <- df %>% 
+#   filter(pvalue<0.04) %>% 
+#   ### 由于显著富集的通路很多，取前20展示
+#   top_n(20) %>% 
+#   ggplot(aes(x=GeneRatio,y= Description,col=p.adjust,size=Count))+
+#   geom_point()+theme_bw()+ylab("")+
+#   # facet_grid(.~Ontology)+
+#   scale_color_gradient(low="#7acdc9",high="#d59b4f")
+# 
+# p
+# 
+# ggsave(p,filename = "~/Documents/GO_dotplot.pdf",height =4,width = 5)
+# ggsave(p,filename = "~/Documents/GO_dotplot.png",height = 6.33,width = 7.82,units = "cm")
+
+########################## 自定义画图 柱状图
+#### 这个图画出来以后，要从下往上看，最下面的是最重要的，一定要注意！！！
+p <- df %>% 
+  filter(pvalue < 0.04) %>% 
+  ### 由于显著富集的通路很多，取前20展示
+  slice_head(n = 15) %>% 
+  ggplot(aes(x=Description,y=Count,fill=p.adjust))+
+  geom_bar(stat = 'identity')+theme_bw()+xlab("")+
+  scale_fill_gradient(low="#7acdc9",high="#d59b4f")+
+  # facet_grid(.~Sub)+
+  coord_flip()+
+  theme(text = element_text(size = 14))
+
+p
+
+ggsave(p,filename = "~/Documents/GO_barplot.pdf",height =4,width = 7)
+ggsave(p,filename = "~/Documents/GO_barplot.png",height = 10.16,width =17.78,units = "cm")
+
+### 第三步：想分清楚是 BP CC MF 中具体哪个过程？
+############################## 加入 Ontology ####################################
+df_GOdb <- read_tsv("data/009_GO/000_DB/GDdb.txt") %>% 
+  distinct(GOID,.keep_all = T) %>% 
+  select(GOID,Description_byGOdb=Description,Ontology)
+
+df_BP_CC_MF <- df %>% 
+  left_join(df_GOdb,by=c("ID"="GOID")) %>%
+    arrange(p.adjust)
+
+
+########################## 柱状图
+p <- df_BP_CC_MF %>%
+  filter(pvalue < 0.04) %>%
+  ### 由于显著富集的通路很多，取前20展示
+  slice_head(n = 15) %>% 
+  ggplot(aes(x=Description,y=Count,fill=p.adjust))+
+  geom_bar(stat = 'identity')+theme_bw()+xlab("")+
+  scale_fill_gradient(low="#7acdc9",high="#d59b4f")+
+  facet_grid(.~ Ontology)+
+  coord_flip()+
+  theme(text = element_text(size = 14))
+
+p
+
+## save height 4 width 7.5
+ggsave(p,filename = "~/Documents/GO_barplot_ont.pdf",height =4,width = 7)
+ggsave(p,filename = "~/Documents/GO_barplot_ont.png",height = 10.16,width =18.59,units = "cm")
+
+######################### 气泡图
+
+# p <- df_BP_CC_MF %>%
+#   ### 由于显著富集的通路很多，取前20展示
+#   top_n(15) %>%
+#   ggplot(aes(x=GeneRatio,y= Description,col=p.adjust,size=Count))+
+#   geom_point()+theme_bw()+ylab("")+
+#   scale_color_gradient(low="#7acdc9",high="#d59b4f")+
+#   facet_grid(.~Ontology)
+# 
+# p
+# 
+# ggsave(p,filename = "~/Documents/GO_dotplot_ont.png",height = 10.16,width =17.78,units = "cm")
 
 ```
 
@@ -2051,6 +2384,7 @@ p <- df_burden1_expression %>%
 
 p
 ggsave(plot = p, "~/Documents//Burden1_vs_TPM.pdf",height = 2,width = 2)
+
 
 ```
 
@@ -2545,9 +2879,11 @@ p <- df %>%
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7)
     ,legend.position = 'none'
-    ,text = element_text(size = 9))
+    ,text = element_text(size = 18))
 p
-ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2,width = 3.6)
+ggsave(p,filename = "~/Documents/test.png",height = 7.62,width = 17.98,units = "cm")
+
 ```
 
 
@@ -2825,23 +3161,78 @@ print("*************** no Sub completed*********************")
 
 ```
 
-### test
+
+## DAF DAF DAF DAF DAF
+### !only daf 坐标轴改变,AB 合并在一起
+
 ```{r}
-test <- c("A practical implementation of this notion would be refining gene constraint models to incorporate
-contributions from constrained regulatory elements. This essentially borrows power from extending the
-functional unit of a gene in the context ofthe gene regulatory network. Such an approach would allow
-Constraint modeling for specific tissue/cell types and conditions given the diverse range of epigenomics
-data. Taking enhancer-gene links from brain tissue as a proof-of-principle, a simple logistic regression test
-onconditioning on gene constraint indicated significant contribution from enhancer constraint for predicting
-functionally relevant genes (e.g, targets of Fragile x Mental Retardation Protein (FMRP), Logit P=2.84*10-8
-, Methods). While we acknowledge that the biological consequences of mutations in enhancers are not
-clearly understood and thus natural selection may differ in its interest depending on mechanistic
-consequence, an extended model to incorporate non-coding variation information in a biologically-
-informed way hold the promise to provide a finer characterization of gene function and facilitate a better
-understanding of the molecular mechanisms underiving selection.")
+df <- dftotal %>% 
+  mutate(Sub=str_sub(Transcript, 9, 9)) %>%
+  filter(Region=="CDS",Variant_type=="SYNONYMOUS"|Variant_type=="NONSYNONYMOUS") %>% 
+  filter(!is.na(Ancestral),Ancestral == Ref | Ancestral == Alt) %>%
+  mutate(Gerp_16way=ifelse(is.na(Gerp_16way),-100,Gerp_16way)) %>%
+  mutate(Derived_PolyPhen2_prob=ifelse(is.na(Derived_PolyPhen2_prob),-100,Derived_PolyPhen2_prob)) %>%
+  mutate(LoadGroup=ifelse(Derived_PolyPhen2_prob>=0.5 & Variant_type %in% c("NONSYNONYMOUS") & Gerp_16way >=1.5, "Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>% 
+  mutate(IfRefisAnc = if_else(Ref == Ancestral,"Anc","Der")) %>% 
+  ### data deal
+  filter(!is.na(DAF)) %>% 
+  mutate(bin=cut_width(DAF,width = 0.05,boundary = 0)) %>% 
+  mutate(mergedSub = if_else(Sub == "D","D","AB")) %>% 
+  group_by(mergedSub,LoadGroup) %>% 
+  count(bin) %>% 
+  mutate(fre=n/sum(n)) %>% 
+  arrange(mergedSub,desc(LoadGroup)) %>% 
+  ungroup() %>% 
+  mutate(binStart = round(as.numeric(str_sub(str_split_fixed(bin,",",2)[,1],2)),2))
+ 
+#### facet by sub
+colB <- rep(c("#d5311c","#e69f00","#004680"),2)
+q <- df %>% 
+  filter(mergedSub=="AB") %>% 
+  ggplot(aes(x=as.character(binStart) ,y=fre,group=LoadGroup,fill=LoadGroup))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  labs(y="Proportion",x="Derived allele frequency")+
+  # scale_color_brewer(palette = "Set2")+
+  scale_fill_manual(values = colB)+
+  # scale_y_continuous(limits = c(0,0.88),breaks = seq(0,0.8,0.2))+
+  scale_x_discrete(labels=c("0","","","","0.2","","","","0.4","","","","0.6","","","","0.8","","","",""))+
+  # scale_fill_brewer(palette = "Blues")+
+  # facet_grid(mergedSub~.)+
+  theme_classic()+
+  # theme(axis.text.x= element_text(angle=90, vjust=1,hjust = 1))+
+  theme(plot.margin=unit(rep(1,4),'lines'),
+        legend.title = element_blank(),legend.position = "none",
+        axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))+
+    theme(strip.text = element_blank())
 
-test2 <- str_replace_all(test,"\n"," ")
 
-test2
+q
+# ggsave(q,filename = "~/Documents/test.pdf",height = 3,width = 5 )
+ggsave(q,filename = "~/Documents/DAF_ABsub.pdf",height = 3,width = 3)
+
+### D sub
+q <- df %>% 
+  filter(mergedSub=="D") %>% 
+  ggplot(aes(x=as.character(binStart) ,y=fre,group=LoadGroup,fill=LoadGroup))+
+  geom_bar(stat = 'identity',position = "dodge")+
+  labs(y="Proportion",x="Derived allele frequency")+
+  # scale_color_brewer(palette = "Set2")+
+  scale_fill_manual(values = colB)+
+  # scale_y_continuous(limits = c(0,0.88),breaks = seq(0,0.8,0.2))+
+  scale_x_discrete(labels=c("0","","","","0.2","","","","0.4","","","","0.6","","","","0.8","","","",""))+
+  # scale_fill_brewer(palette = "Blues")+
+  # facet_grid(mergedSub~.)+
+  theme_classic()+
+  # theme(axis.text.x= element_text(angle=90, vjust=1,hjust = 1))+
+  theme(plot.margin=unit(rep(1,4),'lines'),
+        legend.title = element_blank(),legend.position = "none",
+        axis.line = element_line(size=0.4, colour = "black"),text = element_text(size = 10))+
+    theme(strip.text = element_blank())
+
+
+q
+ggsave(q,filename = "~/Documents/DAF_Dsub.pdf",height = 3,width = 3)
+
 ```
+
 

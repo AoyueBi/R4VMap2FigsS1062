@@ -267,18 +267,20 @@ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
     panel.background = element_blank(),
     axis.line = element_line(size=0.3, colour = "black"),
     legend.position = 'none',
-    text = element_text(size = 12))+
+    text = element_text(size = 14))+
   theme(strip.background = element_blank(),strip.text = element_blank())
 
   p
 
 ggsave(p,filename = "/Users/Aoyue/Documents/test3.pdf",height = 2,width = 6.2)
+ggsave(p,filename = "~/Documents/p.png",height = 7.52,width = 16,units = "cm")
 
 ```
 
 
 
 ### *p LR不同亚洲
+
 ```{r}
 ### 求每个亚基因组的平均值、标准差
 df_pi <- df2 %>% 
@@ -372,6 +374,53 @@ q
 
 cowplot::save_plot(q,filename = "/Users/Aoyue/Documents/test.pdf",base_height = 1.4,base_width = 3.6)
 ```
+
+### *p 达兴中期Pi小提琴
+```{r}
+df <- df1 %>%
+  filter(!Group %in% c("CL","LR_EA","LR_EU")) %>% 
+  bind_rows(df2) %>% 
+  group_by(Group,CHROM) %>% 
+  summarise(N=n(),Pop_mean=mean(PI),Pop_median=median(PI),
+            Pop_sd=sd(PI),Pop_se=Pop_sd/sqrt(N)) %>% 
+  mutate(Subgenome=str_sub(CHROM,2,2)) 
+
+factorA <- c("AT","WE","DE","FTT","LR_AM","LR_EU","CL","LR_WA","LR_AF","LR_CSA","LR_EA")
+df$Group <- factor(df$Group,levels =factorA)
+# colB <- c("#87cef9","#ffd702","#7f5701","#016699",
+#           "#dbb3ff","#FF9900","#9900ff","#82C782","#7B241C","#A9A9A9","#fc6e6e")
+
+colB <- c("#fd8582","#967bce","#4bcdc6")
+
+
+p <- df %>% 
+  ggplot(aes(x=Group,y=Pop_mean*1000,fill=Subgenome))+
+  labs(y = expression(italic(theta)[pi]~"("~10^-3~")"),x="")+
+  ### volin
+  # geom_violin(position = position_dodge(0.8),alpha=0.8) +
+  geom_boxplot(position = position_dodge(0.8), width=0.7, 
+               # color="white",
+               lwd=0.2, ###调节box的线条粗细
+               alpha=0.8,outlier.color = NA) +  
+  # geom_point(position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.8),aes(color=GroupbyContinent),alpha=0.3)+
+  stat_summary(fun=mean, geom="point", color="red",position = position_dodge(0.8),size=0.1)+
+  scale_color_manual(values = colB)+
+  scale_fill_manual(values = colB)+
+  theme(
+    legend.key = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=0.4)
+    # ,legend.position = 'none'
+    ,text = element_text(size = 10))
+
+  p
+
+ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 2.5,width = 7)
+ggsave(p,filename = "/Users/Aoyue/Documents/test2.png",height = 2.5,width = 7)
+
+```
+
+
 
 
 #### ==============

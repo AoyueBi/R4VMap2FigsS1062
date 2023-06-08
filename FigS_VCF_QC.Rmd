@@ -89,9 +89,33 @@ p <- df %>%
       ,panel.background = element_blank()
       ,axis.line = element_line(size=0.3, colour = "black")
       ,legend.position = 'none'
-      ,text = element_text(size = 12))  
+      ,text = element_text(size = 14))  
 p
-ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+ggsave(p,filename = "~/Documents/p4.png",height = 5.94,width = 7.82,units = "cm")
+
+### for manuscript
+p <- df %>% 
+  # filter(! Taxa %in%  c("AB_183","AB_185","AB_039")) %>%
+  ggplot(aes(x=Dim.1,y=Dim.2,color= Subspecies_by6_TreeValidated))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.6,size=0.6)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  scale_color_manual(values = colB,name="Genetic group")+
+  # scale_fill_manual(values = colB,name="Genetic group")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 7))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 1.3,width = 1.7)
+
 
 
 library(plotly)
@@ -228,9 +252,36 @@ p <- df %>%
       ,panel.background = element_blank()
       ,axis.line = element_line(size=0.3, colour = "black")
       ,legend.position = 'none'
-      ,text = element_text(size = 12))  
+      ,text = element_text(size = 14))  
 p
 ggsave(p,filename = "~/Documents/p4.pdf",height = 3,width = 3)
+ggsave(p,filename = "~/Documents/p4.png",height = 5.94,width = 7.82,units = "cm")
+
+
+### for manuscript
+p <- df %>% 
+  # filter(! Taxa %in%  c("AB_183","AB_185","AB_039")) %>%
+  ggplot(aes(x=Dim.1,y=Dim.2,color= Subspecies_by6_TreeValidated))+
+  # geom_point(aes(color=Subspecies),alpha=0.5,size=2)+
+  geom_point(alpha=0.6,size=0.6)+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  geom_vline(xintercept = 0, linetype="dashed", color = "black")+
+  # scale_shape_manual(values=c(23, 22,21,24,25), name="Continent")+
+  # scale_shape_manual(values=c(15, 16,17,18,19), name="Continent")+
+  scale_color_manual(values = colB,name="Genetic group")+
+  # scale_fill_manual(values = colB,name="Genetic group")+
+  # scale_shape_manual(values = shapeB)+
+  labs(x=paste("PC1 ","(",variance1,")",sep = ""), y=paste("PC2 ","(",variance2,")",sep = ""))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+      ,panel.background = element_blank()
+      ,axis.line = element_line(size=0.3, colour = "black")
+      ,legend.position = 'none'
+      ,text = element_text(size = 7))  
+p
+ggsave(p,filename = "~/Documents/p4.pdf",height = 1.3,width = 1.7)
+
+
 
 ggplotly(p)
 
@@ -641,6 +692,8 @@ theme(
   
 p
 ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(p,filename = "~/Documents/p.png",height = 8.56,width = 10.29,units = "cm")
+
 
 ```
 ### IBS distance by 21 subspecies
@@ -931,14 +984,15 @@ theme(
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7)
     ,legend.position = 'none'
-    ,text = element_text(size = 8))
+    ,text = element_text(size = 10))
   # theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45))
 
 p
 
 # ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 3.43)
 # ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 1.8)
-ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 2.4)
+# ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 2.4)
+ggsave(p,filename = "~/Documents/test.pdf",height = 2.4,width = 5.35)
 
 mean(df2$HeterozygousProportion)
 
@@ -1120,7 +1174,7 @@ theme(
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.7)
     ,legend.position = 'none'
-    ,text = element_text(size = 12))
+    ,text = element_text(size = 14))
 
   # theme(panel.background = element_rect(size = 0.4, colour = 'black',fill = 'white'),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),text = element_text(size = 12),legend.position = 'none')
 p
@@ -1128,6 +1182,8 @@ p2 <- ggMarginal(p, type="density",groupColour = TRUE, groupFill = TRUE)
 p2
 # ggsave(p2,filename = "~/Documents/test.pdf",height = 3.2,width = 3.2)
 ggsave(p2,filename = "~/Documents/test.pdf",height = 4,width = 4)
+
+ggsave(p2,filename = "~/Documents/p.png",height = 8.56,width = 10.29,units = "cm")
 
 ### 求均值
 
@@ -1239,11 +1295,12 @@ p <- df1 %>%
     axis.ticks = element_line(size=0.2),
     panel.border = element_rect(colour = "black", fill=NA, size=0.2),
     legend.position="none",
-    text = element_text(size = 6.5))
+    text = element_text(size = 8))
   
 p
 
 ggsave(p,filename = "~/Documents/test.pdf",height = 1.238,width = 1.315)
+ggsave(p,filename = "~/Documents/test.pdf",height = 1.25,width = 3)
 
 
 ### 求每个倍性的深度平均值
@@ -1260,7 +1317,7 @@ length(fsList)
 cnt <- 0
 dflog <- NULL
 for (i in fsList) {
-  df <- read.delim(file.path(inputDir,i))n
+  df <- read.delim(file.path(inputDir,i))
   chr <- str_sub(i,4,6)
   dfout <- df %>% mutate(Total = MafMore005 + MAFLess005) ### data operate
   cnt <- cnt+nrow(dfout)
@@ -1408,8 +1465,8 @@ p <- df %>%
   theme(
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.4),
-    text = element_text(size = 12),legend.position = 'none')+
-  theme(axis.text.x = element_text(size = 10))
+    text = element_text(size = 14),legend.position = 'none')+
+  theme(axis.text.x = element_text(size = 12))
   # theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
   #     panel.background = element_blank(),
   #     axis.line = element_line(size=0.4, colour = "black"),
@@ -1419,6 +1476,8 @@ p <- df %>%
 p
 
 ggsave(p,filename = "~/Documents/test.pdf",height = 2.57,width = 4)
+ggsave(p,filename = "~/Documents/p.png",height = 6.66,width = 10.29,units = "cm")
+
 
 ### 线图形式
 p <- df %>%
@@ -1485,20 +1544,22 @@ df <- read_tsv("/Users/Aoyue/project/wheatVMap2_1000/002_dataAnalysis/RProject/R
 
 p <- ggplot(df, aes(x=Chr, y=VariantRate)) +
   geom_segment(aes(x=Chr, xend=Chr, y=0, yend=VariantRate),color="grey")+
-  geom_point( color="orange", size=4) +
+  geom_point(color="orange", size=4) +
   xlab("") +
   ylab("Variant rate") +
   scale_y_continuous(limits = c(0,110), breaks = seq(0,110,25))+
-  # theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
+  theme(axis.text.x= element_text(angle=45, vjust=1,hjust = 1))+
   theme(
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=0.4),
-    text = element_text(size = 12),legend.position = 'none')+
-    theme(axis.text.x = element_text(size = 9))
+    text = element_text(size = 14),legend.position = 'none')+
+  theme(axis.text.x = element_text(size = 9))
+    
 
 p
 # ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4.5,width = 6)
-ggsave(p,filename = "/Users/Aoyue/Documents/test.pdf",height = 4.5,width = 6)
+# ggsave(p,filename = "/Users/Aoyue/Documents/testk.pdf",height = 4.5,width = 6)
+ggsave(p,filename = "/Users/Aoyue/Documents/testk2.png",height = 7.62,width = 10.16,units = "cm")
 
 #####
 ################################# ##
@@ -1518,7 +1579,7 @@ q <- p +
   annotate("text",x=-Inf,y= Inf ,hjust=-0.1,vjust=3,label=str_c("B sub (Variant rate) = ",out$variantRatebySub[2]," bp"),size=3)+
   annotate("text",x=-Inf,y= Inf ,hjust=-0.1,vjust=4.5,label=str_c("D sub (Variant rate) = ",out$variantRatebySub[3]," bp"),size=3)
 q
-ggsave(q,filename = "~/Documents/test.pdf",height = 3,width = 4)
+ggsave(q,filename = "~/Documents/test.pdf",height = 2.5,width = 3.36)
 
 ```
 

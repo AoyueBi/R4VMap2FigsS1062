@@ -47,6 +47,16 @@ dftotal <- read_tsv("data/005_SNPAnnoDB/geneSNPAnno.txt.gz") %>%
   # mutate(Sub=str_sub(Transcript, 9, 9)) %>% 
 ```
 
+## help lipeng to extract pph2 info
+```{r}
+df <- dftotal %>% 
+  select(ID,Chr,Pos,Ref,Alt,Ancestral,Variant_type,Gerp_16way,Derived_PolyPhen2_prob)
+
+# write_tsv(df,"~/Documents/VMap2.0_geneSNPAnno.txt.gz")
+
+```
+
+
 ## Distribution
 ```{r}
 # factorA <- c("Derived_SIFT","LIST_S2","PhyloP_RefMask","Gerp_16way","Derived_PolyPhen2_prob")
@@ -125,14 +135,13 @@ p
 
 
 
-## Diff methods
+## 1.1 Diff methods
 ```{r}
 library(tidyverse)
 dftotal_mini <- dftotal %>% 
-  filter(HaveAncestralState==1) %>%
-  filter(!is.na(DAF)) %>% 
-  dplyr::select(ID:Minor,Ancestral,DAF,Gerp,Region,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,Effect_snpEff,Impact_snpEff,
-                Gerp_16way,LIST_S2,PhyloP_RefMask,Derived_PolyPhen2_prob,Sub,HaveAncestralState)
+  filter(!is.na(Ancestral),Ancestral == Ref | Ancestral == Alt) %>% 
+  dplyr::select(ID:Minor,Transcript,Ancestral,DAF,Gerp,Region,Variant_type,Derived_SIFT,Effect_VEP,Impact_VEP,Effect_snpEff,Impact_snpEff,
+                Gerp_16way,LIST_S2,PhyloP_RefMask,Derived_PolyPhen2_prob,Sub)
   
 df_SIFT <- dftotal_mini %>%
   mutate(LoadGroup=ifelse(Variant_type %in% c("NONSYNONYMOUS") & Derived_SIFT < 0.05,"Deleterious", ifelse(Variant_type=="SYNONYMOUS", "Synonymous", ifelse(Variant_type=="NONSYNONYMOUS", "Nonsynonymous", NA)))) %>%
@@ -306,7 +315,7 @@ dfcorrr <- df %>%
 p <- heatmap(dfcorrr,main = "")
 p
 ```
-## proxy jaccard 相似性
+## proxy jaccard 相似性 -代码已注释
 ```{r}
 # ### 该数据框用于本chunck 的 code
 # df <- df_AllMethod %>% 
@@ -391,7 +400,7 @@ p
 # ggsave(p,filename = "~/Documents/test.pdf",height = 4, width = 5)
 ```
 
-## proxy jaccard 相似性，简化代码
+## proxy jaccard 相似性，简化代码！文章使用！！！
 ```{r}
 library(proxy)
 
@@ -484,6 +493,29 @@ p
 dev.off()
 
 ```
+
+## 只有GERP PPH2 VEP
+```{r}
+library(ComplexUpset)
+library(ggupset)
+
+p <- df_AllMethod %>% 
+  filter(!Method %in% "GERP+PPH2") %>% 
+  filter(LoadGroup=="Deleterious") %>% 
+  dplyr::select(Chr,Pos,Method) %>% 
+  mutate(MethodMember=1) %>% 
+  pivot_wider(.,names_from = Method,values_from = MethodMember,values_fill = 0) %>% 
+  filter(!(GERP==1 & VEP==1)) %>% 
+  as.data.frame() %>% 
+  UpSetR::upset(sets = c("PPH2","GERP","VEP"), keep.order = TRUE)
+
+
+p
+pdf(file="~/Documents/test.pdf",width = 4,height = 3) # or other device
+p
+dev.off()
+```
+
 
 ## upsetR all methds
 ```{r}
@@ -742,6 +774,8 @@ dfdel <- read_tsv("data/004_delCount/delRatio.txt.gz")
 dftaxaDB <- read.delim("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>% dplyr::select(Taxa=VcfID,GenomeType,GroupbyContinent)
 
 factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+labelsA <- c("Ae.tauschii","Wild emmer","Domesticated emmer", "Free-threshing tetraploids","Landrace_European","Cultivar","Landrace_EastAsian")
+
 colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray90")
 
 
@@ -759,7 +793,7 @@ df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>%
   filter(GroupbyContinent %in% factorA) %>% 
   filter(Stand_LoadGroup %in% factorB) %>% 
   droplevels() %>% 
-  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA,labels = labelsA)) %>% 
   mutate(Stand_LoadGroup=factor(Stand_LoadGroup,levels = factorB, labels = labelsB))
 
 
@@ -796,13 +830,16 @@ p <- df %>%
   theme(strip.background = element_blank())+
   theme(
     panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
-    # ,legend.position = 'none'
-    ,text = element_text(size = 12))
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    # legend.position = 'none',
+    legend.position = "bottom",legend.title = element_blank(),
+    text = element_text(size = 12))
 p
 
 # ggsave(p,filename = "~/Documents/test.pdf",height = 3,width = 4)
 ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
+ggsave(p,filename = "~/Documents/test.png",height = 7.2,width = 7.2)
+
 ```
 ### legend without plot
 ```{r}
@@ -817,9 +854,9 @@ ggsave(p,filename = "~/Documents/test.pdf",height = 7.2,width = 7.2)
 # cowplot::save_plot(filename = "legend.pdf",plot= ggp_legend,base_height = 3, base_width = 2)
 # 
 # ### 方法二：
-# library("ggpubr")
-# ggp_legend <- get_legend(p)   
-# ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 2)
+library("ggpubr")
+ggp_legend <- get_legend(p)
+ggsave(as_ggplot(ggp_legend),filename = "~/Documents/legend.pdf",height = 3,width = 7.2)
 
 ```
 
@@ -832,6 +869,7 @@ dftaxaDB <- read_tsv("data/001_TaxaDB/WheatVMap2_GermplasmInfo.txt") %>%
   dplyr::select(Taxa=VcfID,GenomeType,GroupbyContinent)
 
 factorA <- c("AT","WE","DE","FTT","LR_EU","CL","LR_EA")
+labelsA <- c("Ae.tauschii","Wild emmer","Domesticated emmer", "Free-threshing tetraploids","Landrace_European","Cultivar","Landrace_EastAsian")
 colB <- c("#87cef9","#ffd702","#7f5701","#016699", "#fc6e6e","#9900ff","gray80")
 
 factorB <- c("002_nonsynonymous","004_nonsynDerivedSIFT","015_LIST_S2",
@@ -844,7 +882,7 @@ df <- dfdel %>% left_join(.,dftaxaDB,by="Taxa") %>%
   filter(GroupbyContinent %in% factorA) %>% 
   filter(VariantsGroup %in% factorB) %>% 
   droplevels() %>% 
-  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA)) %>% 
+  mutate(GroupbyContinent= factor(GroupbyContinent, levels = factorA,labels = labelsA)) %>% 
   mutate(VariantsGroup=factor(VariantsGroup,levels = factorB, labels = labelsB))
 ```
 
@@ -864,9 +902,11 @@ p <-ggplot(df, aes(x=Subgenome,y=TotalDerivedSNPCount,fill = GroupbyContinent))+
   theme(strip.background = element_blank())+
   theme(
     panel.background = element_blank(),
-    panel.border = element_rect(colour = "black", fill=NA, size=0.7)
-    ,legend.position = 'none'
-    ,text = element_text(size = 12))
+    panel.border = element_rect(colour = "black", fill=NA, size=0.7),
+    # legend.position = 'none',
+    legend.position = "bottom",legend.title = element_blank(),
+    legend.key = element_blank(),
+    text = element_text(size = 12))
 
 p
 
@@ -1171,6 +1211,23 @@ ggsave(p,filename = "~/Documents/test2.pdf",height = 4, width = 4)
 
 ```
 
+
+#### 补充计算：del vep 存在于多少个基因中
+```{r}
+df_geneCount <- df_AllMethod %>% 
+  filter(Method %in% c("GERP+PPH2","VEP")) %>% 
+  filter(LoadGroup == "Deleterious") %>% 
+  group_by(Transcript) %>% 
+  count(Transcript)
+  
+
+df_geneCount <- df_AllMethod %>% 
+  filter(Method %in% c("VEP")) %>% 
+  filter(LoadGroup == "Deleterious") %>% 
+  group_by(Transcript) %>% 
+  count(Transcript)
+  
+```
 
 
 
